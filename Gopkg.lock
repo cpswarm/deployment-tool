@@ -2,32 +2,20 @@
 
 
 [[projects]]
-  name = "github.com/eclipse/paho.mqtt.golang"
-  packages = [
-    ".",
-    "packets"
-  ]
-  revision = "aff15770515e3c57fc6109da73d42b0d46f7f483"
-  version = "v1.1.0"
-
-[[projects]]
   branch = "master"
   name = "github.com/pebbe/zmq4"
   packages = ["."]
   revision = "5b443b6471cea4b4f9f85025530c04c93233f76a"
 
 [[projects]]
-  branch = "master"
-  name = "golang.org/x/net"
-  packages = [
-    "proxy",
-    "websocket"
-  ]
-  revision = "24dd3780ca4f75fed9f321890729414a4b5d3f13"
+  name = "github.com/satori/go.uuid"
+  packages = ["."]
+  revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
+  version = "v1.2.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7b36aa735b2e50d63dcef7add47daf63be4647bbfc6609adf75bcd0d8db06755"
+  inputs-digest = "c6e1c29db79e18c17a18f9075824df620b871bad983ed1eda161df43838eac9e"
   solver-name = "gps-cdcl"
   solver-version = 1

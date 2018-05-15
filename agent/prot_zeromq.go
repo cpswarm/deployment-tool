@@ -10,24 +10,27 @@ import (
 	zmq "github.com/pebbe/zmq4"
 )
 
-const reqPrefix = "REQ -"
-
-// <arch>.<os>.<distro>.<os_version>.<hw>.<hw_version>
-const ackPrefix = "ACK -"
-const resPrefix = "RES -"
+const (
+	reqTopic = "REQ-"
+	// <arch>.<os>.<distro>.<os_version>.<hw>.<hw_version>
+	ackTopic = "ACK-"
+	resTopic = "RES-"
+)
 
 type ZMQClient struct {
 	subscriber *zmq.Socket
 	publisher  *zmq.Socket
 
 	RequestCh  chan model.Task
-	ResponseCh chan BatchResponse
+	ResponseCh chan model.BatchResponse
 }
 
 func StartZMQClient(subEndpoint, pubEndpoint string) (*ZMQClient, error) {
+	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
+
 	c := &ZMQClient{
 		RequestCh:  make(chan model.Task),
-		ResponseCh: make(chan BatchResponse),
+		ResponseCh: make(chan model.BatchResponse),
 	}
 
 	var err error
@@ -50,39 +53,68 @@ func StartZMQClient(subEndpoint, pubEndpoint string) (*ZMQClient, error) {
 		return nil, err
 	}
 
-	filter := ""
-	go c.startListener(filter)
+	topic := ""
+	go c.startListener(topic)
 	go c.startResponder()
 
 	return c, nil
 }
 
-func (c *ZMQClient) startListener(filter string) {
+func (c *ZMQClient) startListener(topic string) {
 
-	c.subscriber.SetSubscribe(filter)
+	c.subscriber.SetSubscribe(topic)
 	for {
 		msg, err := c.subscriber.Recv(0)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		task, err := c.requestHandler(msg)
+
+		// de-serialize
+		task := c.requestDeserializer(msg)
+		// response acknowledgement
+		c.ResponseCh <- model.BatchResponse{ResponseType: model.ResponseTypeACK, TaskID: task.ID}
+		// send to worker
 		c.RequestCh <- task
-		c.publisher.Send("ACK", 0)
 	}
 }
 
 func (c *ZMQClient) startResponder() {
 	for resp := range c.ResponseCh {
-		log.Printf("Batch: %+v", resp)
-		b, err := json.Marshal(resp)
-		if err != nil {
-			log.Fatal(err)
+		// serialize
+		msg := c.responseSerializer(&resp)
+
+		// set publishing topic
+		topic := resTopic
+		if resp.ResponseType == model.ResponseTypeACK {
+			topic = ackTopic
 		}
-		_, err = c.publisher.Send("RES -- "+string(b), 0)
-		if err != nil {
-			log.Fatal(err)
-		}
+
+		// publish
+		c.publisher.Send(topic+msg, 0)
 	}
+}
+
+func (c *ZMQClient) requestDeserializer(msg string) model.Task {
+	fmt.Println("requestDeserializer: ", msg)
+	// drop the filter
+	msg = strings.TrimPrefix(msg, reqTopic)
+	// deserialize
+	var task model.Task
+	err := json.Unmarshal([]byte(msg), &task)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return task
+}
+
+func (c *ZMQClient) responseSerializer(resp *model.BatchResponse) string {
+	log.Printf("responseSerializer: %+v", resp)
+	// serialize
+	b, err := json.Marshal(resp)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(b)
 }
 
 func (c *ZMQClient) Close() error {
@@ -99,31 +131,4 @@ func (c *ZMQClient) Close() error {
 	}
 
 	return nil
-}
-
-func (c *ZMQClient) requestHandler(msg string) (model.Task, error) {
-	fmt.Println("requestHandler: ", msg)
-	// drop the filter
-	msg = strings.TrimPrefix(msg, reqPrefix)
-	// deserialize
-	var task model.Task
-	err := json.Unmarshal([]byte(msg), &task)
-	if err != nil {
-		log.Fatal(err)
-	}
-	c.RequestCh <- task
-	// send acknowledgement msg
-	c.publisher.Send(ackPrefix+msg, 0)
-}
-
-func (c *ZMQClient) responseHandler(resp *BatchResponse) {
-	log.Printf("responseHandler: %+v", resp)
-
-	// serialize
-	b, err := json.Marshal(resp)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	c.publisher.Send(resPrefix+string(b), 0)
 }

@@ -9,27 +9,15 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
-type BatchResponse struct {
-	Responses   []response
-	TimeElapsed float64
-}
-
-type response struct {
-	Command     string
-	Stdout      string
-	Stderr      string
-	LineNum     uint32
-	TimeElapsed float64
-	//TimeRemaining float64
-}
-
-func responseBatchCollector(command []string, interval time.Duration, out chan BatchResponse) {
-	resCh := make(chan response)
+func responseBatchCollector(command []string, interval time.Duration, out chan model.BatchResponse) {
+	resCh := make(chan model.Response)
 	go responseCollector(command, resCh)
 
-	var batch BatchResponse
+	var batch model.BatchResponse
 
 	ticker := time.NewTicker(interval)
 LOOP:
@@ -46,7 +34,7 @@ LOOP:
 		case <-ticker.C:
 			out <- batch
 			//log.Printf("Batch: %+v", batch)
-			batch = BatchResponse{}
+			batch = model.BatchResponse{}
 		}
 	}
 
@@ -55,7 +43,7 @@ LOOP:
 
 }
 
-func responseCollector(commands []string, out chan response) {
+func responseCollector(commands []string, out chan model.Response) {
 	start := time.Now()
 
 	stdout, stderr := make(chan logLine), make(chan logLine)
@@ -66,9 +54,9 @@ func responseCollector(commands []string, out chan response) {
 	for open := true; open; {
 		select {
 		case x := <-stdout:
-			out <- response{Command: x.command, Stdout: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds()}
+			out <- model.Response{Command: x.command, Stdout: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds()}
 		case x := <-stderr:
-			out <- response{Command: x.command, Stderr: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds()}
+			out <- model.Response{Command: x.command, Stderr: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds()}
 		case _, open = <-callback:
 			// do nothing
 		}

@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	log.Println("start")
+	log.Println("started deployment agent")
 	defer log.Println("bye.")
 
 	zmqClient, err := StartZMQClient("tcp://localhost:5556", "tcp://localhost:5557")
@@ -19,9 +19,9 @@ func main() {
 
 	requestProcessor(zmqClient)
 
-	handler := make(chan os.Signal, 1)
-	signal.Notify(handler, os.Interrupt, os.Kill)
-	<-handler
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, os.Kill)
+	<-sig
 }
 
 func requestProcessor(c *ZMQClient) {
