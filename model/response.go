@@ -3,9 +3,11 @@ package model
 type ResponseType uint8
 
 const (
-	ResponseTypeUnspecified ResponseType = iota
-	ResponseTypeACK
-	ResponseTypeLog
+	ResponseUnspecified ResponseType = iota
+	ResponseACK
+	ResponseLog
+	ResponseError
+	ResponseComplete
 )
 
 type BatchResponse struct {
@@ -23,3 +25,9 @@ type Response struct {
 	TimeElapsed float64
 	//TimeRemaining float64
 }
+
+//
+//func (br *BatchResponse) Flush(){
+//	br.Responses = []Response{}
+//
+//}

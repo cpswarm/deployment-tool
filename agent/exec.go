@@ -13,11 +13,15 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
-func responseBatchCollector(command []string, interval time.Duration, out chan model.BatchResponse) {
+func responseBatchCollector(task model.Task, interval time.Duration, out chan model.BatchResponse) {
 	resCh := make(chan model.Response)
-	go responseCollector(command, resCh)
+	go responseCollector(task.Commands, resCh)
 
-	var batch model.BatchResponse
+	batch := model.BatchResponse{
+		ResponseType: model.ResponseLog,
+		TaskID:       task.ID,
+	}
+	var foundError bool
 
 	ticker := time.NewTicker(interval)
 LOOP:
@@ -28,19 +32,26 @@ LOOP:
 				break LOOP
 			}
 			log.Printf("[res] %+v", res)
+			if len(res.Stderr) > 0 {
+				batch.ResponseType = model.ResponseError
+			}
 			//log.Printf("%s -- %d -- %s -- %s -- %f", res.Command, res.LineNum, res.Stdout, res.Stderr, res.TimeElapsed)
 			batch.Responses = append(batch.Responses, res)
 			batch.TimeElapsed = res.TimeElapsed
 		case <-ticker.C:
 			out <- batch
 			//log.Printf("Batch: %+v", batch)
-			batch = model.BatchResponse{}
+
+			// flush responses
+			batch.Responses = []model.Response{}
 		}
 	}
 
 	out <- batch
-	//log.Printf("Final Batch: %+v", batch)
-
+	log.Printf("Final Batch: %+v", batch)
+	if !foundError {
+		batch.ResponseType = model.ResponseComplete
+	}
 }
 
 func responseCollector(commands []string, out chan model.Response) {

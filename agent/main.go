@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Println("started deployment agent")
 	defer log.Println("bye.")
 
@@ -17,18 +18,18 @@ func main() {
 	}
 	defer zmqClient.Close()
 
-	requestProcessor(zmqClient)
+	taskProcessor(zmqClient)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 	<-sig
 }
 
-func requestProcessor(c *ZMQClient) {
+func taskProcessor(c *ZMQClient) {
 
-	for req := range c.RequestCh {
-		log.Printf("requestProcessor: %+v", req)
-		responseBatchCollector(req.Commands, time.Duration(3)*time.Second, c.ResponseCh)
+	for task := range c.TaskCh {
+		log.Printf("taskProcessor: %+v", task)
+		responseBatchCollector(task, time.Duration(3)*time.Second, c.ResponseCh)
 	}
 
 }

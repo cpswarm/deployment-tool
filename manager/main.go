@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -35,12 +34,12 @@ func main() {
 
 	// listener
 	go func() {
-		topic := ""
-		subscriber.SetSubscribe(topic)
+		subscriber.SetSubscribe(ackTopic)
+		subscriber.SetSubscribe(resTopic)
 
 		for {
 			msg, _ := subscriber.Recv(0)
-			fmt.Println(msg)
+			log.Println(msg)
 		}
 	}()
 
@@ -48,7 +47,7 @@ func main() {
 	go func() {
 		for i := 0; i < 3; i++ {
 			task := model.Task{
-				Commands: []string{"ls"},
+				Commands: []string{"pwdd", "pwd", "pwdd"},
 				Time:     time.Now().Unix(),
 				ID:       uuid.NewV4().String(),
 			}

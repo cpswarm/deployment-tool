@@ -21,7 +21,7 @@ type ZMQClient struct {
 	subscriber *zmq.Socket
 	publisher  *zmq.Socket
 
-	RequestCh  chan model.Task
+	TaskCh     chan model.Task
 	ResponseCh chan model.BatchResponse
 }
 
@@ -29,7 +29,7 @@ func StartZMQClient(subEndpoint, pubEndpoint string) (*ZMQClient, error) {
 	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 
 	c := &ZMQClient{
-		RequestCh:  make(chan model.Task),
+		TaskCh:     make(chan model.Task),
 		ResponseCh: make(chan model.BatchResponse),
 	}
 
@@ -53,7 +53,8 @@ func StartZMQClient(subEndpoint, pubEndpoint string) (*ZMQClient, error) {
 		return nil, err
 	}
 
-	topic := ""
+	// TODO subscribe to the next update, to avoid getting resent tasks
+	topic := reqTopic
 	go c.startListener(topic)
 	go c.startResponder()
 
@@ -66,15 +67,16 @@ func (c *ZMQClient) startListener(topic string) {
 	for {
 		msg, err := c.subscriber.Recv(0)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println("ERROR:", err)
+			continue
 		}
 
 		// de-serialize
-		task := c.requestDeserializer(msg)
+		task := c.taskDeserializer(msg)
 		// response acknowledgement
-		c.ResponseCh <- model.BatchResponse{ResponseType: model.ResponseTypeACK, TaskID: task.ID}
+		c.ResponseCh <- model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID}
 		// send to worker
-		c.RequestCh <- task
+		c.TaskCh <- task
 	}
 }
 
@@ -85,7 +87,7 @@ func (c *ZMQClient) startResponder() {
 
 		// set publishing topic
 		topic := resTopic
-		if resp.ResponseType == model.ResponseTypeACK {
+		if resp.ResponseType == model.ResponseACK {
 			topic = ackTopic
 		}
 
@@ -94,8 +96,8 @@ func (c *ZMQClient) startResponder() {
 	}
 }
 
-func (c *ZMQClient) requestDeserializer(msg string) model.Task {
-	fmt.Println("requestDeserializer: ", msg)
+func (c *ZMQClient) taskDeserializer(msg string) model.Task {
+	fmt.Println("taskDeserializer: ", msg)
 	// drop the filter
 	msg = strings.TrimPrefix(msg, reqTopic)
 	// deserialize
