@@ -1,12 +1,12 @@
-# IoT Deployment Service
+# Deployment Tool 
+a.k.a. CPSwarm Bulk Deployment Tool
 
-## TODO
-### Manager
+This repository consists of the following packages:
+* manager: The Deployment Manager responsible for propagating deployment tasks
+* agent: The Deployment Agent responsible for performing tasks and reporting results
+* model: Data models used among other packages
 
-### Agent
-* create a package for shared data models
-* get commands, interval from manager
-* stop if one command fails?
-* verify sender
-* publish results
-* command whitelist, injection protection
+## Components
+### Deployment Manager
+
+### Deployment Agent
