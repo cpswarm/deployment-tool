@@ -1,0 +1,30 @@
+version: 1.0
+
+
+stages:
+    local:
+        - tar -zcf archive.tar.gz code_generator/output # compress files from CG in the project directory
+    remote:
+        - tar -xzf archive.tar.gz # de-compress
+        - g++ -o main output/main.cpp # compile
+        - chmod +x main # make executable
+
+
+tests:
+    - sh test-script.sh
+
+
+triggers:
+    - on-success # when tests pass
+    - on-startup
+    - manual # signal from AL or Command & Monitoring Tool (CMT)
+
+
+targets:
+    batch:
+        hostname: drone_*
+
+
+logs:
+    - on-failure # tests / stages fail
+    - on-success # output of stage command regardless
