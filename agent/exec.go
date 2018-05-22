@@ -13,13 +13,14 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
-func responseBatchCollector(task model.Task, interval time.Duration, out chan model.BatchResponse) {
+func (a *agent) responseBatchCollector(task model.Task, interval time.Duration, out chan model.BatchResponse) {
 	resCh := make(chan model.Response)
 	go responseCollector(task.Commands, resCh)
 
 	batch := model.BatchResponse{
 		ResponseType: model.ResponseLog,
 		TaskID:       task.ID,
+		TargetID:     a.ID,
 	}
 	var foundError bool
 
@@ -39,7 +40,8 @@ LOOP:
 			batch.Responses = append(batch.Responses, res)
 			batch.TimeElapsed = res.TimeElapsed
 		case <-ticker.C:
-			out <- batch
+			//out <- batch
+			a.sendResponse(&batch)
 			//log.Printf("Batch: %+v", batch)
 
 			// flush responses
@@ -47,7 +49,8 @@ LOOP:
 		}
 	}
 
-	out <- batch
+	//out <- batch
+	a.sendResponse(&batch)
 	log.Printf("Final Batch: %+v", batch)
 	if !foundError {
 		batch.ResponseType = model.ResponseComplete

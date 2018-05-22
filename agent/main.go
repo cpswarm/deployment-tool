@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"time"
 )
 
 func main() {
@@ -18,18 +17,11 @@ func main() {
 	}
 	defer zmqClient.Close()
 
-	taskProcessor(zmqClient)
+	a := newAgent(zmqClient)
+	defer a.close()
+	go a.startTaskProcessor()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 	<-sig
-}
-
-func taskProcessor(c *ZMQClient) {
-
-	for task := range c.TaskCh {
-		log.Printf("taskProcessor: %+v", task)
-		responseBatchCollector(task, time.Duration(3)*time.Second, c.ResponseCh)
-	}
-
 }

@@ -15,6 +15,7 @@ type BatchResponse struct {
 	Responses    []Response
 	TimeElapsed  float64
 	TaskID       string
+	TargetID     string
 }
 
 type Response struct {

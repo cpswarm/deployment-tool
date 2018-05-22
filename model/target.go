@@ -1,9 +1,10 @@
 package model
 
 type Target struct {
-	ID              string
-	Description     string
-	Type            string
-	SoftwareVersion string
-	Status          string
+	ID                string
+	Description       string
+	Type              string
+	TaskHistory       []string
+	CurrentTask       string
+	CurrentTaskStatus ResponseType
 }

@@ -37,20 +37,20 @@ func StartZMQClient(subEndpoint, pubEndpoint string) (*ZMQClient, error) {
 	// socket to receive from server
 	c.subscriber, err = zmq.NewSocket(zmq.SUB)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
 	err = c.subscriber.Connect(subEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
 	}
 	// socket to send to server
 	c.publisher, err = zmq.NewSocket(zmq.PUB)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
 	err = c.publisher.Connect(pubEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)
 	}
 
 	// TODO subscribe to the next update, to avoid getting resent tasks
@@ -73,8 +73,6 @@ func (c *ZMQClient) startListener(topic string) {
 
 		// de-serialize
 		task := c.taskDeserializer(msg)
-		// response acknowledgement
-		c.ResponseCh <- model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID}
 		// send to worker
 		c.TaskCh <- task
 	}
@@ -97,7 +95,7 @@ func (c *ZMQClient) startResponder() {
 }
 
 func (c *ZMQClient) taskDeserializer(msg string) model.Task {
-	fmt.Println("taskDeserializer: ", msg)
+	//fmt.Println("taskDeserializer: ", msg)
 	// drop the filter
 	msg = strings.TrimPrefix(msg, reqTopic)
 	// deserialize
@@ -110,7 +108,7 @@ func (c *ZMQClient) taskDeserializer(msg string) model.Task {
 }
 
 func (c *ZMQClient) responseSerializer(resp *model.BatchResponse) string {
-	log.Printf("responseSerializer: %+v", resp)
+	//log.Printf("responseSerializer: %+v", resp)
 	// serialize
 	b, err := json.Marshal(resp)
 	if err != nil {
