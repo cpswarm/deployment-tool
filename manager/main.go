@@ -19,7 +19,7 @@ func main() {
 	}
 	defer zmqClient.Close()
 
-	m, err := NewManager()
+	m, err := NewManager(zmqClient.pipe)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,8 +28,8 @@ func main() {
 	m.targets["t1"] = &model.Target{}
 	//m.targets["t2"] = &model.Target{}
 
-	go m.processResponses(zmqClient.ResponseCh)
-	go m.sendTasks(zmqClient.TaskCh)
+	go m.processResponses()
+	go m.sendTasks()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)

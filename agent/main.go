@@ -17,7 +17,7 @@ func main() {
 	}
 	defer zmqClient.Close()
 
-	a := newAgent(zmqClient)
+	a := newAgent(zmqClient.pipe)
 	defer a.close()
 	go a.startTaskProcessor()
 

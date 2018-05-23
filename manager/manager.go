@@ -12,16 +12,21 @@ import (
 
 type manager struct {
 	registry
+
+	pipe model.Pipe
 }
 
-func NewManager() (*manager, error) {
-	m := &manager{}
+func NewManager(pipe model.Pipe) (*manager, error) {
+	m := &manager{
+		pipe: pipe,
+	}
+
 	m.targets = make(map[string]*model.Target)
 
 	return m, nil
 }
 
-func (m *manager) sendTasks(taskCh chan model.Task) {
+func (m *manager) sendTasks() {
 	taskID := uuid.NewV4().String()
 	pending := true
 
@@ -41,7 +46,7 @@ func (m *manager) sendTasks(taskCh chan model.Task) {
 			ID:        taskID,
 		}
 		//log.Printf("sendTasks: %+v", task)
-		taskCh <- task
+		m.pipe.TaskCh <- task
 
 		time.Sleep(3 * time.Second)
 
@@ -55,8 +60,8 @@ func (m *manager) sendTasks(taskCh chan model.Task) {
 	log.Println("Task received by all targets.")
 }
 
-func (m *manager) processResponses(responseCh chan model.BatchResponse) {
-	for response := range responseCh {
+func (m *manager) processResponses() {
+	for response := range m.pipe.ResponseCh {
 		if _, found := m.targets[response.TargetID]; !found {
 			log.Println("Response from unknown target:", response.TargetID)
 			continue

@@ -21,16 +21,14 @@ type ZMQClient struct {
 	publisher  *zmq.Socket
 	subscriber *zmq.Socket
 
-	TaskCh     chan model.Task
-	ResponseCh chan model.BatchResponse
+	pipe model.Pipe
 }
 
 func StartZMQClient(pubEndpoint, subEndpoint string) (*ZMQClient, error) {
 	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 
 	c := &ZMQClient{
-		TaskCh:     make(chan model.Task),
-		ResponseCh: make(chan model.BatchResponse),
+		pipe: model.NewPipe(),
 	}
 
 	var err error
@@ -62,7 +60,7 @@ func StartZMQClient(pubEndpoint, subEndpoint string) (*ZMQClient, error) {
 
 func (c *ZMQClient) startTaskPublisher() {
 	// sender
-	for task := range c.TaskCh {
+	for task := range c.pipe.TaskCh {
 		//log.Printf("startTaskPublisher %+v", task)
 		b, err := json.Marshal(&task)
 		if err != nil {
@@ -93,7 +91,7 @@ func (c *ZMQClient) startListener() {
 			log.Fatal(err)
 		}
 		//log.Printf("startListener %+v", msg)
-		c.ResponseCh <- response
+		c.pipe.ResponseCh <- response
 	}
 }
 

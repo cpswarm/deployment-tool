@@ -15,13 +15,14 @@ import (
 type agent struct {
 	sync.Mutex
 	*model.Target
-	client     *ZMQClient
 	configPath string
+
+	pipe model.Pipe
 }
 
-func newAgent(c *ZMQClient) *agent {
+func newAgent(pipe model.Pipe) *agent {
 	a := &agent{
-		client:     c,
+		pipe:       pipe,
 		configPath: "config.json",
 	}
 	a.loadConf()
@@ -59,8 +60,8 @@ func (a *agent) startTaskProcessor() {
 	log.Println("Listenning for tasks...")
 
 TASKLOOP:
-	for task := range a.client.TaskCh {
-		log.Printf("taskProcessor: %+v", task)
+	for task := range a.pipe.TaskCh {
+		//log.Printf("taskProcessor: %+v", task)
 
 		// TODO subscribe to next versions
 		// For now, drop existing tasks
@@ -78,7 +79,7 @@ TASKLOOP:
 		a.storeArtifacts(task.Artifacts)
 
 		// execute and collect results
-		a.responseBatchCollector(task, time.Duration(3)*time.Second, a.client.ResponseCh)
+		a.responseBatchCollector(task, time.Duration(3)*time.Second, a.pipe.ResponseCh)
 	}
 
 }
@@ -102,7 +103,7 @@ func (a *agent) saveConfig() {
 
 func (a *agent) sendResponse(resp *model.BatchResponse) {
 	// send to channel
-	a.client.ResponseCh <- *resp
+	a.pipe.ResponseCh <- *resp
 	// update the status
 	a.CurrentTask = resp.TaskID
 	a.CurrentTaskStatus = resp.ResponseType
