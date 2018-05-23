@@ -28,8 +28,8 @@ func newAgent(pipe model.Pipe) *agent {
 	a.loadConf()
 
 	log.Println("TargetID", a.ID)
-	log.Println("CurrentTask", a.CurrentTask)
-	log.Println("CurrentTaskStatus", a.CurrentTaskStatus)
+	log.Println("CurrentTask", a.Tasks.LatestBatchResponse.TaskID)
+	log.Println("CurrentTaskStatus", a.Tasks.LatestBatchResponse.ResponseType)
 
 	return a
 }
@@ -65,14 +65,14 @@ TASKLOOP:
 
 		// TODO subscribe to next versions
 		// For now, drop existing tasks
-		for i := len(a.TaskHistory) - 1; i >= 0; i-- {
-			if a.TaskHistory[i] == task.ID {
+		for i := len(a.Tasks.History) - 1; i >= 0; i-- {
+			if a.Tasks.History[i] == task.ID {
 				log.Println("Existing task. Dropping it.")
 				continue TASKLOOP
 			}
 		}
 
-		a.TaskHistory = append(a.TaskHistory, task.ID)
+		a.Tasks.History = append(a.Tasks.History, task.ID)
 		// send acknowledgement
 		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID, TargetID: a.ID})
 
@@ -105,8 +105,7 @@ func (a *agent) sendResponse(resp *model.BatchResponse) {
 	// send to channel
 	a.pipe.ResponseCh <- *resp
 	// update the status
-	a.CurrentTask = resp.TaskID
-	a.CurrentTaskStatus = resp.ResponseType
+	a.Tasks.LatestBatchResponse = *resp
 	a.saveConfig()
 }
 

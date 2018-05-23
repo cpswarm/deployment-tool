@@ -26,8 +26,7 @@ func main() {
 	go m.processResponses()
 
 	// add dummy targets
-	m.targets["t1"] = &model.Target{}
-	//m.targets["t2"] = &model.Target{}
+	m.targets["target1"] = &model.Target{}
 
 	go startRESTAPI(":8080", m)
 

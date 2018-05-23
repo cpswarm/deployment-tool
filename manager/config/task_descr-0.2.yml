@@ -5,7 +5,7 @@ stages:
   assemble: # commands run by manager (e.g. packaging, cross-compilation)
 
   transfer: # list of files and directories copied from manager to agent
-    - ../src
+    - ../src.tar
   install: # commands run by agent
     - ls -l
 #  test:
@@ -15,11 +15,14 @@ stages:
 #    - on-startup
 #    - manually # signal from AL or Command & Monitoring Tool (CMT)
 
-targets:
-  batch:
-    hostname: drone_*
+target:
+  byname:
+    - dummy1
+    - pi* # wildcard matching
+  bytype:
 
-logs:
+
+log:
   - always
 #  - on-failure # tests / stages fail
 #  - on-success # output of stage command regardless

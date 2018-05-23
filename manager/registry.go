@@ -5,12 +5,17 @@ import (
 )
 
 type registry struct {
-	tasks   []model.Task
+	taskDescriptions []TaskDescription
+	//tasks            []model.Task
 	targets map[string]*model.Target
 }
 
 type TaskDescription struct {
 	Stages Stages
+	Target DeploymentTarget
+	Log    []string
+
+	DeploymentInfo DeploymentInfo
 }
 
 type Stages struct {
@@ -19,4 +24,15 @@ type Stages struct {
 	Install  []string
 	Test     []string
 	Activate []string
+}
+
+type DeploymentTarget struct {
+	ByName []string
+	ByType []string
+}
+
+type DeploymentInfo struct {
+	TaskID          string
+	TransferSize    int
+	MatchingTargets []string
 }
