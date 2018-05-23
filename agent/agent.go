@@ -76,7 +76,7 @@ TASKLOOP:
 		// send acknowledgement
 		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID, TargetID: a.ID})
 
-		a.storeArtifacts(task.Artifacts)
+		a.storeArtifacts(task.ID, task.Artifacts)
 
 		// execute and collect results
 		a.responseBatchCollector(task, time.Duration(3)*time.Second, a.pipe.ResponseCh)

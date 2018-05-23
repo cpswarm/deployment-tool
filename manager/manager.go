@@ -40,7 +40,7 @@ func (m *manager) sendTask(descr TaskDescription) {
 	for pending {
 
 		task := model.Task{
-			Commands:  descr.Stages.Installation,
+			Commands:  descr.Stages.Install,
 			Artifacts: b.Bytes(),
 			Time:      time.Now().Unix(),
 			ID:        taskID,

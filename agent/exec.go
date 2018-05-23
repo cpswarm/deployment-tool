@@ -16,9 +16,9 @@ import (
 	"github.com/mholt/archiver"
 )
 
-func (a *agent) storeArtifacts(b []byte) {
+func (a *agent) storeArtifacts(name string, b []byte) {
 	log.Printf("Deploying %d bytes of artifacts.", len(b))
-	err := archiver.TarGz.Read(bytes.NewBuffer(b), fmt.Sprintf("artifacts-%d", time.Now().Unix()))
+	err := archiver.TarGz.Read(bytes.NewBuffer(b), fmt.Sprintf("%s", name))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,7 +26,14 @@ func (a *agent) storeArtifacts(b []byte) {
 
 func (a *agent) responseBatchCollector(task model.Task, interval time.Duration, out chan model.BatchResponse) {
 	resCh := make(chan model.Response)
-	go responseCollector(task.Commands, resCh)
+
+	// set work directory
+	wd, _ := os.Getwd()
+
+	wd = fmt.Sprintf("%s/%s", wd, task.ID)
+	log.Println("Work directory:", wd)
+
+	go responseCollector(task.Commands, wd, resCh)
 
 	batch := model.BatchResponse{
 		ResponseType: model.ResponseLog,
@@ -68,13 +75,13 @@ LOOP:
 	}
 }
 
-func responseCollector(commands []string, out chan model.Response) {
+func responseCollector(commands []string, wd string, out chan model.Response) {
 	start := time.Now()
 
 	stdout, stderr := make(chan logLine), make(chan logLine)
 	callback := make(chan error)
 
-	go executeMultiple(commands, stdout, stderr, callback)
+	go executeMultiple(commands, wd, stdout, stderr, callback)
 
 	for open := true; open; {
 		select {
@@ -91,9 +98,9 @@ func responseCollector(commands []string, out chan model.Response) {
 	close(out)
 }
 
-func executeMultiple(commands []string, stdout, stderr chan logLine, callback chan error) {
+func executeMultiple(commands []string, wd string, stdout, stderr chan logLine, callback chan error) {
 	for _, command := range commands {
-		execute(command, stdout, stderr)
+		execute(command, wd, stdout, stderr)
 	}
 	close(callback)
 }
@@ -105,12 +112,11 @@ type logLine struct {
 	lineNum uint32
 }
 
-func execute(command string, stdout, stderr chan logLine) {
+func execute(command, wd string, stdout, stderr chan logLine) {
 	bashCommand := []string{"/bin/bash", "-c", command}
 	cmd := exec.Command(bashCommand[0], bashCommand[1:]...)
 
-	// TODO: pass workdir from upstream
-	cmd.Dir, _ = os.Getwd()
+	cmd.Dir = wd
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	cmd.SysProcAttr.Setsid = true
 

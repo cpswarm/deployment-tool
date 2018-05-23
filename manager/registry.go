@@ -14,9 +14,9 @@ type TaskDescription struct {
 }
 
 type Stages struct {
-	Assembly     []string
-	Transfer     []string
-	Installation []string
-	Tests        []string
-	Activation   []string
+	Assemble []string
+	Transfer []string
+	Install  []string
+	Test     []string
+	Activate []string
 }

@@ -8,7 +8,7 @@ stages:
     - ../src
   install: # commands run by agent
     - ls -l
-#  tests:
+#  test:
 #    - sh test-script.sh
 #  activate:
 #    - on-success # when tests pass
