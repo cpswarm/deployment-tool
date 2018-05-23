@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -11,7 +13,16 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
+	"github.com/mholt/archiver"
 )
+
+func (a *agent) storeArtifacts(b []byte) {
+	log.Printf("Deploying %d bytes of artifacts.", len(b))
+	err := archiver.TarGz.Read(bytes.NewBuffer(b), fmt.Sprintf("artifacts-%d", time.Now().Unix()))
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func (a *agent) responseBatchCollector(task model.Task, interval time.Duration, out chan model.BatchResponse) {
 	resCh := make(chan model.Response)

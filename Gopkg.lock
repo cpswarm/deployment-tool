@@ -3,9 +3,52 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/dsnet/compress"
+  packages = [
+    ".",
+    "bzip2",
+    "bzip2/internal/sais",
+    "internal",
+    "internal/errors",
+    "internal/prefix"
+  ]
+  revision = "cc9eb1d7ad760af14e8f918698f745e80377af4f"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/golang/snappy"
+  packages = ["."]
+  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mholt/archiver"
+  packages = ["."]
+  revision = "e4ef56d48eb029648b0e895bb0b6a393ef0829c3"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/nwaples/rardecode"
+  packages = ["."]
+  revision = "e06696f847aeda6f39a8f0b7cdff193b7690aef6"
+
+[[projects]]
+  branch = "master"
   name = "github.com/pebbe/zmq4"
   packages = ["."]
   revision = "5b443b6471cea4b4f9f85025530c04c93233f76a"
+
+[[projects]]
+  name = "github.com/pierrec/lz4"
+  packages = ["."]
+  revision = "2fcda4cb7018ce05a25959d2fe08c83e3329f169"
+  version = "v1.1"
+
+[[projects]]
+  name = "github.com/pierrec/xxHash"
+  packages = ["xxHash32"]
+  revision = "f051bb7f1d1aaf1b5a665d74fb6b0217712c69f7"
+  version = "v0.1.1"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -13,9 +56,20 @@
   revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
   version = "v1.2.0"
 
+[[projects]]
+  name = "github.com/ulikunitz/xz"
+  packages = [
+    ".",
+    "internal/hash",
+    "internal/xlog",
+    "lzma"
+  ]
+  revision = "0c6b41e72360850ca4f98dc341fd999726ea007f"
+  version = "v0.5.4"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3fe701b895b3c84b0791623382e6b2baf241dd783fbda27f1743254864f8865e"
+  inputs-digest = "c5d67f2d31839b5a0884c8492b0e97cb41bef7c26c211bd9fa2dbc64e9a076e4"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -1,7 +1,8 @@
 package model
 
 type Task struct {
-	ID       string
-	Commands []string
-	Time     int64
+	ID        string
+	Commands  []string
+	Artifacts []byte
+	Time      int64
 }

@@ -72,9 +72,10 @@ TASKLOOP:
 		}
 
 		a.TaskHistory = append(a.TaskHistory, task.ID)
-		// response acknowledgement
-		//a.client.ResponseCh <- model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID, TargetID: a.ID}
+		// send acknowledgement
 		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID, TargetID: a.ID})
+
+		a.storeArtifacts(task.Artifacts)
 
 		// execute and collect results
 		a.responseBatchCollector(task, time.Duration(3)*time.Second, a.client.ResponseCh)

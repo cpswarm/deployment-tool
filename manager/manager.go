@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
+	"github.com/mholt/archiver"
 	"github.com/satori/go.uuid"
 )
 
@@ -23,20 +25,22 @@ func (m *manager) sendTasks(taskCh chan model.Task) {
 	taskID := uuid.NewV4().String()
 	pending := true
 
+	// compress archive
+	var b bytes.Buffer
+	err := archiver.TarGz.Write(&b, []string{"../src"})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for pending {
 
-		//if m.targets["t1"].CurrentTaskStatus >= model.ResponseACK {
-		//	log.Println("Task submission is complete.")
-		//	os.Exit(0)
-		//	break
-		//}
-
 		task := model.Task{
-			Commands: []string{"pwd"},
-			Time:     time.Now().Unix(),
-			ID:       taskID,
+			Commands:  []string{"pwd"},
+			Artifacts: b.Bytes(),
+			Time:      time.Now().Unix(),
+			ID:        taskID,
 		}
-		log.Printf("sendTasks: %+v", task)
+		//log.Printf("sendTasks: %+v", task)
 		taskCh <- task
 
 		time.Sleep(3 * time.Second)
