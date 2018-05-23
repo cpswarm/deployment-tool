@@ -17,17 +17,17 @@ const (
 	resTopic = "RES-"
 )
 
-type ZMQClient struct {
+type zmqClient struct {
 	publisher  *zmq.Socket
 	subscriber *zmq.Socket
 
 	pipe model.Pipe
 }
 
-func StartZMQClient(pubEndpoint, subEndpoint string) (*ZMQClient, error) {
+func startZMQClient(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 
-	c := &ZMQClient{
+	c := &zmqClient{
 		pipe: model.NewPipe(),
 	}
 
@@ -58,7 +58,7 @@ func StartZMQClient(pubEndpoint, subEndpoint string) (*ZMQClient, error) {
 	return c, nil
 }
 
-func (c *ZMQClient) startTaskPublisher() {
+func (c *zmqClient) startTaskPublisher() {
 	// sender
 	for task := range c.pipe.TaskCh {
 		//log.Printf("startTaskPublisher %+v", task)
@@ -70,7 +70,7 @@ func (c *ZMQClient) startTaskPublisher() {
 	}
 }
 
-func (c *ZMQClient) startListener() {
+func (c *zmqClient) startListener() {
 	// listener
 	c.subscriber.SetSubscribe(ackTopic)
 	c.subscriber.SetSubscribe(resTopic)
@@ -80,7 +80,6 @@ func (c *ZMQClient) startListener() {
 		if err != nil {
 			log.Fatal(err)
 		}
-
 		// drop the filter
 		msg = strings.TrimPrefix(msg, ackTopic)
 		msg = strings.TrimPrefix(msg, resTopic)
@@ -95,7 +94,7 @@ func (c *ZMQClient) startListener() {
 	}
 }
 
-func (c *ZMQClient) Close() error {
+func (c *zmqClient) close() error {
 	log.Println("Closing ZeroMQ sockets...")
 
 	err := c.subscriber.Close()

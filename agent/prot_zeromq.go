@@ -17,17 +17,17 @@ const (
 	resTopic = "RES-"
 )
 
-type ZMQClient struct {
+type zmqClient struct {
 	subscriber *zmq.Socket
 	publisher  *zmq.Socket
 
 	pipe model.Pipe
 }
 
-func StartZMQClient(subEndpoint, pubEndpoint string) (*ZMQClient, error) {
+func startZMQClient(subEndpoint, pubEndpoint string) (*zmqClient, error) {
 	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 
-	c := &ZMQClient{
+	c := &zmqClient{
 		pipe: model.NewPipe(),
 	}
 
@@ -59,7 +59,7 @@ func StartZMQClient(subEndpoint, pubEndpoint string) (*ZMQClient, error) {
 	return c, nil
 }
 
-func (c *ZMQClient) startListener(topic string) {
+func (c *zmqClient) startListener(topic string) {
 
 	c.subscriber.SetSubscribe(topic)
 	for {
@@ -68,54 +68,37 @@ func (c *ZMQClient) startListener(topic string) {
 			log.Println("ERROR:", err)
 			continue
 		}
-
-		// de-serialize
-		task := c.taskDeserializer(msg)
+		// drop the filter
+		msg = strings.TrimPrefix(msg, reqTopic)
+		// deserialize
+		var task model.Task
+		err = json.Unmarshal([]byte(msg), &task)
+		if err != nil {
+			log.Fatal(err)
+		}
 		// send to worker
 		c.pipe.TaskCh <- task
 	}
 }
 
-func (c *ZMQClient) startResponder() {
+func (c *zmqClient) startResponder() {
 	for resp := range c.pipe.ResponseCh {
-		// serialize
-		msg := c.responseSerializer(&resp)
-
 		// set publishing topic
 		topic := resTopic
 		if resp.ResponseType == model.ResponseACK {
 			topic = ackTopic
 		}
-
+		// serialize
+		b, err := json.Marshal(resp)
+		if err != nil {
+			log.Fatal(err)
+		}
 		// publish
-		c.publisher.Send(topic+msg, 0)
+		c.publisher.Send(topic+string(b), 0)
 	}
 }
 
-func (c *ZMQClient) taskDeserializer(msg string) model.Task {
-	//fmt.Println("taskDeserializer: ", msg)
-	// drop the filter
-	msg = strings.TrimPrefix(msg, reqTopic)
-	// deserialize
-	var task model.Task
-	err := json.Unmarshal([]byte(msg), &task)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return task
-}
-
-func (c *ZMQClient) responseSerializer(resp *model.BatchResponse) string {
-	//log.Printf("responseSerializer: %+v", resp)
-	// serialize
-	b, err := json.Marshal(resp)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return string(b)
-}
-
-func (c *ZMQClient) Close() error {
+func (c *zmqClient) close() error {
 	log.Println("Closing ZeroMQ sockets...")
 
 	err := c.subscriber.Close()

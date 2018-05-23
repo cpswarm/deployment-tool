@@ -13,11 +13,11 @@ func main() {
 	log.Println("started deployment manager")
 	defer log.Println("bye.")
 
-	zmqClient, err := StartZMQClient("tcp://*:5556", "tcp://*:5557")
+	zmqClient, err := startZMQClient("tcp://*:5556", "tcp://*:5557")
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
-	defer zmqClient.Close()
+	defer zmqClient.close()
 
 	m, err := NewManager(zmqClient.pipe)
 	if err != nil {

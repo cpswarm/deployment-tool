@@ -11,11 +11,11 @@ func main() {
 	log.Println("started deployment agent")
 	defer log.Println("bye.")
 
-	zmqClient, err := StartZMQClient("tcp://localhost:5556", "tcp://localhost:5557")
+	zmqClient, err := startZMQClient("tcp://localhost:5556", "tcp://localhost:5557")
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
-	defer zmqClient.Close()
+	defer zmqClient.close()
 
 	a := newAgent(zmqClient.pipe)
 	defer a.close()
