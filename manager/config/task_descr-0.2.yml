@@ -1,0 +1,25 @@
+version: 0.2
+
+
+stages:
+  assemble: # commands run by manager (e.g. packaging, cross-compilation)
+
+  transfer: # list of files and directories copied from manager to agent
+    - ../src
+  install: # commands run by agent
+    - ls -l
+#  tests:
+#    - sh test-script.sh
+#  activate:
+#    - on-success # when tests pass
+#    - on-startup
+#    - manually # signal from AL or Command & Monitoring Tool (CMT)
+
+targets:
+  batch:
+    hostname: drone_*
+
+logs:
+  - always
+#  - on-failure # tests / stages fail
+#  - on-success # output of stage command regardless

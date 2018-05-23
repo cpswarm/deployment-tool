@@ -19,17 +19,17 @@ func main() {
 	}
 	defer zmqClient.close()
 
-	m, err := NewManager(zmqClient.pipe)
+	m, err := newManager(zmqClient.pipe)
 	if err != nil {
 		log.Fatal(err)
 	}
+	go m.processResponses()
 
 	// add dummy targets
 	m.targets["t1"] = &model.Target{}
 	//m.targets["t2"] = &model.Target{}
 
-	go m.processResponses()
-	go m.sendTasks()
+	go startRESTAPI(":8080", m)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)

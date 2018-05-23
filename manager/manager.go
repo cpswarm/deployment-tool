@@ -16,7 +16,7 @@ type manager struct {
 	pipe model.Pipe
 }
 
-func NewManager(pipe model.Pipe) (*manager, error) {
+func newManager(pipe model.Pipe) (*manager, error) {
 	m := &manager{
 		pipe: pipe,
 	}
@@ -26,13 +26,13 @@ func NewManager(pipe model.Pipe) (*manager, error) {
 	return m, nil
 }
 
-func (m *manager) sendTasks() {
+func (m *manager) sendTask(descr TaskDescription) {
 	taskID := uuid.NewV4().String()
 	pending := true
 
 	// compress archive
 	var b bytes.Buffer
-	err := archiver.TarGz.Write(&b, []string{"../src"})
+	err := archiver.TarGz.Write(&b, descr.Stages.Transfer)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func (m *manager) sendTasks() {
 	for pending {
 
 		task := model.Task{
-			Commands:  []string{"pwd"},
+			Commands:  descr.Stages.Installation,
 			Artifacts: b.Bytes(),
 			Time:      time.Now().Unix(),
 			ID:        taskID,
