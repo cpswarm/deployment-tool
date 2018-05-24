@@ -14,7 +14,7 @@ import (
 
 type agent struct {
 	sync.Mutex
-	*model.Target
+	model.Target
 	configPath string
 
 	pipe model.Pipe
