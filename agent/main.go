@@ -11,7 +11,13 @@ func main() {
 	log.Println("started deployment agent")
 	defer log.Println("bye.")
 
-	zmqClient, err := startZMQClient("tcp://localhost:5556", "tcp://localhost:5557")
+	managerEndpoint := os.Getenv("MANAGER")
+
+	if managerEndpoint == "" {
+		managerEndpoint = "tcp://localhost"
+	}
+
+	zmqClient, err := startZMQClient(managerEndpoint+":5556", managerEndpoint+":5557")
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}

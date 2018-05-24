@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
@@ -40,7 +41,7 @@ func (m *manager) addTaskDescr(descr TaskDescription) (string, error) {
 	}
 
 	task := model.Task{
-		ID:        uuid.NewV1().String(),
+		ID:        newTaskID(),
 		Commands:  descr.Stages.Install,
 		Artifacts: compressedArchive,
 		Time:      time.Now().Unix(),
@@ -56,6 +57,16 @@ func (m *manager) addTaskDescr(descr TaskDescription) (string, error) {
 	return task.ID, nil
 }
 
+func newTaskID() string {
+	// inverse the UUIDv1 chunks to make them alphanumerically sortable
+	split := strings.Split(uuid.NewV1().String(), "-")
+	var reverse []string
+	for _, chunk := range split {
+		reverse = append([]string{chunk}, reverse...)
+	}
+	return strings.Join(reverse, "-")
+}
+
 func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
 	var b bytes.Buffer
 	err := archiver.TarGz.Write(&b, filePaths)
@@ -69,10 +80,12 @@ func (m *manager) sendTask(task model.Task) {
 	pending := true
 
 	for pending {
-		//log.Printf("sendTasks: %+v", task)
+		log.Printf("sendTask: %s", task.ID)
+		//log.Printf("sendTask: %+v", task)
+
 		m.pipe.TaskCh <- task
 
-		time.Sleep(3 * time.Second)
+		time.Sleep(300 * time.Second)
 
 		pending = false
 		for _, target := range m.targets {

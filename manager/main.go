@@ -27,6 +27,7 @@ func main() {
 
 	// add dummy targets
 	m.targets["target1"] = &model.Target{}
+	m.targets["iot-raspizero-1"] = &model.Target{}
 
 	go startRESTAPI(":8080", m)
 

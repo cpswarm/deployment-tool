@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -22,6 +23,7 @@ type agent struct {
 
 func newAgent(pipe model.Pipe) *agent {
 	a := &agent{
+		Target:     model.Target{},
 		pipe:       pipe,
 		configPath: "config.json",
 	}
@@ -62,6 +64,7 @@ func (a *agent) startTaskProcessor() {
 TASKLOOP:
 	for task := range a.pipe.TaskCh {
 		//log.Printf("taskProcessor: %+v", task)
+		log.Printf("taskProcessor: %s", task.ID)
 
 		// TODO subscribe to next versions
 		// For now, drop existing tasks
@@ -71,17 +74,26 @@ TASKLOOP:
 				continue TASKLOOP
 			}
 		}
-
 		a.Tasks.History = append(a.Tasks.History, task.ID)
+
 		// send acknowledgement
 		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID, TargetID: a.ID})
 
-		a.storeArtifacts(task.ID, task.Artifacts)
-
-		// execute and collect results
-		a.responseBatchCollector(task, time.Duration(3)*time.Second, a.pipe.ResponseCh)
+		go a.processTask(&task)
 	}
 
+}
+
+func (a *agent) processTask(task *model.Task) {
+	// set work directory
+	wd, _ := os.Getwd()
+	wd = fmt.Sprintf("%s/tasks/%s", wd, task.ID)
+	log.Println("Task work directory:", wd)
+
+	// decompress and store
+	a.storeArtifacts(wd, task.Artifacts)
+	// execute and collect results
+	a.responseBatchCollector(task, wd, time.Duration(3)*time.Second, a.pipe.ResponseCh)
 }
 
 func (a *agent) saveConfig() {

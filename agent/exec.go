@@ -3,10 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"sync/atomic"
 	"syscall"
@@ -16,22 +14,16 @@ import (
 	"github.com/mholt/archiver"
 )
 
-func (a *agent) storeArtifacts(name string, b []byte) {
+func (a *agent) storeArtifacts(wd string, b []byte) {
 	log.Printf("Deploying %d bytes of artifacts.", len(b))
-	err := archiver.TarGz.Read(bytes.NewBuffer(b), fmt.Sprintf("%s", name))
+	err := archiver.TarGz.Read(bytes.NewBuffer(b), wd)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func (a *agent) responseBatchCollector(task model.Task, interval time.Duration, out chan model.BatchResponse) {
+func (a *agent) responseBatchCollector(task *model.Task, wd string, interval time.Duration, out chan model.BatchResponse) {
 	resCh := make(chan model.Response)
-
-	// set work directory
-	wd, _ := os.Getwd()
-
-	wd = fmt.Sprintf("%s/%s", wd, task.ID)
-	log.Println("Work directory:", wd)
 
 	go responseCollector(task.Commands, wd, resCh)
 

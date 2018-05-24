@@ -2,12 +2,17 @@ version: 0.2
 
 
 stages:
-  assemble: # commands run by manager (e.g. packaging, cross-compilation)
-
-  transfer: # list of files and directories copied from manager to agent
-    - ../src.tar
+#  assemble: # commands run by manager (e.g. packaging, cross-compilation)
+  transfer: # list of files and directories copied to targets
+    - package
+#    - package/monitor
+#    - package/rescue
+#    - package/rescue.json
+#    - package/monitor.json
   install: # commands run by agent
-    - ls -l
+    - sleep 5
+    - chmod +x package/monitor
+    - chmod +x package/rescue
 #  test:
 #    - sh test-script.sh
 #  activate:
@@ -15,14 +20,14 @@ stages:
 #    - on-startup
 #    - manually # signal from AL or Command & Monitoring Tool (CMT)
 
-target:
-  byname:
-    - dummy1
-    - pi* # wildcard matching
-  bytype:
+#target:
+#  byname:
+#    - dummy1
+#    - pi* # wildcard matching
+#  bytype:
 
 
-log:
-  - always
+#log:
+#  - always
 #  - on-failure # tests / stages fail
 #  - on-success # output of stage command regardless
