@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/dsnet/compress"
   packages = [
@@ -76,6 +82,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "84e2d3e806f62295cfed2fa83c9c8867b06b3287217cab7b2077bb5ea8093b79"
+  inputs-digest = "a75fa8dbc881fb46fc4f36a668ecd78f193e5e206df32937ad09ad28205db008"
   solver-name = "gps-cdcl"
   solver-version = 1
