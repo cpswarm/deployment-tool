@@ -1,13 +1,13 @@
 package model
 
-type ResponseType uint8
+type ResponseType string
 
 const (
-	ResponseUnspecified ResponseType = iota
-	ResponseACK
-	ResponseLog
-	ResponseError
-	ResponseComplete
+	ResponseUnspecified ResponseType = ""
+	ResponseACK                      = "ACK"
+	ResponseLog                      = "LOG"
+	ResponseError                    = "ERROR"
+	ResponseFinal                    = "FINAL"
 )
 
 type BatchResponse struct {

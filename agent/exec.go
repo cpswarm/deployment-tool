@@ -58,13 +58,13 @@ LOOP:
 			batch.Responses = []model.Response{}
 		}
 	}
+	if !foundError {
+		batch.ResponseType = model.ResponseFinal
+	}
 
 	//out <- batch
 	a.sendResponse(&batch)
 	log.Printf("Final Batch: %+v", batch)
-	if !foundError {
-		batch.ResponseType = model.ResponseComplete
-	}
 }
 
 func responseCollector(commands []string, wd string, out chan model.Response) {

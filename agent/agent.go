@@ -91,6 +91,7 @@ func (a *agent) processTask(task *model.Task) {
 	// decompress and store
 	a.storeArtifacts(wd, task.Artifacts)
 	// execute and collect results
+	// TODO get log interval from the task
 	a.responseBatchCollector(task, wd, time.Duration(3)*time.Second, a.pipe.ResponseCh)
 }
 
