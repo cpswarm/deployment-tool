@@ -10,3 +10,11 @@ This repository consists of the following packages:
 ### Deployment Manager
 
 ### Deployment Agent
+
+## Checkout and Build
+```
+git clone <repo-address> src/code.linksmart.eu/dt/deployment-tool
+export GOPATH=$(pwd)
+go install code.linksmart.eu/dt/deployment-tool/manager
+go install code.linksmart.eu/dt/deployment-tool/agent
+```
