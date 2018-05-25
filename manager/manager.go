@@ -90,7 +90,7 @@ func (m *manager) sendTask(task model.Task) {
 
 		pending = false
 		for _, target := range m.targets {
-			if target.Tasks.LatestBatchResponse.TaskID != task.ID {
+			if target.Task.LatestBatchResponse.TaskID != task.ID {
 				pending = true
 			}
 		}
@@ -109,16 +109,16 @@ func (m *manager) processResponses() {
 		log.Printf("processResponses %+v", response)
 
 		// allocate memory and work on the alias
-		if m.targets[response.TargetID].Tasks == nil {
-			m.targets[response.TargetID].Tasks = new(model.TargetTask)
+		if m.targets[response.TargetID].Task == nil {
+			m.targets[response.TargetID].Task = new(model.TargetTask)
 		}
-		targetTasks := m.targets[response.TargetID].Tasks
+		targetTask := m.targets[response.TargetID].Task
 
-		targetTasks.LatestBatchResponse = response
-		if len(targetTasks.History) == 0 {
-			targetTasks.History = []string{response.TaskID}
-		} else if targetTasks.History[len(targetTasks.History)-1] != response.TaskID {
-			targetTasks.History = append(targetTasks.History, response.TaskID)
+		targetTask.LatestBatchResponse = response
+		if len(targetTask.History) == 0 {
+			targetTask.History = []string{response.TaskID}
+		} else if targetTask.History[len(targetTask.History)-1] != response.TaskID {
+			targetTask.History = append(targetTask.History, response.TaskID)
 		}
 	}
 }

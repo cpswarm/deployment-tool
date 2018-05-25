@@ -66,13 +66,16 @@ TASKLOOP:
 
 		// TODO subscribe to next versions
 		// For now, drop existing tasks
-		for i := len(a.Tasks.History) - 1; i >= 0; i-- {
-			if a.Tasks.History[i] == task.ID {
+		if a.Task == nil {
+			a.Task = new(model.TargetTask)
+		}
+		for i := len(a.Task.History) - 1; i >= 0; i-- {
+			if a.Task.History[i] == task.ID {
 				log.Println("Existing task. Dropping it.")
 				continue TASKLOOP
 			}
 		}
-		a.Tasks.History = append(a.Tasks.History, task.ID)
+		a.Task.History = append(a.Task.History, task.ID)
 
 		// send acknowledgement
 		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID, TargetID: a.ID})
@@ -116,7 +119,7 @@ func (a *agent) sendResponse(resp *model.BatchResponse) {
 	// send to channel
 	a.pipe.ResponseCh <- *resp
 	// update the status
-	a.Tasks.LatestBatchResponse = *resp
+	a.Task.LatestBatchResponse = *resp
 	a.saveConfig()
 }
 
