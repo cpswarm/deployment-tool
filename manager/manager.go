@@ -25,6 +25,7 @@ func newManager(pipe model.Pipe) (*manager, error) {
 	}
 
 	m.targets = make(map[string]*model.Target)
+	m.taskDescriptions = []TaskDescription{}
 
 	return m, nil
 }
@@ -85,7 +86,7 @@ func (m *manager) sendTask(task model.Task) {
 
 		m.pipe.TaskCh <- task
 
-		time.Sleep(300 * time.Second)
+		time.Sleep(60 * time.Second)
 
 		pending = false
 		for _, target := range m.targets {
@@ -107,9 +108,13 @@ func (m *manager) processResponses() {
 		}
 		log.Printf("processResponses %+v", response)
 
-		targetTasks := &m.targets[response.TargetID].Tasks
-		targetTasks.LatestBatchResponse = response
+		// allocate memory and work on the alias
+		if m.targets[response.TargetID].Tasks == nil {
+			m.targets[response.TargetID].Tasks = new(model.TargetTask)
+		}
+		targetTasks := m.targets[response.TargetID].Tasks
 
+		targetTasks.LatestBatchResponse = response
 		if len(targetTasks.History) == 0 {
 			targetTasks.History = []string{response.TaskID}
 		} else if targetTasks.History[len(targetTasks.History)-1] != response.TaskID {

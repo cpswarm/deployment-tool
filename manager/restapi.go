@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"code.linksmart.eu/dt/deployment-tool/model"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -106,7 +107,13 @@ func (a *restAPI) TargetHandler(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) ListTargets(w http.ResponseWriter, r *http.Request) {
 
-	b, err := json.Marshal(a.manager.targets)
+	var targets []*model.Target
+	for _, t := range a.manager.targets {
+		targets = append(targets, t)
+	}
+	// TODO sort by ID
+
+	b, err := json.Marshal(targets)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, err.Error())

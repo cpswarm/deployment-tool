@@ -4,7 +4,7 @@ type Target struct {
 	ID          string
 	Description string
 	Type        string
-	Tasks       TargetTask
+	Tasks       *TargetTask
 }
 
 type TargetTask struct {

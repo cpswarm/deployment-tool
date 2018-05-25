@@ -30,8 +30,6 @@ func newAgent(pipe model.Pipe) *agent {
 	a.loadConf()
 
 	log.Println("TargetID", a.ID)
-	log.Println("CurrentTask", a.Tasks.LatestBatchResponse.TaskID)
-	log.Println("CurrentTaskStatus", a.Tasks.LatestBatchResponse.ResponseType)
 
 	return a
 }
