@@ -26,8 +26,15 @@ func main() {
 	go m.processResponses()
 
 	// add dummy targets
-	m.targets["target1"] = &model.Target{}
-	m.targets["iot-raspizero-1"] = &model.Target{}
+	//m.targets["target1"] = &model.Target{}
+	m.targets["iot-raspizero-1"] = &model.Target{
+		ID:   "iot-raspizero-1",
+		Type: "raspizero",
+	}
+	m.targets["iot-raspizero-2"] = &model.Target{
+		ID:   "iot-raspizero-2",
+		Type: "raspizero",
+	}
 
 	go startRESTAPI(":8080", m)
 

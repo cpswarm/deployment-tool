@@ -90,7 +90,7 @@ func (m *manager) sendTask(task model.Task) {
 
 		pending = false
 		for _, target := range m.targets {
-			if target.Task.LatestBatchResponse.TaskID != task.ID {
+			if target.Task == nil || target.Task.LatestBatchResponse.TaskID != task.ID {
 				pending = true
 			}
 		}
