@@ -30,14 +30,14 @@ func newManager(pipe model.Pipe) (*manager, error) {
 	return m, nil
 }
 
-func (m *manager) addTaskDescr(descr TaskDescription) (string, error) {
+func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) {
 
 	var compressedArchive []byte
 	var err error
 	if len(descr.Stages.Transfer) > 0 {
 		compressedArchive, err = m.compressFiles(descr.Stages.Transfer)
 		if err != nil {
-			return "", fmt.Errorf("error compressing files: %s", err)
+			return nil, fmt.Errorf("error compressing files: %s", err)
 		}
 	}
 
@@ -55,7 +55,7 @@ func (m *manager) addTaskDescr(descr TaskDescription) (string, error) {
 
 	go m.sendTask(task)
 
-	return task.ID, nil
+	return &descr, nil
 }
 
 func newTaskID() string {

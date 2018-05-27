@@ -65,16 +65,18 @@ func (a *restAPI) AddTask(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Received task descr:", descr)
 
-	id, err := a.manager.addTaskDescr(descr)
+	createdDescr, err := a.manager.addTaskDescr(descr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, err.Error())
 		return
 	}
 
+	b, _ := json.Marshal(createdDescr)
+
 	// task is only accepted, but may not succeed
 	w.WriteHeader(http.StatusAccepted)
-	fmt.Fprintln(w, http.StatusText(http.StatusAccepted), id)
+	fmt.Fprintln(w, string(b))
 }
 
 func (a *restAPI) ListTasks(w http.ResponseWriter, r *http.Request) {
