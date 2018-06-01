@@ -64,6 +64,9 @@ TASKLOOP:
 		//log.Printf("taskProcessor: %+v", task)
 		log.Printf("taskProcessor: %s", task.ID)
 
+		// TODO check available memory before proceeding
+		//	inform manager about available memory and filter low-mem targets from the list?
+
 		// TODO subscribe to next versions
 		// For now, drop existing tasks
 		if a.Task == nil {
@@ -78,7 +81,7 @@ TASKLOOP:
 		a.Task.History = append(a.Task.History, task.ID)
 
 		// send acknowledgement
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseACK, TaskID: task.ID, TargetID: a.ID})
+		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: task.ID, TargetID: a.ID})
 
 		go a.processTask(&task)
 	}
@@ -93,6 +96,7 @@ func (a *agent) processTask(task *model.Task) {
 
 	// decompress and store
 	a.storeArtifacts(wd, task.Artifacts)
+	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.ID})
 	// execute and collect results
 	// TODO get log interval from the task
 	a.responseBatchCollector(task, wd, time.Duration(3)*time.Second, a.pipe.ResponseCh)

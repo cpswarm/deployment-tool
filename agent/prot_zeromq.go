@@ -87,7 +87,7 @@ func (c *zmqClient) startResponder() {
 	for resp := range c.pipe.ResponseCh {
 		// set publishing topic
 		topic := resTopic
-		if resp.ResponseType == model.ResponseACK {
+		if resp.ResponseType == model.ResponseAck {
 			topic = ackTopic
 		}
 		// serialize

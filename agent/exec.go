@@ -32,7 +32,7 @@ func (a *agent) responseBatchCollector(task *model.Task, wd string, interval tim
 		TaskID:       task.ID,
 		TargetID:     a.ID,
 	}
-	var foundError bool
+	var containsErrors bool
 
 	ticker := time.NewTicker(interval)
 LOOP:
@@ -43,9 +43,7 @@ LOOP:
 				break LOOP
 			}
 			log.Printf("[res] %+v", res)
-			if len(res.Stderr) > 0 {
-				batch.ResponseType = model.ResponseError
-			}
+			containsErrors = len(res.Stderr) > 0
 			//log.Printf("%s -- %d -- %s -- %s -- %f", res.Command, res.LineNum, res.Stdout, res.Stderr, res.TimeElapsed)
 			batch.Responses = append(batch.Responses, res)
 			batch.TimeElapsed = res.TimeElapsed
@@ -58,8 +56,10 @@ LOOP:
 			batch.Responses = []model.Response{}
 		}
 	}
-	if !foundError {
-		batch.ResponseType = model.ResponseFinal
+	if containsErrors {
+		batch.ResponseType = model.ResponseError
+	} else {
+		batch.ResponseType = model.ResponseSuccess
 	}
 
 	//out <- batch

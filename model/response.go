@@ -4,10 +4,11 @@ type ResponseType string
 
 const (
 	ResponseUnspecified ResponseType = ""
-	ResponseACK                      = "ACK"
-	ResponseLog                      = "LOG"
-	ResponseError                    = "ERROR"
-	ResponseFinal                    = "FINAL"
+	ResponseAck                      = "ACK"          // received task
+	ResponseAckTransfer              = "ACK_TRANSFER" // completed transfer to local file system
+	ResponseLog                      = "LOG"          // response stdout and stderr
+	ResponseError                    = "ERROR"        // task ended with errors
+	ResponseSuccess                  = "SUCCESS"      // task ended without errors
 )
 
 type BatchResponse struct {
