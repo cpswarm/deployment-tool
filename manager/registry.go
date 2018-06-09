@@ -13,7 +13,7 @@ type registry struct {
 type TaskDescription struct {
 	Stages Stages
 	Target DeploymentTarget
-	Log    []string
+	Log    model.Log
 
 	DeploymentInfo DeploymentInfo
 }

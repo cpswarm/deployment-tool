@@ -97,9 +97,15 @@ func (a *agent) processTask(task *model.Task) {
 	// decompress and store
 	a.storeArtifacts(wd, task.Artifacts)
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.ID})
+	interval, err := time.ParseDuration(task.Log.Interval)
+	if err != nil {
+		log.Println(err)
+		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseClientError, TaskID: task.ID, TargetID: a.ID})
+		return
+	}
+	log.Println("Will send logs every", interval)
 	// execute and collect results
-	// TODO get log interval from the task
-	a.responseBatchCollector(task, wd, time.Duration(3)*time.Second, a.pipe.ResponseCh)
+	a.responseBatchCollector(task, wd, interval, a.pipe.ResponseCh)
 }
 
 func (a *agent) saveConfig() {

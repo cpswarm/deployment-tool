@@ -1,0 +1,35 @@
+version: 0.2
+
+stages:
+  assemble: # commands run by manager (e.g. packaging, cross-compilation)
+    - make
+    - make clean
+  transfer: # list of files and directories copied to targets
+    - package
+  install: # commands run by agent
+    - chmod +x package/monitor
+    - sleep 5
+    - chmod +x package/rescue
+  test:
+    - sh test-script.sh
+  activate:
+    - on-success # when tests pass
+    - on-startup
+    - manually # signal from AL or Command & Monitoring Tool (CMT)
+
+target:
+  all: true
+  byname:
+    - iot-raspizero-1
+  bytype:
+    - pizero
+    - turtlebot
+  bytag:
+    - groupA
+
+log:
+  interval: 3s
+  verbosity: DEBUG
+  # DEBUG: INFO and agent logs
+  # INFO: ERROR and stdout stages
+  # ERROR: stderr of stages

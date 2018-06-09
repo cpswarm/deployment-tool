@@ -9,6 +9,7 @@ const (
 	ResponseLog                      = "LOG"          // response stdout and stderr
 	ResponseError                    = "ERROR"        // task ended with errors
 	ResponseSuccess                  = "SUCCESS"      // task ended without errors
+	ResponseClientError              = "CLIENT_ERROR" // client errors
 )
 
 type BatchResponse struct {

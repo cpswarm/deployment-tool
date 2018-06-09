@@ -46,6 +46,7 @@ func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) 
 		Commands:  descr.Stages.Install,
 		Artifacts: compressedArchive,
 		Time:      time.Now().Unix(),
+		Log:       descr.Log,
 	}
 
 	//m.tasks = append(m.tasks, task)
