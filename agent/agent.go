@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
+	"github.com/pbnjay/memory"
 	"github.com/satori/go.uuid"
 )
 
@@ -28,6 +29,9 @@ func newAgent(pipe model.Pipe) *agent {
 		configPath: "config.json",
 	}
 	a.loadConf()
+	if a.Task == nil {
+		a.Task = new(model.TargetTask)
+	}
 
 	log.Println("TargetID", a.ID)
 
@@ -64,26 +68,29 @@ TASKLOOP:
 		//log.Printf("taskProcessor: %+v", task)
 		log.Printf("taskProcessor: %s", task.ID)
 
-		// TODO check available memory before proceeding
-		//	inform manager about available memory and filter low-mem targets from the list?
-
-		// TODO subscribe to next versions
-		// For now, drop existing tasks
-		if a.Task == nil {
-			a.Task = new(model.TargetTask)
-		}
-		for i := len(a.Task.History) - 1; i >= 0; i-- {
-			if a.Task.History[i] == task.ID {
-				log.Println("Existing task. Dropping it.")
-				continue TASKLOOP
+		if task.Announcement {
+			sizeLimit := memory.TotalMemory() / 2 // TODO calculate this based on the available memory
+			if task.Size <= sizeLimit {
+				log.Printf("task announcement. Size: %v", task.Size)
+				log.Printf("Total system memory: %d\n", memory.TotalMemory())
+				for i := len(a.Task.History) - 1; i >= 0; i-- {
+					if a.Task.History[i] == task.ID {
+						log.Println("Dropping announcement for task", task.ID)
+						continue TASKLOOP
+					}
+				}
+				a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: task.ID, TargetID: a.ID})
+			} else {
+				log.Printf("Task is too large to process: %v", task.Size)
+				a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseError, TaskID: task.ID, TargetID: a.ID}) // TODO include error message
 			}
+
+		} else {
+			// actual task received
+			a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.ID})
+			a.Task.History = append(a.Task.History, task.ID)
+			go a.processTask(&task)
 		}
-		a.Task.History = append(a.Task.History, task.ID)
-
-		// send acknowledgement
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: task.ID, TargetID: a.ID})
-
-		go a.processTask(&task)
 	}
 
 }

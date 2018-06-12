@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	reqTopic = "REQ-"
+	reqTopic = "TASK"
 	// <arch>.<os>.<distro>.<os_version>.<hw>.<hw_version>
 	ackTopic = "ACK-"
 	resTopic = "RES-"
@@ -66,7 +66,11 @@ func (c *zmqClient) startTaskPublisher() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		c.publisher.Send(reqTopic+string(b), 0)
+		topic := reqTopic
+		if !task.Announcement {
+			topic = task.ID
+		}
+		c.publisher.Send(topic+":"+string(b), 0)
 	}
 }
 

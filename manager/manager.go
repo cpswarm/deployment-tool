@@ -47,6 +47,7 @@ func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) 
 		Artifacts: compressedArchive,
 		Time:      time.Now().Unix(),
 		Log:       descr.Log,
+		Size:      uint64(len(compressedArchive)),
 	}
 
 	//m.tasks = append(m.tasks, task)
@@ -85,10 +86,13 @@ func (m *manager) sendTask(task model.Task) {
 		log.Printf("sendTask: %s", task.ID)
 		//log.Printf("sendTask: %+v", task)
 
+		m.pipe.TaskCh <- model.Task{ID: task.ID, Size: task.Size, Announcement: true}
+		time.Sleep(time.Second)
 		m.pipe.TaskCh <- task
 
-		time.Sleep(60 * time.Second)
+		time.Sleep(10 * time.Second)
 
+		// TODO which messages are received, what is pending?
 		pending = false
 		for _, target := range m.targets {
 			if target.Task == nil || target.Task.LatestBatchResponse.TaskID != task.ID {

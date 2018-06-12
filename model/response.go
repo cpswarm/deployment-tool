@@ -4,7 +4,8 @@ type ResponseType string
 
 const (
 	ResponseUnspecified ResponseType = ""
-	ResponseAck                      = "ACK"          // received task
+	ResponseAck                      = "ACK"          // received task info
+	ResponseAckTask                  = "ACK_TASK"     // received task
 	ResponseAckTransfer              = "ACK_TRANSFER" // completed transfer to local file system
 	ResponseLog                      = "LOG"          // response stdout and stderr
 	ResponseError                    = "ERROR"        // task ended with errors

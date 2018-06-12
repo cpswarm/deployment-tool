@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	reqTopic = "REQ-"
+	reqTopic = "TASK:"
 	// <arch>.<os>.<distro>.<os_version>.<hw>.<hw_version>
 	ackTopic = "ACK-"
 	resTopic = "RES-"
@@ -63,20 +63,28 @@ func startZMQClient(subEndpoint, pubEndpoint string) (*zmqClient, error) {
 
 func (c *zmqClient) startListener(topic string) {
 
-	c.subscriber.SetSubscribe(topic)
+	err := c.subscriber.SetSubscribe(topic)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	for {
 		msg, err := c.subscriber.Recv(0)
 		if err != nil {
-			log.Println("ERROR:", err)
+			log.Println("ERROR:", err) // TODO send to manager
 			continue
 		}
-		// drop the filter
-		msg = strings.TrimPrefix(msg, reqTopic)
+		// drop the prefix
+		parts := strings.SplitN(msg, ":", 2)
+		if len(parts) != 2 {
+			log.Fatalln("Unable to parse message") // TODO send to manager
+			continue
+		}
 		// deserialize
 		var task model.Task
-		err = json.Unmarshal([]byte(msg), &task)
+		err = json.Unmarshal([]byte(parts[1]), &task)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalln(err) // TODO send to manager
+			continue
 		}
 		// send to worker
 		c.pipe.TaskCh <- task
@@ -89,6 +97,20 @@ func (c *zmqClient) startResponder() {
 		topic := resTopic
 		if resp.ResponseType == model.ResponseAck {
 			topic = ackTopic
+		}
+		if resp.ResponseType == model.ResponseAck {
+			err := c.subscriber.SetSubscribe(resp.TaskID)
+			if err != nil {
+				log.Println(err)
+			}
+			log.Println("Subscribed to task", resp.TaskID)
+		}
+		if resp.ResponseType == model.ResponseAckTask {
+			err := c.subscriber.SetUnsubscribe(resp.TaskID)
+			if err != nil {
+				log.Println(err)
+			}
+			log.Println("Unsubscribed from task", resp.TaskID)
 		}
 		// serialize
 		b, err := json.Marshal(resp)
