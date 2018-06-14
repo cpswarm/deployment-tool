@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	reqTopic = "TASK:"
 	// <arch>.<os>.<distro>.<os_version>.<hw>.<hw_version>
 	ackTopic = "ACK-"
 	resTopic = "RES-"
@@ -24,13 +23,13 @@ type zmqClient struct {
 	pipe model.Pipe
 }
 
-func startZMQClient(subEndpoint, pubEndpoint string) (*zmqClient, error) {
+func startZMQClient(subEndpoint, pubEndpoint, agentID string, pipe model.Pipe) (*zmqClient, error) {
 	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 	log.Println("Sub endpoint:", subEndpoint)
 	log.Println("Pub endpoint:", pubEndpoint)
 
 	c := &zmqClient{
-		pipe: model.NewPipe(),
+		pipe: pipe,
 	}
 
 	var err error
@@ -53,41 +52,37 @@ func startZMQClient(subEndpoint, pubEndpoint string) (*zmqClient, error) {
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)
 	}
 
-	// TODO subscribe to the next update, to avoid getting resent tasks
-	topic := reqTopic
-	go c.startListener(topic)
+	// subscribe to fixed topics
+	err = c.subscriber.SetSubscribe(model.RequestTaskAnnouncement)
+	if err != nil {
+		return nil, fmt.Errorf("error subscribing: %s", err)
+	}
+	err = c.subscriber.SetSubscribe(agentID)
+	if err != nil {
+		return nil, fmt.Errorf("error subscribing: %s", err)
+	}
+
+	go c.startListener()
 	go c.startResponder()
 
 	return c, nil
 }
 
-func (c *zmqClient) startListener(topic string) {
-
-	err := c.subscriber.SetSubscribe(topic)
-	if err != nil {
-		log.Fatalln(err)
-	}
+func (c *zmqClient) startListener() {
 	for {
 		msg, err := c.subscriber.Recv(0)
 		if err != nil {
 			log.Println("ERROR:", err) // TODO send to manager
 			continue
 		}
-		// drop the prefix
+		// split the prefix
 		parts := strings.SplitN(msg, ":", 2)
 		if len(parts) != 2 {
 			log.Fatalln("Unable to parse message") // TODO send to manager
 			continue
 		}
-		// deserialize
-		var task model.Task
-		err = json.Unmarshal([]byte(parts[1]), &task)
-		if err != nil {
-			log.Fatalln(err) // TODO send to manager
-			continue
-		}
 		// send to worker
-		c.pipe.TaskCh <- task
+		c.pipe.RequestCh <- model.Request{parts[0], []byte(parts[1])}
 	}
 }
 

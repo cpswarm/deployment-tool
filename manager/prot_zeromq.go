@@ -52,25 +52,18 @@ func startZMQClient(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
 	}
 
-	go c.startTaskPublisher()
+	go c.startPublisher()
 	go c.startListener()
 
 	return c, nil
 }
 
-func (c *zmqClient) startTaskPublisher() {
-	// sender
-	for task := range c.pipe.TaskCh {
-		//log.Printf("startTaskPublisher %+v", task)
-		b, err := json.Marshal(&task)
+func (c *zmqClient) startPublisher() {
+	for request := range c.pipe.RequestCh {
+		_, err := c.publisher.Send(request.Topic+":"+string(request.Payload), 0)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("error publishing: %s", err)
 		}
-		topic := reqTopic
-		if !task.Announcement {
-			topic = task.ID
-		}
-		c.publisher.Send(topic+":"+string(b), 0)
 	}
 }
 

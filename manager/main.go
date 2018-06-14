@@ -19,11 +19,10 @@ func main() {
 	}
 	defer zmqClient.close()
 
-	m, err := newManager(zmqClient.pipe)
+	m, err := startManager(zmqClient.pipe)
 	if err != nil {
 		log.Fatal(err)
 	}
-	go m.processResponses()
 
 	// add dummy targets
 	//m.targets["target1"] = &model.Target{}

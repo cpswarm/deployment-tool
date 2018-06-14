@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -19,7 +20,7 @@ type manager struct {
 	pipe model.Pipe
 }
 
-func newManager(pipe model.Pipe) (*manager, error) {
+func startManager(pipe model.Pipe) (*manager, error) {
 	m := &manager{
 		pipe: pipe,
 	}
@@ -27,6 +28,7 @@ func newManager(pipe model.Pipe) (*manager, error) {
 	m.targets = make(map[string]*model.Target)
 	m.taskDescriptions = []TaskDescription{}
 
+	go m.processResponses()
 	return m, nil
 }
 
@@ -47,7 +49,6 @@ func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) 
 		Artifacts: compressedArchive,
 		Time:      time.Now().Unix(),
 		Log:       descr.Log,
-		Size:      uint64(len(compressedArchive)),
 	}
 
 	//m.tasks = append(m.tasks, task)
@@ -55,7 +56,7 @@ func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) 
 	descr.DeploymentInfo.TransferSize = len(compressedArchive)
 	m.taskDescriptions = append(m.taskDescriptions, descr)
 
-	go m.sendTask(task)
+	go m.sendTask(&task)
 
 	return &descr, nil
 }
@@ -79,16 +80,29 @@ func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (m *manager) sendTask(task model.Task) {
+func (m *manager) sendTask(task *model.Task) {
 	pending := true
 
 	for pending {
 		log.Printf("sendTask: %s", task.ID)
 		//log.Printf("sendTask: %+v", task)
 
-		m.pipe.TaskCh <- model.Task{ID: task.ID, Size: task.Size, Announcement: true}
+		// send announcement
+		taskA := model.TaskAnnouncement{ID: task.ID, Size: uint64(len(task.Artifacts))}
+		b, err := json.Marshal(&taskA)
+		if err != nil {
+			log.Fatal(err)
+		}
+		m.pipe.RequestCh <- model.Request{model.RequestTaskAnnouncement, b}
+
 		time.Sleep(time.Second)
-		m.pipe.TaskCh <- task
+
+		// send actual task
+		b, err = json.Marshal(&task)
+		if err != nil {
+			log.Fatal(err)
+		}
+		m.pipe.RequestCh <- model.Request{task.ID, b}
 
 		time.Sleep(10 * time.Second)
 

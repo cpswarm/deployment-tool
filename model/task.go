@@ -6,11 +6,16 @@ type Task struct {
 	Artifacts    []byte
 	Log          Log
 	Time         int64
-	Size         uint64
-	Announcement bool
+	//Size         uint64
+	//Announcement bool
 }
 
 type Log struct {
 	Interval  string
 	Verbosity string
+}
+
+type TaskAnnouncement struct {
+	ID string
+	Size uint64
 }
