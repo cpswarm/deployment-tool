@@ -52,6 +52,9 @@ func startZMQClient(subEndpoint, pubEndpoint, agentID string, pipe model.Pipe) (
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)
 	}
 
+	go c.startListener()
+	go c.startResponder()
+
 	// subscribe to fixed topics
 	err = c.subscriber.SetSubscribe(model.RequestTaskAnnouncement)
 	if err != nil {
@@ -61,9 +64,6 @@ func startZMQClient(subEndpoint, pubEndpoint, agentID string, pipe model.Pipe) (
 	if err != nil {
 		return nil, fmt.Errorf("error subscribing: %s", err)
 	}
-
-	go c.startListener()
-	go c.startResponder()
 
 	return c, nil
 }
@@ -88,11 +88,10 @@ func (c *zmqClient) startListener() {
 
 func (c *zmqClient) startResponder() {
 	for resp := range c.pipe.ResponseCh {
-		// set publishing topic
-		topic := resTopic
-		if resp.ResponseType == model.ResponseAck {
-			topic = ackTopic
-		}
+		// set response publish topic
+		topic := string(model.ResponseUnspecified)
+
+		// on-demand subscription
 		if resp.ResponseType == model.ResponseAck {
 			err := c.subscriber.SetSubscribe(resp.TaskID)
 			if err != nil {
@@ -107,13 +106,15 @@ func (c *zmqClient) startResponder() {
 			}
 			log.Println("Unsubscribed from task", resp.TaskID)
 		}
+
 		// serialize
-		b, err := json.Marshal(resp)
+		b, err := json.Marshal(&resp)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		// publish
-		c.publisher.Send(topic+string(b), 0)
+		c.publisher.Send(topic+":"+string(b), 0)
 	}
 }
 

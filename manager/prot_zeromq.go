@@ -55,6 +55,11 @@ func startZMQClient(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	go c.startPublisher()
 	go c.startListener()
 
+	err = c.subscriber.SetSubscribe(string(model.ResponseUnspecified))
+	if err != nil {
+		return nil, fmt.Errorf("error subscribing: %s", err)
+	}
+
 	return c, nil
 }
 
@@ -68,23 +73,25 @@ func (c *zmqClient) startPublisher() {
 }
 
 func (c *zmqClient) startListener() {
-	// listener
-	c.subscriber.SetSubscribe(ackTopic)
-	c.subscriber.SetSubscribe(resTopic)
-
 	for {
 		msg, err := c.subscriber.Recv(0)
 		if err != nil {
 			log.Fatal(err)
 		}
-		// drop the filter
-		msg = strings.TrimPrefix(msg, ackTopic)
-		msg = strings.TrimPrefix(msg, resTopic)
+		// split the prefix
+		parts := strings.SplitN(msg, ":", 2)
+		if len(parts) != 2 {
+			log.Printf("Unable to parse response: %s", msg)
+			continue
+		}
+
 		// de-serialize
 		var response model.BatchResponse
-		err = json.Unmarshal([]byte(msg), &response)
+		err = json.Unmarshal([]byte(parts[1]), &response)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("error parsing response: %s", err)
+			log.Printf("message was: %s", msg)
+			continue
 		}
 		//log.Printf("startListener %+v", msg)
 		c.pipe.ResponseCh <- response

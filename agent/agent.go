@@ -104,42 +104,6 @@ func (a *agent) handleAnnouncement(payload []byte) {
 
 }
 
-//
-//func (a *agent) startTaskProcessor() {
-//	log.Println("Listenning for tasks...")
-//
-//TASKLOOP:
-//	for task := range a.pipe.TaskCh {
-//		//log.Printf("taskProcessor: %+v", task)
-//		log.Printf("taskProcessor: %s", task.ID)
-//
-//		if task.Announcement {
-//			sizeLimit := memory.TotalMemory() / 2 // TODO calculate this based on the available memory
-//			if task.Size <= sizeLimit {
-//				log.Printf("task announcement. Size: %v", task.Size)
-//				log.Printf("Total system memory: %d\n", memory.TotalMemory())
-//				for i := len(a.Task.History) - 1; i >= 0; i-- {
-//					if a.Task.History[i] == task.ID {
-//						log.Println("Dropping announcement for task", task.ID)
-//						continue TASKLOOP
-//					}
-//				}
-//				a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: task.ID, TargetID: a.ID})
-//			} else {
-//				log.Printf("Task is too large to process: %v", task.Size)
-//				a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseError, TaskID: task.ID, TargetID: a.ID}) // TODO include error message
-//			}
-//
-//		} else {
-//			// actual task received
-//			a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.ID})
-//			a.Task.History = append(a.Task.History, task.ID)
-//			go a.processTask(&task)
-//		}
-//	}
-//
-//}
-
 func (a *agent) handleTask(id string, payload []byte) {
 	log.Printf("processTask: %s", id)
 
@@ -187,7 +151,7 @@ func (a *agent) saveConfig() {
 		log.Println("ERROR:", err)
 		return
 	}
-	log.Println("Saved configuration:", a.configPath)
+	//log.Println("Saved configuration:", a.configPath)
 }
 
 func (a *agent) sendResponse(resp *model.BatchResponse) {
