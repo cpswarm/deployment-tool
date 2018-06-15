@@ -1,19 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
 	zmq "github.com/pebbe/zmq4"
-)
-
-const (
-	// <arch>.<os>.<distro>.<os_version>.<hw>.<hw_version>
-	ackTopic = "ACK-"
-	resTopic = "RES-"
 )
 
 type zmqClient struct {
@@ -56,6 +49,7 @@ func startZMQClient(subEndpoint, pubEndpoint, agentID string, pipe model.Pipe) (
 	c.monitor()
 	go c.startListener()
 	go c.startResponder()
+	go c.startOperator()
 
 	// subscribe to fixed topics
 	err = c.subscriber.SetSubscribe(model.RequestTaskAnnouncement)
@@ -84,39 +78,33 @@ func (c *zmqClient) startListener() {
 			continue
 		}
 		// send to worker
-		c.pipe.RequestCh <- model.Request{parts[0], []byte(parts[1])}
+		c.pipe.RequestCh <- model.Message{parts[0], []byte(parts[1])}
 	}
 }
 
 func (c *zmqClient) startResponder() {
 	for resp := range c.pipe.ResponseCh {
-		// set response publish topic
-		topic := string(model.ResponseUnspecified)
+		c.publisher.Send(resp.Topic+":"+string(resp.Payload), 0)
+	}
+}
 
+func (c *zmqClient) startOperator() {
+	for op := range c.pipe.OperationCh {
 		// on-demand subscription
-		if resp.ResponseType == model.ResponseAck {
-			err := c.subscriber.SetSubscribe(resp.TaskID)
+		if op.Topic == model.OperationSubscribe {
+			err := c.subscriber.SetSubscribe(string(op.Payload))
 			if err != nil {
 				log.Println(err)
 			}
-			log.Println("Subscribed to task", resp.TaskID)
+			log.Println("Subscribed to task", string(op.Payload))
 		}
-		if resp.ResponseType == model.ResponseAckTask {
-			err := c.subscriber.SetUnsubscribe(resp.TaskID)
+		if op.Topic == model.OperationUnsubscribe {
+			err := c.subscriber.SetUnsubscribe(string(op.Payload))
 			if err != nil {
 				log.Println(err)
 			}
-			log.Println("Unsubscribed from task", resp.TaskID)
+			log.Println("Unsubscribed from task", string(op.Payload))
 		}
-
-		// serialize
-		b, err := json.Marshal(&resp)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// publish
-		c.publisher.Send(topic+":"+string(b), 0)
 	}
 }
 
@@ -151,7 +139,7 @@ func (c *zmqClient) monitor() {
 			}
 			log.Printf("Event %s %s", eventType, eventAddr)
 			// send to worker
-			c.pipe.RequestCh <- model.Request{Topic: model.RequestTargetAdvertisement}
+			c.pipe.RequestCh <- model.Message{Topic: model.RequestTargetAdvertisement}
 		}
 	}()
 

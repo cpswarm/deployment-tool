@@ -93,7 +93,7 @@ func (m *manager) sendTask(task *model.Task) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		m.pipe.RequestCh <- model.Request{model.RequestTaskAnnouncement, b}
+		m.pipe.RequestCh <- model.Message{model.RequestTaskAnnouncement, b}
 
 		time.Sleep(time.Second)
 
@@ -102,14 +102,14 @@ func (m *manager) sendTask(task *model.Task) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		m.pipe.RequestCh <- model.Request{task.ID, b}
+		m.pipe.RequestCh <- model.Message{task.ID, b}
 
 		time.Sleep(10 * time.Second)
 
 		// TODO which messages are received, what is pending?
 		pending = false
 		for _, target := range m.targets {
-			if target.Task == nil || target.Task.LatestBatchResponse.TaskID != task.ID {
+			if target.Tasks == nil || target.Tasks.LatestBatchResponse.TaskID != task.ID {
 				pending = true
 			}
 		}
@@ -118,26 +118,47 @@ func (m *manager) sendTask(task *model.Task) {
 }
 
 func (m *manager) processResponses() {
-	for response := range m.pipe.ResponseCh {
-		spew.Dump(response)
+	for resp := range m.pipe.ResponseCh {
+		switch resp.Topic {
+		case model.ResponseAdvertisement:
+			var target model.Target
+			err := json.Unmarshal(resp.Payload, &target)
+			if err != nil {
+				log.Printf("error parsing response: %s", err)
+				log.Printf("payload was: %s", string(resp.Payload))
+				continue
+			}
+			m.targets[target.ID] = &target
+			log.Printf("Discoverred target: %s %s %s", target.ID, target.Type, target.Tags)
+		default:
+			var response model.BatchResponse
+			err := json.Unmarshal(resp.Payload, &response)
+			if err != nil {
+				log.Printf("error parsing response: %s", err)
+				log.Printf("payload was: %s", string(resp.Payload))
+				continue
+			}
 
-		if _, found := m.targets[response.TargetID]; !found {
-			log.Println("Response from unknown target:", response.TargetID)
-			continue
-		}
-		log.Printf("processResponses %+v", response)
+			spew.Dump(response)
 
-		// allocate memory and work on the alias
-		if m.targets[response.TargetID].Task == nil {
-			m.targets[response.TargetID].Task = new(model.TargetTask)
-		}
-		targetTask := m.targets[response.TargetID].Task
+			if _, found := m.targets[response.TargetID]; !found {
+				log.Println("Response from unknown target:", response.TargetID)
+				continue
+			}
+			log.Printf("processResponses %+v", response)
 
-		targetTask.LatestBatchResponse = response
-		if len(targetTask.History) == 0 {
-			targetTask.History = []string{response.TaskID}
-		} else if targetTask.History[len(targetTask.History)-1] != response.TaskID {
-			targetTask.History = append(targetTask.History, response.TaskID)
+			// allocate memory and work on the alias
+			if m.targets[response.TargetID].Tasks == nil {
+				m.targets[response.TargetID].Tasks = new(model.TaskHistory)
+			}
+			targetTask := m.targets[response.TargetID].Tasks
+
+			targetTask.LatestBatchResponse = response
+			if len(targetTask.History) == 0 {
+				targetTask.History = []string{response.TaskID}
+			} else if targetTask.History[len(targetTask.History)-1] != response.TaskID {
+				targetTask.History = append(targetTask.History, response.TaskID)
+			}
 		}
 	}
 }

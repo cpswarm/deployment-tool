@@ -1,20 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
 	zmq "github.com/pebbe/zmq4"
-)
-
-const (
-	reqTopic = "TASK"
-	// <arch>.<os>.<distro>.<os_version>.<hw>.<hw_version>
-	ackTopic = "ACK-"
-	resTopic = "RES-"
 )
 
 type zmqClient struct {
@@ -55,7 +47,7 @@ func startZMQClient(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	go c.startPublisher()
 	go c.startListener()
 
-	err = c.subscriber.SetSubscribe(string(model.ResponseUnspecified))
+	err = c.subscriber.SetSubscribe("")
 	if err != nil {
 		return nil, fmt.Errorf("error subscribing: %s", err)
 	}
@@ -84,17 +76,8 @@ func (c *zmqClient) startListener() {
 			log.Printf("Unable to parse response: %s", msg)
 			continue
 		}
-
-		// de-serialize
-		var response model.BatchResponse
-		err = json.Unmarshal([]byte(parts[1]), &response)
-		if err != nil {
-			log.Printf("error parsing response: %s", err)
-			log.Printf("message was: %s", msg)
-			continue
-		}
 		//log.Printf("startListener %+v", msg)
-		c.pipe.ResponseCh <- response
+		c.pipe.ResponseCh <- model.Message{parts[0], []byte(parts[1])}
 	}
 }
 

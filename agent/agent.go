@@ -82,7 +82,8 @@ func (a *agent) startWorker() {
 
 func (a *agent) advertiseTarget() {
 	for t := time.NewTicker(AdvInterval); true; <-t.C {
-		a.pipe.ResponseCh <- model.BatchResponse{ResponseType: model.ResponseAdvertisement, TargetID: a.ID}
+		b, _ := json.Marshal(a.Target)
+		a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 	}
 }
 
@@ -106,6 +107,7 @@ func (a *agent) handleAnnouncement(payload []byte) {
 				return
 			}
 		}
+		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
 		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: taskA.ID, TargetID: a.ID})
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
@@ -124,6 +126,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}
 	payload = nil // to release memory
 
+	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.ID})
 	a.Tasks.History = append(a.Tasks.History, task.ID)
 
@@ -144,7 +147,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	log.Println("Will send logs every", interval)
 
 	// execute and collect results
-	a.responseBatchCollector(&task, wd, interval, a.pipe.ResponseCh)
+	a.responseBatchCollector(&task, wd, interval)
 }
 
 func (a *agent) saveConfig() {
@@ -165,8 +168,10 @@ func (a *agent) saveConfig() {
 }
 
 func (a *agent) sendResponse(resp *model.BatchResponse) {
+	// serialize
+	b, _ := json.Marshal(resp)
 	// send to channel
-	a.pipe.ResponseCh <- *resp
+	a.pipe.ResponseCh <- model.Message{string(resp.ResponseType), b}
 	// update the status
 	a.Tasks.LatestBatchResponse = *resp
 	a.saveConfig()

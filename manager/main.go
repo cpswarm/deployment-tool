@@ -4,8 +4,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-
-	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
 func main() {
@@ -22,17 +20,6 @@ func main() {
 	m, err := startManager(zmqClient.pipe)
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	// add dummy targets
-	//m.targets["target1"] = &model.Target{}
-	m.targets["iot-raspizero-1"] = &model.Target{
-		ID:   "iot-raspizero-1",
-		Type: "raspizero",
-	}
-	m.targets["iot-raspizero-2"] = &model.Target{
-		ID:   "iot-raspizero-2",
-		Type: "raspizero",
 	}
 
 	go startRESTAPI(":8080", m)

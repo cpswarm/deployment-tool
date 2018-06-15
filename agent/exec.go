@@ -22,7 +22,7 @@ func (a *agent) storeArtifacts(wd string, b []byte) {
 	}
 }
 
-func (a *agent) responseBatchCollector(task *model.Task, wd string, interval time.Duration, out chan model.BatchResponse) {
+func (a *agent) responseBatchCollector(task *model.Task, wd string, interval time.Duration) {
 	resCh := make(chan model.Response)
 
 	go responseCollector(task.Commands, wd, resCh)
