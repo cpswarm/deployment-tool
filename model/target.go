@@ -1,13 +1,10 @@
 package model
 
 type Target struct {
-	ID          string
-	Description string
-	Type        string
-	Task        *TargetTask
-}
+	// identification attributes
+	ID   string
+	Type string
+	Tags []string
 
-type TargetTask struct {
-	LatestBatchResponse BatchResponse
-	History             []string
+	Tasks *TaskHistory
 }

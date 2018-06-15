@@ -19,6 +19,7 @@ const (
 type zmqClient struct {
 	subscriber *zmq.Socket
 	publisher  *zmq.Socket
+	pubMonitor *zmq.Socket
 
 	pipe model.Pipe
 }
@@ -52,6 +53,7 @@ func startZMQClient(subEndpoint, pubEndpoint, agentID string, pipe model.Pipe) (
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)
 	}
 
+	c.monitor()
 	go c.startListener()
 	go c.startResponder()
 
@@ -118,18 +120,63 @@ func (c *zmqClient) startResponder() {
 	}
 }
 
-func (c *zmqClient) close() error {
+func (c *zmqClient) monitor() {
+
+	pubMonitorAddr := "inproc://pub-monitor.rep"
+	err := c.publisher.Monitor(pubMonitorAddr, zmq.EVENT_CONNECTED)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	c.pubMonitor, err = zmq.NewSocket(zmq.PAIR)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = c.pubMonitor.Connect(pubMonitorAddr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	//defer close(chMsg)
+	go func() {
+		for {
+			eventType, eventAddr, _, err := c.pubMonitor.RecvEvent(0)
+			if err != nil {
+				fmt.Printf("s.RecvEvent: %s", err) // TODO send this to manager
+				continue
+			}
+			log.Printf("Event %s %s", eventType, eventAddr)
+			// send to worker
+			c.pipe.RequestCh <- model.Request{Topic: model.RequestTargetAdvertisement}
+		}
+	}()
+
+}
+
+func (c *zmqClient) close() {
 	log.Println("Closing ZeroMQ sockets...")
 
+	// close subscriber
 	err := c.subscriber.Close()
 	if err != nil {
-		return err
+		log.Println(err)
 	}
 
+	// close publisher monitor
+	c.pubMonitor.SetLinger(0)
+	err = c.pubMonitor.Close()
+	if err != nil {
+		log.Println(err)
+	}
+
+	// close publisher
 	err = c.publisher.Close()
 	if err != nil {
-		return err
+		log.Println(err)
 	}
 
-	return nil
 }

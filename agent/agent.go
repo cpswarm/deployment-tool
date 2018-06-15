@@ -14,6 +14,8 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+const AdvInterval = 30 * time.Second
+
 type agent struct {
 	sync.Mutex
 	model.Target
@@ -29,8 +31,8 @@ func startAgent() *agent {
 		configPath: "config.json",
 	}
 	a.loadConf()
-	if a.Task == nil {
-		a.Task = new(model.TargetTask)
+	if a.Tasks == nil {
+		a.Tasks = new(model.TaskHistory)
 	}
 
 	log.Println("TargetID", a.ID)
@@ -65,6 +67,8 @@ func (a *agent) startWorker() {
 	log.Println("Listenning to requests...")
 	for request := range a.pipe.RequestCh {
 		switch request.Topic {
+		case model.RequestTargetAdvertisement:
+			go a.advertiseTarget()
 		case model.RequestTaskAnnouncement:
 			go a.handleAnnouncement(request.Payload)
 		case a.Target.ID:
@@ -73,6 +77,12 @@ func (a *agent) startWorker() {
 		default:
 			go a.handleTask(request.Topic, request.Payload)
 		}
+	}
+}
+
+func (a *agent) advertiseTarget() {
+	for t := time.NewTicker(AdvInterval); true; <-t.C {
+		a.pipe.ResponseCh <- model.BatchResponse{ResponseType: model.ResponseAdvertisement, TargetID: a.ID}
 	}
 }
 
@@ -90,8 +100,8 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	if taskA.Size <= sizeLimit {
 		log.Printf("task announcement. Size: %v", taskA.Size)
 		log.Printf("Total system memory: %d\n", memory.TotalMemory())
-		for i := len(a.Task.History) - 1; i >= 0; i-- {
-			if a.Task.History[i] == taskA.ID {
+		for i := len(a.Tasks.History) - 1; i >= 0; i-- {
+			if a.Tasks.History[i] == taskA.ID {
 				log.Println("Dropping announcement for task", taskA.ID)
 				return
 			}
@@ -115,7 +125,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	payload = nil // to release memory
 
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.ID})
-	a.Task.History = append(a.Task.History, task.ID)
+	a.Tasks.History = append(a.Tasks.History, task.ID)
 
 	// set work directory
 	wd, _ := os.Getwd()
@@ -158,7 +168,7 @@ func (a *agent) sendResponse(resp *model.BatchResponse) {
 	// send to channel
 	a.pipe.ResponseCh <- *resp
 	// update the status
-	a.Task.LatestBatchResponse = *resp
+	a.Tasks.LatestBatchResponse = *resp
 	a.saveConfig()
 }
 

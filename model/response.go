@@ -3,14 +3,15 @@ package model
 type ResponseType string
 
 const (
-	ResponseUnspecified ResponseType = "RES"
-	ResponseAck                      = "ACK"          // received task info
-	ResponseAckTask                  = "ACK_TASK"     // received task
-	ResponseAckTransfer              = "ACK_TRANSFER" // completed transfer to local file system
-	ResponseLog                      = "LOG"          // response stdout and stderr
-	ResponseError                    = "ERROR"        // task ended with errors
-	ResponseSuccess                  = "SUCCESS"      // task ended without errors
-	ResponseClientError              = "CLIENT_ERROR" // client errors
+	ResponseUnspecified   ResponseType = "RES"
+	ResponseAck                        = "ACK"          // received task announcement
+	ResponseAckTask                    = "ACK_TASK"     // received task
+	ResponseAckTransfer                = "ACK_TRANSFER" // completed transfer to local file system
+	ResponseLog                        = "LOG"          // response stdout and stderr
+	ResponseError                      = "ERROR"        // task ended with errors
+	ResponseSuccess                    = "SUCCESS"      // task ended without errors
+	ResponseClientError                = "CLIENT_ERROR" // client errors
+	ResponseAdvertisement              = "ADV"          // agent advertisement
 )
 
 type BatchResponse struct {
@@ -29,9 +30,3 @@ type Response struct {
 	TimeElapsed float64
 	//TimeRemaining float64
 }
-
-//
-//func (br *BatchResponse) Flush(){
-//	br.Responses = []Response{}
-//
-//}

@@ -17,11 +17,10 @@ func main() {
 		managerEndpoint = "tcp://localhost"
 	}
 
-	a := startAgent()
-	defer a.close()
+	agent := startAgent()
+	defer agent.close()
 
-
-	zmqClient, err := startZMQClient(managerEndpoint+":5556", managerEndpoint+":5557", a.Target.ID, a.pipe)
+	zmqClient, err := startZMQClient(managerEndpoint+":5556", managerEndpoint+":5557", agent.Target.ID, agent.pipe)
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
