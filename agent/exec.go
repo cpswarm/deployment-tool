@@ -30,7 +30,7 @@ func (a *agent) responseBatchCollector(task *model.Task, wd string, interval tim
 	batch := model.BatchResponse{
 		ResponseType: model.ResponseLog,
 		TaskID:       task.ID,
-		TargetID:     a.ID,
+		TargetID:     a.target.ID,
 	}
 	var containsErrors bool
 

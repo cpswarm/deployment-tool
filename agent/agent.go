@@ -19,21 +19,20 @@ const AdvInterval = 30 * time.Second
 
 type agent struct {
 	sync.Mutex
-	model.Target
-	configPath string
 
-	pipe model.Pipe
+	target     model.Target
+	configPath string
+	pipe       model.Pipe
 }
 
 func startAgent() *agent {
 	a := &agent{
-		Target:     model.Target{},
 		pipe:       model.NewPipe(),
 		configPath: "config.json",
 	}
 	a.loadConf()
-	if a.Tasks == nil {
-		a.Tasks = new(model.TaskHistory)
+	if a.target.Tasks == nil {
+		a.target.Tasks = new(model.TaskHistory)
 	}
 
 	go a.startWorker()
@@ -44,8 +43,8 @@ func (a *agent) loadConf() {
 	if _, err := os.Stat(a.configPath); os.IsNotExist(err) {
 		log.Println("Configuration file not found.")
 
-		a.ID = uuid.NewV4().String()
-		log.Println("Generated target ID:", a.ID)
+		a.target.ID = uuid.NewV4().String()
+		log.Println("Generated target ID:", a.target.ID)
 		a.saveConfig()
 		return
 	}
@@ -54,23 +53,23 @@ func (a *agent) loadConf() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = json.Unmarshal(b, a)
+	err = json.Unmarshal(b, &a.target)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Loaded config file:", a.configPath)
 
-	if a.ID == "" {
-		a.ID = uuid.NewV4().String()
-		log.Println("Generated target ID:", a.ID)
+	if a.target.ID == "" {
+		a.target.ID = uuid.NewV4().String()
+		log.Println("Generated target ID:", a.target.ID)
 		a.saveConfig()
 	}
 }
 
 func (a *agent) startWorker() {
 	log.Printf("Subscribing to topics...")
-	topics := []string{model.RequestTargetAll, a.Target.ID}
-	topics = append(topics, a.Target.Tags...)
+	topics := []string{model.RequestTargetAll, a.target.ID}
+	topics = append(topics, a.target.Tags...)
 	topicMap := make(map[string]bool)
 	for _, topic := range topics {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(topic)}
@@ -101,7 +100,7 @@ func (a *agent) startWorker() {
 func (a *agent) advertiseTarget() {
 	log.Printf("Will advertise target every %s", AdvInterval)
 	for t := time.NewTicker(AdvInterval); true; <-t.C {
-		b, _ := json.Marshal(a.Target)
+		b, _ := json.Marshal(a.target)
 		a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 	}
 }
@@ -120,17 +119,17 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	if taskA.Size <= sizeLimit {
 		log.Printf("task announcement. Size: %v", taskA.Size)
 		log.Printf("Total system memory: %d\n", memory.TotalMemory())
-		for i := len(a.Tasks.History) - 1; i >= 0; i-- {
-			if a.Tasks.History[i] == taskA.ID {
+		for i := len(a.target.Tasks.History) - 1; i >= 0; i-- {
+			if a.target.Tasks.History[i] == taskA.ID {
 				log.Println("Dropping announcement for task", taskA.ID)
 				return
 			}
 		}
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: taskA.ID, TargetID: a.ID})
+		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: taskA.ID, TargetID: a.target.ID})
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseError, TaskID: taskA.ID, TargetID: a.ID}) // TODO include error message
+		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseError, TaskID: taskA.ID, TargetID: a.target.ID}) // TODO include error message
 	}
 
 }
@@ -146,8 +145,8 @@ func (a *agent) handleTask(id string, payload []byte) {
 	payload = nil // to release memory
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.ID})
-	a.Tasks.History = append(a.Tasks.History, task.ID)
+	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.target.ID})
+	a.target.Tasks.History = append(a.target.Tasks.History, task.ID)
 
 	// set work directory
 	wd, _ := os.Getwd()
@@ -156,11 +155,11 @@ func (a *agent) handleTask(id string, payload []byte) {
 
 	// decompress and store
 	a.storeArtifacts(wd, task.Artifacts)
-	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.ID})
+	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.target.ID})
 	interval, err := time.ParseDuration(task.Log.Interval)
 	if err != nil {
 		log.Println(err)
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseClientError, TaskID: task.ID, TargetID: a.ID})
+		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseClientError, TaskID: task.ID, TargetID: a.target.ID})
 		return
 	}
 	log.Println("Will send logs every", interval)
@@ -173,7 +172,7 @@ func (a *agent) saveConfig() {
 	a.Lock()
 	defer a.Unlock()
 
-	b, err := json.MarshalIndent(a, "", "\t")
+	b, err := json.MarshalIndent(&a.target, "", "\t")
 	if err != nil {
 		log.Println(err)
 		return
@@ -183,7 +182,7 @@ func (a *agent) saveConfig() {
 		log.Println("ERROR:", err)
 		return
 	}
-	//log.Println("Saved configuration:", a.configPath)
+	log.Println("Saved configuration:", a.configPath)
 }
 
 func (a *agent) sendResponse(resp *model.BatchResponse) {
@@ -192,7 +191,7 @@ func (a *agent) sendResponse(resp *model.BatchResponse) {
 	// send to channel
 	a.pipe.ResponseCh <- model.Message{string(resp.ResponseType), b}
 	// update the status
-	a.Tasks.LatestBatchResponse = *resp
+	a.target.Tasks.LatestBatchResponse = *resp
 	a.saveConfig()
 }
 
