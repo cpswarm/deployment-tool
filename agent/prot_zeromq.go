@@ -62,7 +62,7 @@ func (c *zmqClient) startListener() {
 			continue
 		}
 		// split the prefix
-		parts := strings.SplitN(msg, ":", 2)
+		parts := strings.SplitN(msg, model.TopicSeperator, 2)
 		if len(parts) != 2 {
 			log.Fatalln("Unable to parse message") // TODO send to manager
 			continue
@@ -82,18 +82,20 @@ func (c *zmqClient) startOperator() {
 	for op := range c.pipe.OperationCh {
 		// on-demand subscription
 		if op.Topic == model.OperationSubscribe {
-			err := c.subscriber.SetSubscribe(string(op.Payload))
+			topic := string(op.Payload) + model.TopicSeperator
+			err := c.subscriber.SetSubscribe(topic)
 			if err != nil {
 				log.Println(err)
 			}
-			log.Println("Subscribed to", string(op.Payload))
+			log.Println("Subscribed to", topic)
 		}
 		if op.Topic == model.OperationUnsubscribe {
-			err := c.subscriber.SetUnsubscribe(string(op.Payload))
+			topic := string(op.Payload) + model.TopicSeperator
+			err := c.subscriber.SetUnsubscribe(topic)
 			if err != nil {
 				log.Println(err)
 			}
-			log.Println("Unsubscribed from", string(op.Payload))
+			log.Println("Unsubscribed from", topic)
 		}
 	}
 }

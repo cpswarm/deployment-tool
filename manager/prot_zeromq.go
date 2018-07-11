@@ -71,7 +71,7 @@ func (c *zmqClient) startListener() {
 			log.Fatal(err)
 		}
 		// split the prefix
-		parts := strings.SplitN(msg, ":", 2)
+		parts := strings.SplitN(msg, model.TopicSeperator, 2)
 		if len(parts) != 2 {
 			log.Printf("Unable to parse response: %s", msg)
 			continue

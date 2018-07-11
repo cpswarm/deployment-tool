@@ -144,10 +144,6 @@ func (a *agent) handleTask(id string, payload []byte) {
 		log.Fatalln(err) // TODO send to manager
 	}
 	payload = nil // to release memory
-	if task.ID != id {
-		log.Println("Something is not right!  Dropping task.") // e.g. same tag prefix: mypc and mypc2
-		return
-	}
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.ID})

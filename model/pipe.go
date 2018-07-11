@@ -1,5 +1,11 @@
 package model
 
+const (
+	TopicSeperator       = ":"
+	OperationSubscribe   = "SUB"
+	OperationUnsubscribe = "UNSUB"
+)
+
 // Pipe is a bi-directional channel structure
 //	for communication between the clients and manager/agent
 type Pipe struct {
@@ -21,8 +27,3 @@ type Message struct {
 	Topic   string
 	Payload []byte
 }
-
-const (
-	OperationSubscribe   = "SUB"
-	OperationUnsubscribe = "UNSUB"
-)
