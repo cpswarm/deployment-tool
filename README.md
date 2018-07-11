@@ -6,14 +6,17 @@ This repository consists of the following packages:
 * agent: The Deployment Agent responsible for performing tasks and reporting results
 * model: Data models used among other packages
 
-## Components
-### Deployment Manager
+## Compile from source
+### Dependencies
+* [ZeroMQ v4.x.x](http://zeromq.org/intro:get-the-software)
 
-### Deployment Agent
-
-## Checkout and Build
+### Get the codes
 ```
 git clone <repo-address> src/code.linksmart.eu/dt/deployment-tool
+```
+
+### Build
+```
 export GOPATH=$(pwd)
 go install code.linksmart.eu/dt/deployment-tool/manager
 go install code.linksmart.eu/dt/deployment-tool/agent
