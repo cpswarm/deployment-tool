@@ -8,6 +8,7 @@ type Task struct {
 	Time      int64
 	//Size         uint64
 	//Announcement bool
+	TargetTags []string
 }
 
 type Log struct {

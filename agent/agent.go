@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -35,8 +36,6 @@ func startAgent() *agent {
 		a.Tasks = new(model.TaskHistory)
 	}
 
-	log.Println("TargetID", a.ID)
-
 	go a.startWorker()
 	return a
 }
@@ -44,9 +43,9 @@ func startAgent() *agent {
 func (a *agent) loadConf() {
 	if _, err := os.Stat(a.configPath); os.IsNotExist(err) {
 		log.Println("Configuration file not found.")
+
 		a.ID = uuid.NewV4().String()
 		log.Println("Generated target ID:", a.ID)
-
 		a.saveConfig()
 		return
 	}
@@ -61,19 +60,38 @@ func (a *agent) loadConf() {
 	}
 	log.Println("Loaded config file:", a.configPath)
 
+	if a.ID == "" {
+		a.ID = uuid.NewV4().String()
+		log.Println("Generated target ID:", a.ID)
+		a.saveConfig()
+	}
 }
 
 func (a *agent) startWorker() {
+	log.Printf("Subscribing to topics...")
+	topics := []string{model.RequestTargetAll, a.Target.ID}
+	topics = append(topics, a.Target.Tags...)
+	topicMap := make(map[string]bool)
+	for _, topic := range topics {
+		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(topic)}
+		topicMap[topic] = true
+	}
+
 	log.Println("Listenning to requests...")
+	var latestMessageChecksum [16]byte
 	for request := range a.pipe.RequestCh {
-		switch request.Topic {
-		case model.RequestTargetAdvertisement:
+		switch {
+		case model.RequestTargetAdvertisement == request.Topic:
 			go a.advertiseTarget()
-		case model.RequestTaskAnnouncement:
-			go a.handleAnnouncement(request.Payload)
-		case a.Target.ID:
-			log.Println("Target topic")
-			// do nothing
+		case model.RequestTargetAll == request.Topic:
+			// do nothing for now
+		case topicMap[request.Topic]:
+			// an announcement is received as many matching tags but needs to be processed only once
+			sum := md5.Sum(request.Payload)
+			if latestMessageChecksum != sum {
+				go a.handleAnnouncement(request.Payload)
+				latestMessageChecksum = sum
+			}
 		default:
 			go a.handleTask(request.Topic, request.Payload)
 		}
@@ -81,6 +99,7 @@ func (a *agent) startWorker() {
 }
 
 func (a *agent) advertiseTarget() {
+	log.Printf("Will advertise target every %s", AdvInterval)
 	for t := time.NewTicker(AdvInterval); true; <-t.C {
 		b, _ := json.Marshal(a.Target)
 		a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
@@ -95,7 +114,7 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	}
 	payload = nil // to release memory
 
-	log.Printf("handleTask: %s", taskA.ID)
+	log.Printf("handleAnnouncement: %s", taskA.ID)
 
 	sizeLimit := memory.TotalMemory() / 2 // TODO calculate this based on the available memory
 	if taskA.Size <= sizeLimit {
@@ -117,7 +136,7 @@ func (a *agent) handleAnnouncement(payload []byte) {
 }
 
 func (a *agent) handleTask(id string, payload []byte) {
-	log.Printf("processTask: %s", id)
+	log.Printf("handleTask: %s", id)
 
 	var task model.Task
 	err := json.Unmarshal(payload, &task)
@@ -125,6 +144,10 @@ func (a *agent) handleTask(id string, payload []byte) {
 		log.Fatalln(err) // TODO send to manager
 	}
 	payload = nil // to release memory
+	if task.ID != id {
+		log.Println("Something is not right!  Dropping task.") // e.g. same tag prefix: mypc and mypc2
+		return
+	}
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.ID})

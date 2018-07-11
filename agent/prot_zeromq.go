@@ -17,7 +17,7 @@ type zmqClient struct {
 	pipe model.Pipe
 }
 
-func startZMQClient(subEndpoint, pubEndpoint, agentID string, pipe model.Pipe) (*zmqClient, error) {
+func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClient, error) {
 	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 	log.Println("Sub endpoint:", subEndpoint)
 	log.Println("Pub endpoint:", pubEndpoint)
@@ -50,16 +50,6 @@ func startZMQClient(subEndpoint, pubEndpoint, agentID string, pipe model.Pipe) (
 	go c.startListener()
 	go c.startResponder()
 	go c.startOperator()
-
-	// subscribe to fixed topics
-	err = c.subscriber.SetSubscribe(model.RequestTaskAnnouncement)
-	if err != nil {
-		return nil, fmt.Errorf("error subscribing: %s", err)
-	}
-	err = c.subscriber.SetSubscribe(agentID)
-	if err != nil {
-		return nil, fmt.Errorf("error subscribing: %s", err)
-	}
 
 	return c, nil
 }
@@ -96,14 +86,14 @@ func (c *zmqClient) startOperator() {
 			if err != nil {
 				log.Println(err)
 			}
-			log.Println("Subscribed to task", string(op.Payload))
+			log.Println("Subscribed to", string(op.Payload))
 		}
 		if op.Topic == model.OperationUnsubscribe {
 			err := c.subscriber.SetUnsubscribe(string(op.Payload))
 			if err != nil {
 				log.Println(err)
 			}
-			log.Println("Unsubscribed from task", string(op.Payload))
+			log.Println("Unsubscribed from", string(op.Payload))
 		}
 	}
 }

@@ -136,6 +136,7 @@ func HTTPResponseError(w http.ResponseWriter, code int, message ...interface{}) 
 
 // HTTPResponse writes a response
 func HTTPResponse(w http.ResponseWriter, code int, body []byte) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_, err := w.Write(body)
 	if err != nil {

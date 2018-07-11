@@ -1,6 +1,6 @@
 package model
 
 const (
-	RequestTaskAnnouncement    = "TASK"
+	RequestTargetAll           = "ALL"
 	RequestTargetAdvertisement = "ADV"
 )

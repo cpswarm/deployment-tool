@@ -27,8 +27,7 @@ type Stages struct {
 }
 
 type DeploymentTarget struct {
-	ByName []string
-	ByType []string
+	Tags []string
 }
 
 type DeploymentInfo struct {

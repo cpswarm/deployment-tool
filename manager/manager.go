@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
@@ -15,6 +16,7 @@ import (
 )
 
 type manager struct {
+	sync.RWMutex
 	registry
 
 	pipe model.Pipe
@@ -33,6 +35,19 @@ func startManager(pipe model.Pipe) (*manager, error) {
 }
 
 func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) {
+	m.RLock()
+TARGETS:
+	for _, target := range m.targets {
+		for _, t := range target.Tags {
+			for _, t2 := range descr.Target.Tags {
+				if t == t2 {
+					descr.DeploymentInfo.MatchingTargets = append(descr.DeploymentInfo.MatchingTargets, target.ID)
+					continue TARGETS
+				}
+			}
+		}
+	}
+	m.RUnlock()
 
 	var compressedArchive []byte
 	var err error
@@ -44,11 +59,12 @@ func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) 
 	}
 
 	task := model.Task{
-		ID:        newTaskID(),
-		Commands:  descr.Stages.Install,
-		Artifacts: compressedArchive,
-		Time:      time.Now().Unix(),
-		Log:       descr.Log,
+		ID:         newTaskID(),
+		Commands:   descr.Stages.Install,
+		Artifacts:  compressedArchive,
+		Time:       time.Now().Unix(),
+		Log:        descr.Log,
+		TargetTags: descr.Target.Tags,
 	}
 
 	//m.tasks = append(m.tasks, task)
@@ -93,7 +109,9 @@ func (m *manager) sendTask(task *model.Task) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		m.pipe.RequestCh <- model.Message{model.RequestTaskAnnouncement, b}
+		for _, tag := range task.TargetTags {
+			m.pipe.RequestCh <- model.Message{tag, b}
+		}
 
 		time.Sleep(time.Second)
 
@@ -129,7 +147,7 @@ func (m *manager) processResponses() {
 				continue
 			}
 			m.targets[target.ID] = &target
-			log.Printf("Discoverred target: %s %s %s", target.ID, target.Type, target.Tags)
+			log.Printf("Received target advertisement: %s Tags: %s", target.ID, target.Tags)
 		default:
 			var response model.BatchResponse
 			err := json.Unmarshal(resp.Payload, &response)
@@ -147,10 +165,12 @@ func (m *manager) processResponses() {
 			}
 			log.Printf("processResponses %+v", response)
 
+			m.Lock()
 			// allocate memory and work on the alias
 			if m.targets[response.TargetID].Tasks == nil {
 				m.targets[response.TargetID].Tasks = new(model.TaskHistory)
 			}
+			m.Unlock()
 			targetTask := m.targets[response.TargetID].Tasks
 
 			targetTask.LatestBatchResponse = response

@@ -1,4 +1,4 @@
-version: 0.2
+version: 0.3
 
 stages:
   assemble: # commands run by manager (e.g. packaging, cross-compilation)
@@ -18,14 +18,9 @@ stages:
     - manually # signal from AL or Command & Monitoring Tool (CMT)
 
 target:
-  all: true
-  byname:
-    - iot-raspizero-1
-  bytype:
-    - pizero
-    - turtlebot
-  bytag:
-    - groupA
+  tags:
+    - macbook
+    - mypc
 
 log:
   interval: 3s

@@ -20,7 +20,7 @@ func main() {
 	agent := startAgent()
 	defer agent.close()
 
-	zmqClient, err := startZMQClient(managerEndpoint+":5556", managerEndpoint+":5557", agent.Target.ID, agent.pipe)
+	zmqClient, err := startZMQClient(managerEndpoint+":5556", managerEndpoint+":5557", agent.pipe)
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
