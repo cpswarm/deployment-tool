@@ -154,18 +154,17 @@ func (a *agent) handleTask(id string, payload []byte) {
 	log.Println("Task work directory:", wd)
 
 	// decompress and store
-	a.storeArtifacts(wd, task.Artifacts)
+	storeArtifacts(wd, task.Artifacts)
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.target.ID})
-	interval, err := time.ParseDuration(task.Log.Interval)
-	if err != nil {
-		log.Println(err)
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseClientError, TaskID: task.ID, TargetID: a.target.ID})
-		return
-	}
-	log.Println("Will send logs every", interval)
 
 	// execute and collect results
-	a.responseBatchCollector(&task, wd, interval)
+	resCh := make(chan *model.BatchResponse)
+	go func() {
+		for res := range resCh {
+			a.sendResponse(res)
+		}
+	}()
+	responseBatchCollector(&task, wd, resCh)
 }
 
 func (a *agent) saveConfig() {
@@ -186,6 +185,7 @@ func (a *agent) saveConfig() {
 }
 
 func (a *agent) sendResponse(resp *model.BatchResponse) {
+	resp.TargetID = a.target.ID
 	// serialize
 	b, _ := json.Marshal(resp)
 	// send to channel

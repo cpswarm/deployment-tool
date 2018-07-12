@@ -14,7 +14,7 @@ import (
 	"github.com/mholt/archiver"
 )
 
-func (a *agent) storeArtifacts(wd string, b []byte) {
+func storeArtifacts(wd string, b []byte) {
 	log.Printf("Deploying %d bytes of artifacts.", len(b))
 	err := archiver.TarGz.Read(bytes.NewBuffer(b), wd)
 	if err != nil {
@@ -22,18 +22,26 @@ func (a *agent) storeArtifacts(wd string, b []byte) {
 	}
 }
 
-func (a *agent) responseBatchCollector(task *model.Task, wd string, interval time.Duration) {
-	resCh := make(chan model.Response)
+func responseBatchCollector(task *model.Task, wd string, out chan *model.BatchResponse) {
 
-	go responseCollector(task.Commands, wd, resCh)
-
-	batch := model.BatchResponse{
+	batch := &model.BatchResponse{
 		ResponseType: model.ResponseLog,
 		TaskID:       task.ID,
-		TargetID:     a.target.ID,
 	}
-	var containsErrors bool
 
+	// logging attributes
+	interval, err := time.ParseDuration(task.Log.Interval)
+	if err != nil {
+		log.Println(err)
+		batch.ResponseType = model.ResponseClientError
+		out <- batch
+		return
+	}
+	log.Println("Will send logs every", interval)
+
+	resCh := make(chan model.Response)
+	go responseCollector(task.Commands, wd, resCh)
+	var containsErrors bool
 	ticker := time.NewTicker(interval)
 LOOP:
 	for {
@@ -48,9 +56,11 @@ LOOP:
 			batch.Responses = append(batch.Responses, res)
 			batch.TimeElapsed = res.TimeElapsed
 		case <-ticker.C:
-			//out <- batch
-			a.sendResponse(&batch)
-			//log.Printf("Batch: %+v", batch)
+			if len(batch.Responses) == 0 {
+				break
+			}
+			out <- batch
+			log.Printf("Batch: %+v", batch)
 
 			// flush responses
 			batch.Responses = []model.Response{}
@@ -62,8 +72,7 @@ LOOP:
 		batch.ResponseType = model.ResponseSuccess
 	}
 
-	//out <- batch
-	a.sendResponse(&batch)
+	out <- batch
 	log.Printf("Final Batch: %+v", batch)
 }
 
@@ -105,7 +114,7 @@ type logLine struct {
 }
 
 func execute(command, wd string, stdout, stderr chan logLine) {
-	bashCommand := []string{"/bin/bash", "-c", command}
+	bashCommand := []string{"/bin/sh", "-c", command}
 	cmd := exec.Command(bashCommand[0], bashCommand[1:]...)
 
 	cmd.Dir = wd
