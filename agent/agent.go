@@ -153,18 +153,22 @@ func (a *agent) handleTask(id string, payload []byte) {
 	wd = fmt.Sprintf("%s/tasks/%s", wd, task.ID)
 	log.Println("Task work directory:", wd)
 
+	// start a new executor
+	exec := newExecutor(wd)
+
 	// decompress and store
-	storeArtifacts(wd, task.Artifacts)
+	exec.storeArtifacts(task.Artifacts)
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.target.ID})
 
 	// execute and collect results
-	resCh := make(chan *model.BatchResponse)
+	resCh := make(chan model.BatchResponse)
 	go func() {
 		for res := range resCh {
-			a.sendResponse(res)
+			a.sendResponse(&res)
 		}
 	}()
-	responseBatchCollector(&task, wd, resCh)
+	exec.responseBatchCollector(&task, resCh)
+
 }
 
 func (a *agent) saveConfig() {
@@ -187,7 +191,10 @@ func (a *agent) saveConfig() {
 func (a *agent) sendResponse(resp *model.BatchResponse) {
 	resp.TargetID = a.target.ID
 	// serialize
-	b, _ := json.Marshal(resp)
+	b, err := json.Marshal(resp)
+	if err != nil {
+		log.Println(err)
+	}
 	// send to channel
 	a.pipe.ResponseCh <- model.Message{string(resp.ResponseType), b}
 	// update the status

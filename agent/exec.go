@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"sync/atomic"
 	"syscall"
@@ -14,17 +15,26 @@ import (
 	"github.com/mholt/archiver"
 )
 
-func storeArtifacts(wd string, b []byte) {
+type executor struct {
+	workDir string
+	cmd     *exec.Cmd
+}
+
+func newExecutor(workDir string) *executor {
+	return &executor{workDir: workDir}
+}
+
+func (e *executor) storeArtifacts(b []byte) {
 	log.Printf("Deploying %d bytes of artifacts.", len(b))
-	err := archiver.TarGz.Read(bytes.NewBuffer(b), wd)
+	err := archiver.TarGz.Read(bytes.NewBuffer(b), e.workDir)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func responseBatchCollector(task *model.Task, wd string, out chan *model.BatchResponse) {
+func (e *executor) responseBatchCollector(task *model.Task, out chan model.BatchResponse) {
 
-	batch := &model.BatchResponse{
+	batch := model.BatchResponse{
 		ResponseType: model.ResponseLog,
 		TaskID:       task.ID,
 	}
@@ -40,7 +50,7 @@ func responseBatchCollector(task *model.Task, wd string, out chan *model.BatchRe
 	log.Println("Will send logs every", interval)
 
 	resCh := make(chan model.Response)
-	go responseCollector(task.Commands, wd, resCh)
+	go e.responseCollector(task.Commands, resCh)
 	var containsErrors bool
 	ticker := time.NewTicker(interval)
 LOOP:
@@ -76,13 +86,13 @@ LOOP:
 	log.Printf("Final Batch: %+v", batch)
 }
 
-func responseCollector(commands []string, wd string, out chan model.Response) {
+func (e *executor) responseCollector(commands []string, out chan model.Response) {
 	start := time.Now()
 
 	stdout, stderr := make(chan logLine), make(chan logLine)
 	callback := make(chan error)
 
-	go executeMultiple(commands, wd, stdout, stderr, callback)
+	go e.executeMultiple(commands, stdout, stderr, callback)
 
 	for open := true; open; {
 		select {
@@ -99,9 +109,9 @@ func responseCollector(commands []string, wd string, out chan model.Response) {
 	close(out)
 }
 
-func executeMultiple(commands []string, wd string, stdout, stderr chan logLine, callback chan error) {
+func (e *executor) executeMultiple(commands []string, stdout, stderr chan logLine, callback chan error) {
 	for _, command := range commands {
-		execute(command, wd, stdout, stderr)
+		e.execute(command, stdout, stderr)
 	}
 	close(callback)
 }
@@ -113,22 +123,22 @@ type logLine struct {
 	lineNum uint32
 }
 
-func execute(command, wd string, stdout, stderr chan logLine) {
+func (e *executor) execute(command string, stdout, stderr chan logLine) {
 	bashCommand := []string{"/bin/sh", "-c", command}
-	cmd := exec.Command(bashCommand[0], bashCommand[1:]...)
+	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
 
-	cmd.Dir = wd
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	cmd.SysProcAttr.Setsid = true
+	e.cmd.Dir = e.workDir
+	e.cmd.SysProcAttr = &syscall.SysProcAttr{}
+	e.cmd.SysProcAttr.Setsid = true
 
 	var line uint32
 
-	outStream, err := cmd.StdoutPipe()
+	outStream, err := e.cmd.StdoutPipe()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	errStream, err := cmd.StderrPipe()
+	errStream, err := e.cmd.StderrPipe()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -167,7 +177,7 @@ func execute(command, wd string, stdout, stderr chan logLine) {
 
 	//defer log.Println("closing execute")
 
-	err = cmd.Run()
+	err = e.cmd.Run()
 	if err != nil {
 		atomic.AddUint32(&line, 1)
 		stderr <- logLine{command, err.Error(), line}
@@ -176,4 +186,39 @@ func execute(command, wd string, stdout, stderr chan logLine) {
 	atomic.AddUint32(&line, 1)
 	stdout <- logLine{command, "exit status 0", line}
 
+}
+
+func (e *executor) stop() {
+	if e.cmd == nil || e.cmd.Process == nil {
+		return
+	}
+
+	// try to terminate
+	group, err := os.FindProcess(-1 * e.cmd.Process.Pid)
+	if err != nil {
+		log.Println("Error finding pid:", err)
+		return
+	}
+	err = group.Signal(syscall.SIGTERM)
+	if err != nil {
+		log.Println("Error terminating process:", err)
+		return
+	}
+	if e.cmd.Process == nil {
+		log.Println("Terminated process:", e.cmd.Process.Pid)
+		return
+	}
+
+	// try to kill
+	group, err = os.FindProcess(-1 * e.cmd.Process.Pid)
+	if err != nil {
+		log.Println("Error finding pid:", err)
+		return
+	}
+	err = group.Signal(syscall.SIGKILL)
+	if err != nil {
+		log.Println("Error killing process:", err)
+		return
+	}
+	log.Println("Killed process:", e.cmd.Process.Pid)
 }
