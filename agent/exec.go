@@ -192,33 +192,26 @@ func (e *executor) stop() {
 	if e.cmd == nil || e.cmd.Process == nil {
 		return
 	}
+	pid := e.cmd.Process.Pid
+	log.Printf("Stopping process: %d", pid)
 
-	// try to terminate
-	group, err := os.FindProcess(-1 * e.cmd.Process.Pid)
-	if err != nil {
-		log.Println("Error finding pid:", err)
-		return
-	}
-	err = group.Signal(syscall.SIGTERM)
+	err := e.cmd.Process.Signal(syscall.SIGTERM)
 	if err != nil {
 		log.Println("Error terminating process:", err)
 		return
 	}
-	if e.cmd.Process == nil {
-		log.Println("Terminated process:", e.cmd.Process.Pid)
+	err = e.cmd.Process.Release()
+	if err != nil {
+		log.Println("Error releasing process:", err)
+	} else {
+		log.Println("Terminated process:", pid)
 		return
 	}
 
-	// try to kill
-	group, err = os.FindProcess(-1 * e.cmd.Process.Pid)
-	if err != nil {
-		log.Println("Error finding pid:", err)
-		return
-	}
-	err = group.Signal(syscall.SIGKILL)
+	err = e.cmd.Process.Kill()
 	if err != nil {
 		log.Println("Error killing process:", err)
 		return
 	}
-	log.Println("Killed process:", e.cmd.Process.Pid)
+	log.Println("Killed process:", pid)
 }
