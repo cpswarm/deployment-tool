@@ -12,10 +12,13 @@ stages:
     - chmod +x package/rescue
   test:
     - sh test-script.sh
-  activate:
-    - on-success # when tests pass
-    - on-startup
-    - manually # signal from AL or Command & Monitoring Tool (CMT)
+
+
+activation:
+  execute:
+    - python -u package/app.py
+  autoStart: true
+  remoteControl: false
 
 target:
   tags:

@@ -35,6 +35,11 @@ func startManager(pipe model.Pipe) (*manager, error) {
 }
 
 func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) {
+
+	if len(descr.Activation.Execute) > 1 {
+		return nil, fmt.Errorf("execution of multiple processes is currently not supported")
+	}
+
 	m.RLock()
 TARGETS:
 	for _, target := range m.targets {
@@ -62,17 +67,17 @@ TARGETS:
 		ID:         newTaskID(),
 		Commands:   descr.Stages.Install,
 		Artifacts:  compressedArchive,
-		Time:       time.Now().Unix(),
+		Activation: descr.Activation,
 		Log:        descr.Log,
-		TargetTags: descr.Target.Tags,
 	}
 
 	//m.tasks = append(m.tasks, task)
 	descr.DeploymentInfo.TaskID = task.ID
+	descr.DeploymentInfo.Created = time.Now().Format(time.RFC3339)
 	descr.DeploymentInfo.TransferSize = len(compressedArchive)
 	m.taskDescriptions = append(m.taskDescriptions, descr)
 
-	go m.sendTask(&task)
+	go m.sendTask(&task, descr.Target.Tags)
 
 	return &descr, nil
 }
@@ -96,7 +101,7 @@ func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (m *manager) sendTask(task *model.Task) {
+func (m *manager) sendTask(task *model.Task, targetTags []string) {
 	pending := true
 
 	for pending {
@@ -109,7 +114,7 @@ func (m *manager) sendTask(task *model.Task) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		for _, tag := range task.TargetTags {
+		for _, tag := range targetTags {
 			m.pipe.RequestCh <- model.Message{tag, b}
 		}
 

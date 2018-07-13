@@ -11,9 +11,10 @@ type registry struct {
 }
 
 type TaskDescription struct {
-	Stages Stages
-	Target DeploymentTarget
-	Log    model.Log
+	Stages     Stages
+	Activation model.Activation
+	Target     DeploymentTarget
+	Log        model.Log
 
 	DeploymentInfo DeploymentInfo
 }
@@ -23,7 +24,6 @@ type Stages struct {
 	Transfer []string
 	Install  []string
 	Test     []string
-	Activate []string
 }
 
 type DeploymentTarget struct {
@@ -32,6 +32,7 @@ type DeploymentTarget struct {
 
 type DeploymentInfo struct {
 	TaskID          string
+	Created         string
 	TransferSize    int
 	MatchingTargets []string
 }

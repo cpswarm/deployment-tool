@@ -1,14 +1,12 @@
 package model
 
+// Task is a struct with all the information for deployment on a target
 type Task struct {
-	ID        string
-	Commands  []string
-	Artifacts []byte
-	Log       Log
-	Time      int64
-	//Size         uint64
-	//Announcement bool
-	TargetTags []string
+	ID         string
+	Commands   []string
+	Artifacts  []byte
+	Log        Log
+	Activation Activation
 }
 
 type Log struct {
@@ -21,7 +19,10 @@ type TaskAnnouncement struct {
 	Size uint64
 }
 
-type TaskHistory struct {
-	LatestBatchResponse BatchResponse
-	History             []string
+
+
+type Activation struct {
+	Execute       []string
+	AutoStart     bool `yaml:"autoStart" json:"autoStart"`
+	RemoteControl bool
 }

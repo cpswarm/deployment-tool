@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"sync/atomic"
 	"syscall"
@@ -32,25 +31,24 @@ func (e *executor) storeArtifacts(b []byte) {
 	}
 }
 
-func (e *executor) responseBatchCollector(task *model.Task, out chan model.BatchResponse) {
+func (e *executor) responseBatchCollector(commands []string, logging model.Log, out chan model.BatchResponse) bool {
 
 	batch := model.BatchResponse{
 		ResponseType: model.ResponseLog,
-		TaskID:       task.ID,
 	}
 
 	// logging attributes
-	interval, err := time.ParseDuration(task.Log.Interval)
+	interval, err := time.ParseDuration(logging.Interval)
 	if err != nil {
 		log.Println(err)
 		batch.ResponseType = model.ResponseClientError
 		out <- batch
-		return
+		return false
 	}
 	log.Println("Will send logs every", interval)
 
 	resCh := make(chan model.Response)
-	go e.responseCollector(task.Commands, resCh)
+	go e.responseCollector(commands, resCh)
 	var containsErrors bool
 	ticker := time.NewTicker(interval)
 LOOP:
@@ -84,6 +82,7 @@ LOOP:
 
 	out <- batch
 	log.Printf("Final Batch: %+v", batch)
+	return !containsErrors
 }
 
 func (e *executor) responseCollector(commands []string, out chan model.Response) {

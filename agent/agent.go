@@ -34,6 +34,11 @@ func startAgent() *agent {
 	if a.target.Tasks == nil {
 		a.target.Tasks = new(model.TaskHistory)
 	}
+	// autostart
+	log.Println(a.target.Tasks.Activation)
+	if a.target.Tasks.Activation.AutoStart {
+		a.activate(a.target.Tasks.Activation, a.target.Tasks.Logging, a.target.Tasks.LatestBatchResponse.TaskID)
+	}
 
 	go a.startWorker()
 	return a
@@ -158,17 +163,54 @@ func (a *agent) handleTask(id string, payload []byte) {
 
 	// decompress and store
 	exec.storeArtifacts(task.Artifacts)
+	task.Artifacts = nil // release memory
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.target.ID})
 
 	// execute and collect results
 	resCh := make(chan model.BatchResponse)
 	go func() {
 		for res := range resCh {
+			res.TaskID = task.ID
 			a.sendResponse(&res)
 		}
 	}()
-	exec.responseBatchCollector(&task, resCh)
+	success := exec.responseBatchCollector(task.Commands, task.Log, resCh)
+	if success {
+		a.activate(task.Activation, task.Log, task.ID)
+	}
+}
 
+func (a *agent) activate(activation model.Activation, logging model.Log, taskID string) {
+	if len(activation.Execute) == 0 {
+		return
+	}
+	a.target.Tasks.Activation = activation
+	a.target.Tasks.Logging = logging
+	a.saveConfig()
+
+	if activation.AutoStart {
+		log.Printf("Activating task :%s", taskID)
+
+		wd, _ := os.Getwd()
+		wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
+		// start a new executor
+		exec := newExecutor(wd)
+
+		// execute and collect results
+		resCh := make(chan model.BatchResponse)
+		go func() {
+			for res := range resCh {
+				res.TaskID = taskID
+				a.sendResponse(&res)
+			}
+		}()
+		go exec.responseBatchCollector(activation.Execute, logging, resCh)
+	}
+
+	if activation.RemoteControl {
+		// TODO
+		log.Println("Remote activation is not implemented!")
+	}
 }
 
 func (a *agent) saveConfig() {
