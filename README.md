@@ -7,19 +7,17 @@ This repository consists of the following packages:
 * model: Data models used among other packages
 
 ## Development Status
-| Feature                          | Status |
-|----------------------------------|:------:|
-| Deployment Status                | Beta   |
-| Deployment Logs                  | Alpha  |
-| Package Assembly                 | -      |
-| Selective Deployment (Targeting) | Beta   |
-| Package Transfer                 | Beta   |
-| Package Installation             | Beta   |
-| Validation Testing               | -      |
-| Package Activation               | -      |
-| Certificate Manager              | -      |
-| Package Validation               | -      |
-| Tamper Detection                 | -      |
+| Feature                          | Functional |
+|----------------------------------|:----------:|
+| Deployment Logs                  | ✔          |
+| Package Assembly                 | -          |
+| Package Transfer                 | ✔          |
+| Package Installation             | ✔          |
+| Validation Testing               | -          |
+| Package Activation               | ✔          |
+| Certificate Manager              | -          |
+| Package Validation               | -          |
+| Tamper Detection                 | -          |
 ## Compile from source
 ### Dependencies
 * [ZeroMQ v4.x.x](http://zeromq.org/intro:get-the-software)
