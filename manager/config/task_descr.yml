@@ -1,33 +1,35 @@
 version: 0.3
 
+# Deployment stages
 stages:
-  assemble: # commands run by manager (e.g. packaging, cross-compilation)
+  # commands run locally by the manager (e.g. packaging, cross-compilation)
+  assemble:
     - make
     - make clean
-  transfer: # list of files and directories copied to targets
+  # list of files and directories copied to targets
+  transfer:
     - package
-  install: # commands run by agent
-    - chmod +x package/monitor
-    - sleep 5
-    - chmod +x package/rescue
+  # commands run on target devices
+  install:
+    - mv package/dummy.py package/app.py
+  # validation tests
   test:
     - sh test-script.sh
-
-
-activation:
-  execute:
+  # package execution on target devices
+  activate:
     - python -u package/app.py
-  autoStart: true
-  remoteControl: false
 
+# Which target devices should receive the package
 target:
   tags:
-    - macbook
-    - mypc
+    - groupA
+    - turtlebot
 
+# How target devices report logs
 log:
   interval: 3s
   verbosity: DEBUG
-  # DEBUG: INFO and agent logs
-  # INFO: ERROR and stdout stages
+  # The following verbosity levels are supported:
   # ERROR: stderr of stages
+  # INFO: ERROR and stdout stages
+  # DEBUG: INFO and agent internal logs

@@ -36,7 +36,7 @@ func startAgent() *agent {
 	}
 	// autostart
 	log.Println(a.target.Tasks.Activation)
-	if a.target.Tasks.Activation.AutoStart {
+	if len(a.target.Tasks.Activation) > 0 {
 		a.activate(a.target.Tasks.Activation, a.target.Tasks.Logging, a.target.Tasks.LatestBatchResponse.TaskID)
 	}
 
@@ -180,37 +180,31 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}
 }
 
-func (a *agent) activate(activation model.Activation, logging model.Log, taskID string) {
-	if len(activation.Execute) == 0 {
+func (a *agent) activate(commands []string, logging model.Log, taskID string) {
+	if len(commands) == 0 {
 		return
 	}
-	a.target.Tasks.Activation = activation
+	a.target.Tasks.Activation = commands
 	a.target.Tasks.Logging = logging
 	a.saveConfig()
 
-	if activation.AutoStart {
-		log.Printf("Activating task :%s", taskID)
+	log.Printf("Activating task :%s", taskID)
 
-		wd, _ := os.Getwd()
-		wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
-		// start a new executor
-		exec := newExecutor(wd)
+	wd, _ := os.Getwd()
+	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
+	// start a new executor
+	exec := newExecutor(wd)
 
-		// execute and collect results
-		resCh := make(chan model.BatchResponse)
-		go func() {
-			for res := range resCh {
-				res.TaskID = taskID
-				a.sendResponse(&res)
-			}
-		}()
-		go exec.responseBatchCollector(activation.Execute, logging, resCh)
-	}
+	// execute and collect results
+	resCh := make(chan model.BatchResponse)
+	go func() {
+		for res := range resCh {
+			res.TaskID = taskID
+			a.sendResponse(&res)
+		}
+	}()
+	go exec.responseBatchCollector(commands, logging, resCh)
 
-	if activation.RemoteControl {
-		// TODO
-		log.Println("Remote activation is not implemented!")
-	}
 }
 
 func (a *agent) saveConfig() {

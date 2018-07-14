@@ -6,7 +6,7 @@ type Task struct {
 	Commands   []string
 	Artifacts  []byte
 	Log        Log
-	Activation Activation
+	Activation []string
 }
 
 type Log struct {
@@ -17,12 +17,4 @@ type Log struct {
 type TaskAnnouncement struct {
 	ID   string
 	Size uint64
-}
-
-
-
-type Activation struct {
-	Execute       []string
-	AutoStart     bool `yaml:"autoStart" json:"autoStart"`
-	RemoteControl bool
 }

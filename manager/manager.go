@@ -36,8 +36,8 @@ func startManager(pipe model.Pipe) (*manager, error) {
 
 func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) {
 
-	if len(descr.Activation.Execute) > 1 {
-		return nil, fmt.Errorf("execution of multiple processes is currently not supported")
+	if len(descr.Stages.Activate) > 1 {
+		return nil, fmt.Errorf("activation request error: execution of multiple processes is currently not supported")
 	}
 
 	m.RLock()
@@ -67,7 +67,7 @@ TARGETS:
 		ID:         newTaskID(),
 		Commands:   descr.Stages.Install,
 		Artifacts:  compressedArchive,
-		Activation: descr.Activation,
+		Activation: descr.Stages.Activate,
 		Log:        descr.Log,
 	}
 

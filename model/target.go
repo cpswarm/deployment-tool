@@ -12,7 +12,7 @@ type Target struct {
 
 type TaskHistory struct {
 	LatestBatchResponse BatchResponse
-	Activation          Activation
+	Activation          []string
 	Logging             Log
 	History             []string
 }
