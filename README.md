@@ -24,7 +24,7 @@ This repository consists of the following packages:
 
 ### Get the codes
 ```
-git clone <repo-address> src/code.linksmart.eu/dt/deployment-tool
+git clone <repo-address> deployment-tool/src/code.linksmart.eu/dt/deployment-tool
 ```
 
 ### Build
