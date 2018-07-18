@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
 	zmq "github.com/pebbe/zmq4"
@@ -131,6 +132,7 @@ func (c *zmqClient) monitor() {
 			}
 			log.Printf("Event %s %s", eventType, eventAddr)
 			// send to worker
+			time.Sleep(time.Second) // solves missing pub on slow connections
 			c.pipe.RequestCh <- model.Message{Topic: model.RequestTargetAdvertisement}
 		}
 	}()
