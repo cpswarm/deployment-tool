@@ -1,0 +1,14 @@
+FROM farshidtz/zeromq-armv7
+
+ARG GO_VER=1.10.3
+
+WORKDIR /home
+
+ARG GO_ARCHIVE=go$GO_VER.linux-armv6l.tar.gz
+RUN wget --quiet https://dl.google.com/go/$GO_ARCHIVE && \
+    tar -C /usr/local -xzf $GO_ARCHIVE && \
+    rm $GO_ARCHIVE
+ENV PATH=$PATH:/usr/local/go/bin
+
+# BUILD
+# docker build -f Dockerfile-zeromq-go -t farshidtz/zeromq-armv7:go .
