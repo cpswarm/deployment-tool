@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"code.linksmart.eu/dt/deployment-tool/agent/buffer"
 	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/pbnjay/memory"
 	"github.com/satori/go.uuid"
@@ -195,15 +196,22 @@ func (a *agent) activate(commands []string, logging model.Log, taskID string) {
 	// start a new executor
 	exec := newExecutor(wd)
 
+	buf := buffer.NewBuffer(5)
+
 	// execute and collect results
-	resCh := make(chan model.BatchResponse)
+	resCh := make(chan model.Response)
 	go func() {
 		for res := range resCh {
-			res.TaskID = taskID
-			a.sendResponse(&res)
+			if res.Stdout != "" {
+				buf.Insert(res.Stdout)
+			} else {
+				buf.Insert(res.Stderr)
+			}
+			log.Printf("Activation log: %v", buf.Collect())
 		}
+		log.Printf("Process ended: %s", taskID)
 	}()
-	go exec.responseBatchCollector(commands, logging, resCh)
+	go exec.responseCollector(commands, resCh)
 
 }
 
