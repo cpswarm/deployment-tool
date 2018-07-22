@@ -8,6 +8,7 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetOutput(os.Stdout)
 	log.Println("started deployment agent")
 	defer log.Println("bye.")
 
