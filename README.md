@@ -18,10 +18,16 @@ This repository consists of the following packages:
 | Certificate Manager              | -          |
 | Package Validation               | -          |
 | Tamper Detection                 | -          |
-## Compile from source
+
 ### Dependencies
 * [ZeroMQ v4.x.x](http://zeromq.org/intro:get-the-software)
 
+**Install via apt**
+```
+sudo apt install libzmq5
+```
+
+## Compile from source
 ### Get the codes
 ```
 git clone <repo-address> deployment-tool/src/code.linksmart.eu/dt/deployment-tool
