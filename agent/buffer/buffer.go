@@ -3,24 +3,26 @@ package buffer
 
 import (
 	"sync"
+
+	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
-func NewBuffer(capacity uint8) *buffer {
-	return &buffer{
+func NewBuffer(capacity uint8) Buffer {
+	return Buffer{
 		capacity: capacity,
 	}
 }
 
-type buffer struct {
-	sync.RWMutex
-	list     []string
+type Buffer struct {
+	mutex    sync.RWMutex
+	list     []model.Response
 	capacity uint8
 	index    uint8
 }
 
-func (b *buffer) Insert(line string) {
-	b.RLock()
-	defer b.RUnlock()
+func (b *Buffer) Insert(line model.Response) {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
 
 	if uint8(len(b.list)) < b.capacity { // buffer expanding
 		b.list = append(b.list, line)
@@ -33,9 +35,9 @@ func (b *buffer) Insert(line string) {
 	}
 }
 
-func (b *buffer) Collect() []string {
-	b.Lock()
-	defer b.Unlock()
+func (b *Buffer) Collect() []model.Response {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
 	return append(b.list[b.index:], b.list[:b.index]...)
 }

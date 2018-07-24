@@ -7,11 +7,13 @@ import (
 	"net/http"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
+	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v2"
 )
 
 type restAPI struct {
 	manager *manager
+	router  *mux.Router
 }
 
 func startRESTAPI(bindAddr string, manager *manager) {
@@ -20,34 +22,36 @@ func startRESTAPI(bindAddr string, manager *manager) {
 		manager: manager,
 	}
 
-	h := http.NewServeMux()
-
-	h.HandleFunc("/tasks", a.TaskHandler)
-	h.HandleFunc("/targets", a.TargetHandler)
+	a.setupRouter()
 
 	log.Println("RESTAPI: Binding to", bindAddr)
-	err := http.ListenAndServe(bindAddr, h)
+	err := http.ListenAndServe(bindAddr, a.router)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func (a *restAPI) TaskHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL)
-	defer log.Println(r.Method, r.URL, "responded.")
+func (a *restAPI) setupRouter() {
+	r := mux.NewRouter()
+	// targets
+	r.HandleFunc("/targets/{id}/logs/{stage}", a.GetTargetLogs).Methods("PUT")
+	r.HandleFunc("/targets/{id}", a.GetTarget).Methods("GET")
+	r.HandleFunc("/targets", a.GetTargets).Methods("GET")
+	// tasks
+	r.HandleFunc("/tasks", a.ListTasks).Methods("GET")
+	r.HandleFunc("/tasks", a.AddTask).Methods("POST")
 
-	switch r.Method {
-	case http.MethodPost:
-		a.AddTask(w, r)
-		return
-	case http.MethodGet:
-		a.ListTasks(w, r)
-		return
-	default:
-		HTTPResponseError(w, http.StatusMethodNotAllowed)
-		return
-	}
+	r.Use(loggingMiddleware)
 
+	a.router = r
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println(r.Method, r.RequestURI)
+		next.ServeHTTP(w, r)
+		log.Println(r.Method, r.URL, "responded.")
+	})
 }
 
 func (a *restAPI) AddTask(w http.ResponseWriter, r *http.Request) {
@@ -88,22 +92,7 @@ func (a *restAPI) ListTasks(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) TargetHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL)
-	defer log.Println(r.Method, r.URL, "responded.")
-
-	switch r.Method {
-	case http.MethodGet:
-		a.ListTargets(w, r)
-		return
-	default:
-		HTTPResponseError(w, http.StatusMethodNotAllowed)
-		return
-	}
-
-}
-
-func (a *restAPI) ListTargets(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) GetTargets(w http.ResponseWriter, r *http.Request) {
 
 	var targets []*model.Target
 	for _, t := range a.manager.targets {
@@ -121,6 +110,46 @@ func (a *restAPI) ListTargets(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func (a *restAPI) GetTarget(w http.ResponseWriter, r *http.Request) {
+
+	id := mux.Vars(r)["id"]
+
+	target, found := a.manager.targets[id]
+	if !found {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	b, err := json.Marshal(target)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	HTTPResponse(w, http.StatusOK, b)
+	return
+}
+
+func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	stage := vars["stage"]
+
+	target, found := a.manager.targets[id]
+	if !found {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	err := a.manager.requestLogs(target.ID, stage)
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	HTTPResponseSuccess(w, http.StatusOK, "Requested logs for stage: ", stage)
+	return
+}
+
 // HTTPResponseError serializes and writes an error response
 //	If no message is provided, the status text will be set as the message
 func HTTPResponseError(w http.ResponseWriter, code int, message ...interface{}) {
@@ -130,6 +159,19 @@ func HTTPResponseError(w http.ResponseWriter, code int, message ...interface{}) 
 	}
 	body, _ := json.Marshal(&map[string]string{
 		"error": fmt.Sprint(message...),
+	})
+	HTTPResponse(w, code, body)
+}
+
+// HTTPResponseSuccess serializes and writes a success response
+//	If no message is provided, the status text will be set as the message
+func HTTPResponseSuccess(w http.ResponseWriter, code int, message ...interface{}) {
+	if len(message) == 0 {
+		message = make([]interface{}, 1)
+		message[0] = http.StatusText(code)
+	}
+	body, _ := json.Marshal(&map[string]string{
+		"message": fmt.Sprint(message...),
 	})
 	HTTPResponse(w, code, body)
 }

@@ -12,6 +12,7 @@ const (
 	ResponseSuccess                    = "SUCCESS"      // task ended without errors
 	ResponseClientError                = "CLIENT_ERROR" // client errors
 	ResponseAdvertisement              = "ADV"          // agent advertisement
+	ResponseRunnerLog                  = "RUNLOG"       // runner stdout and stderr
 )
 
 type BatchResponse struct {

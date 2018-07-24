@@ -16,7 +16,10 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-const AdvInterval = 30 * time.Second
+const (
+	AdvInterval       = 30 * time.Second
+	LogBufferCapacity = 10
+)
 
 type agent struct {
 	sync.Mutex
@@ -24,12 +27,14 @@ type agent struct {
 	target     model.Target
 	configPath string
 	pipe       model.Pipe
+	buf        buffer.Buffer
 }
 
 func startAgent() *agent {
 	a := &agent{
 		pipe:       model.NewPipe(),
 		configPath: "config.json",
+		buf:        buffer.NewBuffer(LogBufferCapacity),
 	}
 	a.loadConf()
 	if a.target.Tasks == nil {
@@ -74,13 +79,13 @@ func (a *agent) loadConf() {
 
 func (a *agent) startWorker() {
 	log.Printf("Subscribing to topics...")
-	topics := []string{model.RequestTargetAll, a.target.ID}
-	topics = append(topics, a.target.Tags...)
 	topicMap := make(map[string]bool)
-	for _, topic := range topics {
+	for _, topic := range a.target.Tags {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(topic)}
 		topicMap[topic] = true
 	}
+	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetAll)}
+	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetID + model.PrefixSeperator + a.target.ID)}
 
 	log.Println("Listenning to requests...")
 	var latestMessageChecksum [16]byte
@@ -90,6 +95,9 @@ func (a *agent) startWorker() {
 			go a.advertiseTarget()
 		case model.RequestTargetAll == request.Topic:
 			// do nothing for now
+		case model.RequestTargetID+model.PrefixSeperator+a.target.ID == request.Topic:
+			log.Println(string(request.Payload))
+			a.sendRunLogs()
 		case topicMap[request.Topic]:
 			// an announcement is received as many matching tags but needs to be processed only once
 			sum := md5.Sum(request.Payload)
@@ -181,6 +189,12 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}
 }
 
+func (a *agent) sendRunLogs() {
+	log.Printf("Sending runner logs to manager.")
+	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseRunnerLog, Responses: a.buf.Collect(), TargetID: a.target.ID})
+
+}
+
 func (a *agent) activate(commands []string, logging model.Log, taskID string) {
 	if len(commands) == 0 {
 		return
@@ -196,18 +210,12 @@ func (a *agent) activate(commands []string, logging model.Log, taskID string) {
 	// start a new executor
 	exec := newExecutor(wd)
 
-	buf := buffer.NewBuffer(5)
-
 	// execute and collect results
 	resCh := make(chan model.Response)
 	go func() {
 		for res := range resCh {
-			if res.Stdout != "" {
-				buf.Insert(res.Stdout)
-			} else {
-				buf.Insert(res.Stderr)
-			}
-			log.Printf("Activation log: %v", buf.Collect())
+			a.buf.Insert(res)
+			log.Printf("Activation log: %v", a.buf.Collect())
 		}
 		log.Printf("Process ended: %s", taskID)
 	}()

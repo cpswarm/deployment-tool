@@ -140,6 +140,19 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 	log.Println("Task received by all targets.")
 }
 
+func (m *manager) requestLogs(targetID, stage string) error {
+	switch stage {
+	case "run":
+		m.pipe.RequestCh <- model.Message{Topic: model.RequestTargetID + model.PrefixSeperator + targetID, Payload: []byte(model.RequestRunLogs)}
+	case "install":
+		m.pipe.RequestCh <- model.Message{Topic: model.RequestInstallLogs}
+	default:
+		return fmt.Errorf("unsupported stage for log request: %s", stage)
+	}
+	return nil
+
+}
+
 func (m *manager) processResponses() {
 	for resp := range m.pipe.ResponseCh {
 		switch resp.Topic {

@@ -2,6 +2,7 @@ package model
 
 const (
 	TopicSeperator       = ":"
+	PrefixSeperator      = "-"
 	OperationSubscribe   = "SUB"
 	OperationUnsubscribe = "UNSUB"
 )
