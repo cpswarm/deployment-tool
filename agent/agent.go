@@ -180,6 +180,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	go func() {
 		for res := range resCh {
 			res.TaskID = task.ID
+			res.Stage = model.StageInstall
 			a.sendResponse(&res)
 		}
 	}()
@@ -191,7 +192,13 @@ func (a *agent) handleTask(id string, payload []byte) {
 
 func (a *agent) sendRunLogs() {
 	log.Printf("Sending runner logs to manager.")
-	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseRunnerLog, Responses: a.buf.Collect(), TargetID: a.target.ID})
+	a.sendResponse(&model.BatchResponse{
+		ResponseType: model.ResponseRunnerLog,
+		Responses:    a.buf.Collect(),
+		TargetID:     a.target.ID,
+		TaskID:       a.target.Tasks.LatestBatchResponse.TaskID,
+		Stage:        model.StageRun,
+	})
 
 }
 

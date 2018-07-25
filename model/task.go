@@ -1,5 +1,14 @@
 package model
 
+const (
+	StageUnspecified = iota
+	StageAssemble
+	StageTransfer
+	StageInstall
+	StageTest
+	StageRun
+)
+
 // Task is a struct with all the information for deployment on a target
 type Task struct {
 	ID         string

@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v2"
 )
@@ -67,6 +66,9 @@ func (a *restAPI) AddTask(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Received task descr:", descr)
 
+	a.manager.RLock()
+	defer a.manager.RUnlock()
+
 	createdDescr, err := a.manager.addTaskDescr(descr)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
@@ -82,6 +84,9 @@ func (a *restAPI) AddTask(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) ListTasks(w http.ResponseWriter, r *http.Request) {
 
+	a.manager.RLock()
+	defer a.manager.RUnlock()
+
 	b, err := json.Marshal(a.manager.taskDescriptions)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
@@ -94,13 +99,16 @@ func (a *restAPI) ListTasks(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) GetTargets(w http.ResponseWriter, r *http.Request) {
 
-	var targets []*model.Target
-	for _, t := range a.manager.targets {
-		targets = append(targets, t)
-	}
-	// TODO sort by ID
+	//var targets []*model.Target
+	//for _, t := range a.manager.targets {
+	//	targets = append(targets, t)
+	//}
+	//// TODO sort by ID
 
-	b, err := json.Marshal(targets)
+	a.manager.RLock()
+	defer a.manager.RUnlock()
+
+	b, err := json.Marshal(a.manager.Targets)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -114,7 +122,10 @@ func (a *restAPI) GetTarget(w http.ResponseWriter, r *http.Request) {
 
 	id := mux.Vars(r)["id"]
 
-	target, found := a.manager.targets[id]
+	a.manager.RLock()
+	defer a.manager.RUnlock()
+
+	target, found := a.manager.Targets[id]
 	if !found {
 		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
 		return
@@ -135,13 +146,15 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 	stage := vars["stage"]
 
-	target, found := a.manager.targets[id]
-	if !found {
+	a.manager.RLock()
+	defer a.manager.RUnlock()
+
+	if _, found := a.manager.Targets[id]; !found {
 		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
 		return
 	}
 
-	err := a.manager.requestLogs(target.ID, stage)
+	err := a.manager.requestLogs(id, stage)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return

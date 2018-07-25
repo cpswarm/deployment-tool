@@ -27,7 +27,7 @@ func startManager(pipe model.Pipe) (*manager, error) {
 		pipe: pipe,
 	}
 
-	m.targets = make(map[string]*model.Target)
+	m.Targets = make(map[string]*Target)
 	m.taskDescriptions = []TaskDescription{}
 
 	go m.processResponses()
@@ -42,11 +42,11 @@ func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) 
 
 	m.RLock()
 TARGETS:
-	for _, target := range m.targets {
+	for id, target := range m.Targets {
 		for _, t := range target.Tags {
 			for _, t2 := range descr.Target.Tags {
 				if t == t2 {
-					descr.DeploymentInfo.MatchingTargets = append(descr.DeploymentInfo.MatchingTargets, target.ID)
+					descr.DeploymentInfo.MatchingTargets = append(descr.DeploymentInfo.MatchingTargets, id)
 					continue TARGETS
 				}
 			}
@@ -131,8 +131,8 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 
 		// TODO which messages are received, what is pending?
 		pending = false
-		for _, target := range m.targets {
-			if target.Tasks == nil || target.Tasks.LatestBatchResponse.TaskID != task.ID {
+		for _, target := range m.Targets {
+			if _, found := target.Tasks.History[task.ID]; !found {
 				pending = true
 			}
 		}
@@ -144,8 +144,10 @@ func (m *manager) requestLogs(targetID, stage string) error {
 	switch stage {
 	case "run":
 		m.pipe.RequestCh <- model.Message{Topic: model.RequestTargetID + model.PrefixSeperator + targetID, Payload: []byte(model.RequestRunLogs)}
+		m.Targets[targetID].Tasks.Current.Stages.Run.RequestedAt = time.Now().Format(time.RFC3339)
 	case "install":
 		m.pipe.RequestCh <- model.Message{Topic: model.RequestInstallLogs}
+		m.Targets[targetID].Tasks.Current.Stages.Install.RequestedAt = time.Now().Format(time.RFC3339)
 	default:
 		return fmt.Errorf("unsupported stage for log request: %s", stage)
 	}
@@ -164,7 +166,16 @@ func (m *manager) processResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			m.targets[target.ID] = &target
+			m.Lock()
+			if _, found := m.Targets[target.ID]; !found {
+				m.Targets[target.ID] = new(Target)
+				m.Targets[target.ID].Tasks.History = make(map[string]model.ResponseType)
+			}
+			m.Targets[target.ID].Tags = target.Tags
+			m.Targets[target.ID].Tasks.Current.ID = target.Tasks.LatestBatchResponse.TaskID
+			m.Targets[target.ID].Tasks.Current.Status = target.Tasks.LatestBatchResponse.ResponseType
+			//m.Targets[target.ID].Tasks.History
+			m.Unlock()
 			log.Printf("Received target advertisement: %s Tags: %s", target.ID, target.Tags)
 		default:
 			var response model.BatchResponse
@@ -177,26 +188,16 @@ func (m *manager) processResponses() {
 
 			spew.Dump(response)
 
-			if _, found := m.targets[response.TargetID]; !found {
+			if _, found := m.Targets[response.TargetID]; !found {
 				log.Println("Response from unknown target:", response.TargetID)
 				continue
 			}
 			log.Printf("processResponses %+v", response)
 
 			m.Lock()
-			// allocate memory and work on the alias
-			if m.targets[response.TargetID].Tasks == nil {
-				m.targets[response.TargetID].Tasks = new(model.TaskHistory)
-			}
+			m.Targets[response.TargetID].Tasks.Current.InsertResponses(&response)
+			m.Targets[response.TargetID].Tasks.History[response.TaskID] = response.ResponseType
 			m.Unlock()
-			targetTask := m.targets[response.TargetID].Tasks
-
-			targetTask.LatestBatchResponse = response
-			if len(targetTask.History) == 0 {
-				targetTask.History = []string{response.TaskID}
-			} else if targetTask.History[len(targetTask.History)-1] != response.TaskID {
-				targetTask.History = append(targetTask.History, response.TaskID)
-			}
 		}
 	}
 }
