@@ -1,12 +1,14 @@
 package model
 
+type StageType string
+
 const (
-	StageUnspecified = iota
-	StageAssemble
-	StageTransfer
-	StageInstall
-	StageTest
-	StageRun
+	StageUnspecified StageType = ""
+	StageAssemble              = "assemble"
+	StageTransfer              = "transfer"
+	StageInstall               = "install"
+	StageTest                  = "test"
+	StageRun                   = "run"
 )
 
 // Task is a struct with all the information for deployment on a target

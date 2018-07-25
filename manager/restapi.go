@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v2"
 )
@@ -154,7 +155,7 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := a.manager.requestLogs(id, stage)
+	err := a.manager.requestLogs(id, model.StageType(stage))
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return

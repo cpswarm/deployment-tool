@@ -21,11 +21,12 @@ type BatchResponse struct {
 	TimeElapsed  float64
 	TaskID       string
 	TargetID     string
-	Stage        uint8
+	Stage        StageType
 }
 
 type Response struct {
-	Command     string
+	Command string
+	// TODO keep only stdout and set a flag if stderr
 	Stdout      string
 	Stderr      string
 	LineNum     uint32

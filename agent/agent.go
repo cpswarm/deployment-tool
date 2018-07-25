@@ -140,10 +140,10 @@ func (a *agent) handleAnnouncement(payload []byte) {
 			}
 		}
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: taskA.ID, TargetID: a.target.ID})
+		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: taskA.ID, TargetID: a.target.ID, Stage: model.StageTransfer})
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseError, TaskID: taskA.ID, TargetID: a.target.ID}) // TODO include error message
+		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseError, TaskID: taskA.ID, TargetID: a.target.ID, Stage: model.StageTransfer}) // TODO include error message
 	}
 
 }
@@ -159,7 +159,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	payload = nil // to release memory
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.target.ID})
+	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.target.ID, Stage: model.StageTransfer})
 	a.target.Tasks.History = append(a.target.Tasks.History, task.ID)
 
 	// set work directory
@@ -173,7 +173,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	// decompress and store
 	exec.storeArtifacts(task.Artifacts)
 	task.Artifacts = nil // release memory
-	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.target.ID})
+	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.target.ID, Stage: model.StageTransfer})
 
 	// execute and collect results
 	resCh := make(chan model.BatchResponse)

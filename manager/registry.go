@@ -62,6 +62,26 @@ type CurrentTask struct {
 	Stages StageLogs
 }
 
+func (t *CurrentTask) Stage(stage model.StageType) *StageLog {
+	switch stage {
+	case model.StageUnspecified:
+		// do nothing
+		return nil
+	case model.StageAssemble:
+		return &t.Stages.Assemble
+	case model.StageTransfer:
+		return &t.Stages.Transfer
+	case model.StageInstall:
+		return &t.Stages.Install
+	case model.StageTest:
+		return &t.Stages.Test
+	case model.StageRun:
+		return &t.Stages.Run
+	}
+	log.Fatalln("Unknown/unsupported stage:", stage)
+	return nil
+}
+
 type StageLogs struct {
 	Assemble StageLog
 	Transfer StageLog
@@ -75,25 +95,6 @@ type StageLog struct {
 	Logs        []model.Response
 }
 
-func (s *StageLog) insertLogs(responses []model.Response) {
+func (s *StageLog) InsertLogs(responses []model.Response) {
 	s.Logs = append(s.Logs, responses...)
-}
-
-func (t *CurrentTask) InsertResponses(b *model.BatchResponse) {
-	switch b.Stage {
-	case model.StageUnspecified:
-		// do nothing
-	case model.StageAssemble:
-		t.Stages.Assemble.insertLogs(b.Responses)
-	case model.StageTransfer:
-		t.Stages.Transfer.insertLogs(b.Responses)
-	case model.StageInstall:
-		t.Stages.Install.insertLogs(b.Responses)
-	case model.StageTest:
-		t.Stages.Test.insertLogs(b.Responses)
-	case model.StageRun:
-		t.Stages.Run.insertLogs(b.Responses)
-	default:
-		log.Fatalln("Unknown/unsupported stage:", b.Stage)
-	}
 }

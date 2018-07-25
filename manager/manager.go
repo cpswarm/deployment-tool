@@ -140,17 +140,12 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 	log.Println("Task received by all targets.")
 }
 
-func (m *manager) requestLogs(targetID, stage string) error {
-	switch stage {
-	case "run":
-		m.pipe.RequestCh <- model.Message{Topic: model.RequestTargetID + model.PrefixSeperator + targetID, Payload: []byte(model.RequestRunLogs)}
-		m.Targets[targetID].Tasks.Current.Stages.Run.RequestedAt = time.Now().Format(time.RFC3339)
-	case "install":
-		m.pipe.RequestCh <- model.Message{Topic: model.RequestInstallLogs}
-		m.Targets[targetID].Tasks.Current.Stages.Install.RequestedAt = time.Now().Format(time.RFC3339)
-	default:
-		return fmt.Errorf("unsupported stage for log request: %s", stage)
+func (m *manager) requestLogs(targetID string, stage model.StageType) error {
+	m.pipe.RequestCh <- model.Message{
+		Topic:   model.RequestTargetID + model.PrefixSeperator + targetID,
+		Payload: []byte(stage),
 	}
+	m.Targets[targetID].Tasks.Current.Stage(stage).RequestedAt = time.Now().Format(time.RFC3339)
 	return nil
 
 }
@@ -195,7 +190,11 @@ func (m *manager) processResponses() {
 			log.Printf("processResponses %+v", response)
 
 			m.Lock()
-			m.Targets[response.TargetID].Tasks.Current.InsertResponses(&response)
+			if len(response.Responses) == 0 {
+				// TODO temporary fix for payload-less responses
+				response.Responses = append(response.Responses, model.Response{Stdout: string(response.ResponseType)})
+			}
+			m.Targets[response.TargetID].Tasks.Current.Stage(response.Stage).InsertLogs(response.Responses)
 			m.Targets[response.TargetID].Tasks.History[response.TaskID] = response.ResponseType
 			m.Unlock()
 		}
