@@ -25,11 +25,9 @@ type BatchResponse struct {
 }
 
 type Response struct {
-	Command string
-	// TODO keep only stdout and set a flag if stderr
-	Stdout      string
-	Stderr      string
-	LineNum     uint32
-	TimeElapsed float64
-	//TimeRemaining float64
+	Command     string `json:",omitempty"'`
+	Output      string
+	Error       bool
+	LineNum     uint32  `json:",omitempty"'`
+	TimeElapsed float64 `json:",omitempty"'`
 }

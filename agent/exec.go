@@ -59,7 +59,7 @@ LOOP:
 				break LOOP
 			}
 			log.Printf("[res] %+v", res)
-			containsErrors = len(res.Stderr) > 0
+			containsErrors = res.Error
 			//log.Printf("%s -- %d -- %s -- %s -- %f", res.Command, res.LineNum, res.Stdout, res.Stderr, res.TimeElapsed)
 			batch.Responses = append(batch.Responses, res)
 			batch.TimeElapsed = res.TimeElapsed
@@ -96,9 +96,9 @@ func (e *executor) responseCollector(commands []string, out chan model.Response)
 	for open := true; open; {
 		select {
 		case x := <-stdout:
-			out <- model.Response{Command: x.command, Stdout: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds()}
+			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds()}
 		case x := <-stderr:
-			out <- model.Response{Command: x.command, Stderr: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds()}
+			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds(), Error: true}
 		case _, open = <-callback:
 			// do nothing
 		}

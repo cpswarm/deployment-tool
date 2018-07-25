@@ -192,7 +192,7 @@ func (m *manager) processResponses() {
 			m.Lock()
 			if len(response.Responses) == 0 {
 				// TODO temporary fix for payload-less responses
-				response.Responses = append(response.Responses, model.Response{Stdout: string(response.ResponseType)})
+				response.Responses = append(response.Responses, model.Response{Output: string(response.ResponseType)})
 			}
 			m.Targets[response.TargetID].Tasks.Current.Stage(response.Stage).InsertLogs(response.Responses)
 			m.Targets[response.TargetID].Tasks.History[response.TaskID] = response.ResponseType
