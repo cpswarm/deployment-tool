@@ -5,6 +5,8 @@ const (
 	PrefixSeperator      = "-"
 	OperationSubscribe   = "SUB"
 	OperationUnsubscribe = "UNSUB"
+	PipeConnected        = "CONN"
+	PipeDisconnected     = "DISCONN"
 )
 
 // Pipe is a bi-directional channel structure

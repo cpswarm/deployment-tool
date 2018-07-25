@@ -24,18 +24,22 @@ const (
 type agent struct {
 	sync.Mutex
 
-	target     model.Target
-	configPath string
-	pipe       model.Pipe
-	buf        buffer.Buffer
+	target       model.Target
+	configPath   string
+	pipe         model.Pipe
+	buf          buffer.Buffer
+	disconnected chan bool
 }
 
 func startAgent() *agent {
+
 	a := &agent{
-		pipe:       model.NewPipe(),
-		configPath: "config.json",
-		buf:        buffer.NewBuffer(LogBufferCapacity),
+		pipe:         model.NewPipe(),
+		configPath:   "config.json",
+		buf:          buffer.NewBuffer(LogBufferCapacity),
+		disconnected: make(chan bool),
 	}
+
 	a.loadConf()
 	if a.target.Tasks == nil {
 		a.target.Tasks = new(model.TaskHistory)
@@ -91,11 +95,13 @@ func (a *agent) startWorker() {
 	var latestMessageChecksum [16]byte
 	for request := range a.pipe.RequestCh {
 		switch {
-		case model.RequestTargetAdvertisement == request.Topic:
+		case request.Topic == model.PipeConnected:
 			go a.advertiseTarget()
-		case model.RequestTargetAll == request.Topic:
+		case request.Topic == model.PipeDisconnected:
+			a.disconnected <- true
+		case request.Topic == model.RequestTargetAll:
 			// do nothing for now
-		case model.RequestTargetID+model.PrefixSeperator+a.target.ID == request.Topic:
+		case request.Topic == model.RequestTargetID+model.PrefixSeperator+a.target.ID:
 			log.Println(string(request.Payload))
 			a.sendRunLogs()
 		case topicMap[request.Topic]:
@@ -113,9 +119,19 @@ func (a *agent) startWorker() {
 
 func (a *agent) advertiseTarget() {
 	log.Printf("Will advertise target every %s", AdvInterval)
-	for t := time.NewTicker(AdvInterval); true; <-t.C {
-		b, _ := json.Marshal(a.target)
-		a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
+	defer log.Println("Stopped advertisement routine.")
+
+	b, _ := json.Marshal(a.target)
+	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
+
+	t := time.NewTicker(AdvInterval)
+	for {
+		select {
+		case <-t.C:
+			a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
+		case <-a.disconnected:
+			return
+		}
 	}
 }
 

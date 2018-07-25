@@ -104,7 +104,7 @@ func (c *zmqClient) startOperator() {
 func (c *zmqClient) monitor() {
 
 	pubMonitorAddr := "inproc://pub-monitor.rep"
-	err := c.publisher.Monitor(pubMonitorAddr, zmq.EVENT_CONNECTED)
+	err := c.publisher.Monitor(pubMonitorAddr, zmq.EVENT_CONNECTED|zmq.EVENT_DISCONNECTED)
 	if err != nil {
 		log.Println(err)
 		return
@@ -131,9 +131,15 @@ func (c *zmqClient) monitor() {
 				continue
 			}
 			log.Printf("Event %s %s", eventType, eventAddr)
-			// send to worker
-			time.Sleep(time.Second) // solves missing pub on slow connections
-			c.pipe.RequestCh <- model.Message{Topic: model.RequestTargetAdvertisement}
+			switch eventType {
+			case zmq.EVENT_CONNECTED:
+				// send to worker
+				time.Sleep(time.Second) // solves missing pub on slow connections
+				c.pipe.RequestCh <- model.Message{Topic: model.PipeConnected}
+			case zmq.EVENT_DISCONNECTED:
+				// send to worker
+				c.pipe.RequestCh <- model.Message{Topic: model.PipeDisconnected}
+			}
 		}
 	}()
 
