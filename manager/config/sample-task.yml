@@ -1,35 +1,35 @@
-version: 0.2
+version: 0.3
 
-
+# Deployment stages
 stages:
-  assemble: # commands run by manager (e.g. packaging, cross-compilation)
+  # commands run locally by the manager (e.g. packaging, cross-compilation)
+  assemble:
     - make
     - make clean
-  transfer: # list of files and directories copied to targets
-    - package/monitor
-    - package/rescue
-    - package/rescue.json
-    - package/monitor.json
-    - package/test-script.sh
-  install: # commands run by agent
-    - chmod +x package/monitor
-    - chmod +x package/rescue
+  # list of files and directories copied to targets
+  transfer:
+    - package
+  # commands run on target devices
+  install:
+    - mv package/dummy.py package/app.py
+  # validation tests
   test:
     - sh test-script.sh
+  # package execution on target devices
   activate:
-    - on-success # when tests pass
-    - on-startup
-    - manually # signal from AL or Command & Monitoring Tool (CMT)
+    - python -u package/app.py
 
+# Which target devices should receive the package
 target:
-  byname:
-    - dummy1
-    - pi* # wildcard matching
-  bytype:
-    - pizero
+  tags:
+    - groupA
     - turtlebot
 
+# How target devices report logs
 log:
-  - always
-  - on-failure # tests / stages fail
-  - on-success # output of stage command regardless
+  interval: 3s
+  verbosity: DEBUG
+  # The following verbosity levels are supported:
+  # ERROR: stderr of stages
+  # INFO: ERROR and stdout stages
+  # DEBUG: INFO and agent internal logs
