@@ -29,7 +29,7 @@ type Stages struct {
 	Transfer []string
 	Install  []string
 	Test     []string
-	Activate []string
+	Run      []string
 }
 
 type DeploymentTarget struct {
@@ -92,7 +92,7 @@ type StageLogs struct {
 
 type StageLog struct {
 	RequestedAt string
-	Logs        []model.Response
+	Logs        []model.Response `json:",omitempty"'`
 }
 
 func (s *StageLog) InsertLogs(responses []model.Response) {

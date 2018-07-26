@@ -36,7 +36,7 @@ func startManager(pipe model.Pipe) (*manager, error) {
 
 func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) {
 
-	if len(descr.Stages.Activate) > 1 {
+	if len(descr.Stages.Run) > 1 {
 		return nil, fmt.Errorf("activation request error: execution of multiple processes is currently not supported")
 	}
 
@@ -64,11 +64,11 @@ TARGETS:
 	}
 
 	task := model.Task{
-		ID:         newTaskID(),
-		Commands:   descr.Stages.Install,
-		Artifacts:  compressedArchive,
-		Activation: descr.Stages.Activate,
-		Log:        descr.Log,
+		ID:        newTaskID(),
+		Artifacts: compressedArchive,
+		Install:   descr.Stages.Install,
+		Run:       descr.Stages.Run,
+		Log:       descr.Log,
 	}
 
 	//m.tasks = append(m.tasks, task)

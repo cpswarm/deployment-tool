@@ -1,4 +1,4 @@
-version: 0.3
+version: 0.4
 
 # Deployment stages
 stages:
@@ -16,7 +16,7 @@ stages:
   test:
     - sh test-script.sh
   # package execution on target devices
-  activate:
+  run:
     - python -u package/app.py
 
 # Which target devices should receive the package

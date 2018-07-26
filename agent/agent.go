@@ -45,9 +45,8 @@ func startAgent() *agent {
 		a.target.Tasks = new(model.TaskHistory)
 	}
 	// autostart
-	log.Println(a.target.Tasks.Activation)
-	if len(a.target.Tasks.Activation) > 0 {
-		a.activate(a.target.Tasks.Activation, a.target.Tasks.Logging, a.target.Tasks.LatestBatchResponse.TaskID)
+	if len(a.target.Tasks.Run) > 0 {
+		a.run(a.target.Tasks.Run, a.target.Tasks.Logging, a.target.Tasks.LatestBatchResponse.TaskID)
 	}
 
 	go a.startWorker()
@@ -200,9 +199,9 @@ func (a *agent) handleTask(id string, payload []byte) {
 			a.sendResponse(&res)
 		}
 	}()
-	success := exec.responseBatchCollector(task.Commands, task.Log, resCh)
+	success := exec.responseBatchCollector(task.Install, task.Log, resCh)
 	if success {
-		a.activate(task.Activation, task.Log, task.ID)
+		a.run(task.Run, task.Log, task.ID)
 	}
 }
 
@@ -218,15 +217,15 @@ func (a *agent) sendRunLogs() {
 
 }
 
-func (a *agent) activate(commands []string, logging model.Log, taskID string) {
+func (a *agent) run(commands []string, logging model.Log, taskID string) {
 	if len(commands) == 0 {
 		return
 	}
-	a.target.Tasks.Activation = commands
+	a.target.Tasks.Run = commands
 	a.target.Tasks.Logging = logging
 	a.saveConfig()
 
-	log.Printf("Activating task :%s", taskID)
+	log.Printf("Running task: %s", taskID)
 
 	wd, _ := os.Getwd()
 	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
@@ -238,9 +237,9 @@ func (a *agent) activate(commands []string, logging model.Log, taskID string) {
 	go func() {
 		for res := range resCh {
 			a.buf.Insert(res)
-			log.Printf("Activation log: %v", a.buf.Collect())
+			log.Printf("Run: %v", a.buf.Collect())
 		}
-		log.Printf("Process ended: %s", taskID)
+		log.Printf("Run ended for task: %s", taskID)
 	}()
 	go exec.responseCollector(commands, resCh)
 
