@@ -3,23 +3,21 @@ package model
 type ResponseType string
 
 const (
-	ResponseUnspecified   ResponseType = "RES"
-	ResponseAck                        = "ACK"          // received task announcement
-	ResponseAckTask                    = "ACK_TASK"     // received task
-	ResponseAckTransfer                = "ACK_TRANSFER" // completed transfer to local file system
-	ResponseLog                        = "LOG"          // response stdout and stderr
-	ResponseError                      = "ERROR"        // task ended with errors
-	ResponseSuccess                    = "SUCCESS"      // task ended without errors
-	ResponseClientError                = "CLIENT_ERROR" // client errors
-	ResponseAdvertisement              = "ADV"          // agent advertisement
-	ResponseRunnerLog                  = "RUNLOG"       // runner stdout and stderr
+	// Response types
+	ResponseLog     ResponseType = "LOG"     // stage stdout and stderr
+	ResponseSuccess              = "SUCCESS" // stage ended without errors
+	ResponseError                = "ERROR"   // stage ended with errors
+
+	ResponseClientError   = "CLIENT_ERROR" // client errors
+	ResponseAdvertisement = "ADV"          // agent advertisement
 )
 
 type BatchResponse struct {
+	Stage        StageType
 	ResponseType ResponseType
 	Responses    []Response
 	TimeElapsed  float64
-	Stage        StageType
+
 	// identifiers
 	TaskID   string
 	TargetID string

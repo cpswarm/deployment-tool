@@ -57,26 +57,27 @@ type Tasks struct {
 }
 
 type CurrentTask struct {
-	ID     string
-	Status model.ResponseType
-	Stages StageLogs
+	ID           string
+	CurrentStage model.StageType
+	Status       model.ResponseType
+	StageLogs    StageLogs
 }
 
-func (t *CurrentTask) Stage(stage model.StageType) *StageLog {
+func (t *CurrentTask) GetStageLogs(stage model.StageType) *StageLog {
 	switch stage {
 	case model.StageUnspecified:
 		// do nothing
 		return nil
 	case model.StageAssemble:
-		return &t.Stages.Assemble
+		return &t.StageLogs.Assemble
 	case model.StageTransfer:
-		return &t.Stages.Transfer
+		return &t.StageLogs.Transfer
 	case model.StageInstall:
-		return &t.Stages.Install
+		return &t.StageLogs.Install
 	case model.StageTest:
-		return &t.Stages.Test
+		return &t.StageLogs.Test
 	case model.StageRun:
-		return &t.Stages.Run
+		return &t.StageLogs.Run
 	}
 	log.Fatalln("Unknown/unsupported stage:", stage)
 	return nil

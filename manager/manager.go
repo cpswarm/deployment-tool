@@ -145,7 +145,7 @@ func (m *manager) requestLogs(targetID string, stage model.StageType) error {
 		Topic:   model.TargetTopic(targetID),
 		Payload: b,
 	}
-	m.Targets[targetID].Tasks.Current.Stage(stage).RequestedAt = time.Now().Format(time.RFC3339)
+	m.Targets[targetID].Tasks.Current.GetStageLogs(stage).RequestedAt = time.Now().Format(time.RFC3339)
 	return nil
 
 }
@@ -169,6 +169,7 @@ func (m *manager) processResponses() {
 			}
 			m.Targets[target.ID].Tags = target.Tags
 			m.Targets[target.ID].Tasks.Current.ID = target.Tasks.LatestBatchResponse.TaskID
+			m.Targets[target.ID].Tasks.Current.CurrentStage = target.Tasks.LatestBatchResponse.Stage
 			m.Targets[target.ID].Tasks.Current.Status = target.Tasks.LatestBatchResponse.ResponseType
 			m.Targets[target.ID].Tasks.History[target.Tasks.LatestBatchResponse.TaskID] = target.Tasks.LatestBatchResponse.ResponseType
 			m.Unlock()
@@ -196,8 +197,9 @@ func (m *manager) processResponses() {
 				response.Responses = append(response.Responses, model.Response{Output: string(response.ResponseType)})
 			}
 			m.Targets[response.TargetID].Tasks.Current.ID = response.TaskID
+			m.Targets[response.TargetID].Tasks.Current.CurrentStage = response.Stage
 			m.Targets[response.TargetID].Tasks.Current.Status = response.ResponseType
-			m.Targets[response.TargetID].Tasks.Current.Stage(response.Stage).InsertLogs(response.Responses) // TODO logs not flushed from task to task
+			m.Targets[response.TargetID].Tasks.Current.GetStageLogs(response.Stage).InsertLogs(response.Responses) // TODO logs not flushed from task to task
 			m.Targets[response.TargetID].Tasks.History[response.TaskID] = response.ResponseType
 			m.Unlock()
 		}

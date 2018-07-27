@@ -156,10 +156,10 @@ func (a *agent) handleAnnouncement(payload []byte) {
 			}
 		}
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAck, TaskID: taskA.ID, TargetID: a.target.ID, Stage: model.StageTransfer})
+		a.sendTransferResponse(model.ResponseLog, taskA.ID, "received announcement")
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
-		a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseError, TaskID: taskA.ID, TargetID: a.target.ID, Stage: model.StageTransfer}) // TODO include error message
+		a.sendTransferResponse(model.ResponseError, taskA.ID, "not enough memory")
 	}
 
 }
@@ -176,7 +176,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	//runtime.GC() ?
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.target.ID, Stage: model.StageTransfer})
+	a.sendTransferResponse(model.ResponseLog, task.ID, "received task")
 	a.target.Tasks.History = append(a.target.Tasks.History, task.ID)
 
 	// set work directory
@@ -190,7 +190,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	// decompress and store
 	exec.storeArtifacts(task.Artifacts)
 	task.Artifacts = nil // release memory
-	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTransfer, TaskID: task.ID, TargetID: a.target.ID, Stage: model.StageTransfer})
+	a.sendTransferResponse(model.ResponseSuccess, task.ID, "stored artifacts")
 
 	// execute and collect results
 	resCh := make(chan model.BatchResponse)
@@ -218,7 +218,7 @@ func (a *agent) sendLogs(payload []byte) {
 	switch request.Stage {
 	case model.StageRun:
 		a.sendResponse(&model.BatchResponse{
-			ResponseType: model.ResponseRunnerLog,
+			ResponseType: model.ResponseLog,
 			Responses:    a.buf.Collect(),
 			TargetID:     a.target.ID,
 			TaskID:       a.target.Tasks.LatestBatchResponse.TaskID,
@@ -287,6 +287,15 @@ func (a *agent) sendResponse(resp *model.BatchResponse) {
 	// update the status
 	a.target.Tasks.LatestBatchResponse = *resp
 	a.saveConfig()
+}
+
+func (a *agent) sendTransferResponse(status model.ResponseType, taskID, message string) {
+	a.sendResponse(&model.BatchResponse{
+		Stage:        model.StageTransfer,
+		ResponseType: status,
+		TaskID:       taskID,
+		Responses:    []model.Response{{Output: message, Error: status == model.ResponseError}},
+	})
 }
 
 func (a *agent) close() {
