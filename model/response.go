@@ -19,9 +19,10 @@ type BatchResponse struct {
 	ResponseType ResponseType
 	Responses    []Response
 	TimeElapsed  float64
-	TaskID       string
-	TargetID     string
 	Stage        StageType
+	// identifiers
+	TaskID   string
+	TargetID string
 }
 
 type Response struct {
@@ -30,4 +31,19 @@ type Response struct {
 	Error       bool
 	LineNum     uint32  `json:",omitempty"'`
 	TimeElapsed float64 `json:",omitempty"'`
+}
+
+type Target struct {
+	// identification attributes
+	ID   string
+	Tags []string
+
+	Tasks *TaskHistory
+}
+
+type TaskHistory struct {
+	LatestBatchResponse BatchResponse
+	Run                 []string
+	Logging             Log
+	History             []string
 }

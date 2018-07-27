@@ -83,9 +83,10 @@ func (a *agent) loadConf() {
 func (a *agent) startWorker() {
 	log.Printf("Subscribing to topics...")
 	topicMap := make(map[string]bool)
-	for _, topic := range a.target.Tags {
-		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(topic)}
-		topicMap[topic] = true
+	for _, tag := range a.target.Tags {
+		tag = model.TargetTag(tag)
+		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(tag)}
+		topicMap[tag] = true
 	}
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetAll)}
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetID + model.PrefixSeperator + a.target.ID)}
@@ -100,9 +101,8 @@ func (a *agent) startWorker() {
 			a.disconnected <- true
 		case request.Topic == model.RequestTargetAll:
 			// do nothing for now
-		case request.Topic == model.RequestTargetID+model.PrefixSeperator+a.target.ID:
-			log.Println(string(request.Payload))
-			a.sendRunLogs()
+		case request.Topic == model.TargetTopic(a.target.ID):
+			a.sendLogs(request.Payload)
 		case topicMap[request.Topic]:
 			// an announcement is received as many matching tags but needs to be processed only once
 			sum := md5.Sum(request.Payload)
@@ -127,6 +127,7 @@ func (a *agent) advertiseTarget() {
 	for {
 		select {
 		case <-t.C:
+			b, _ := json.Marshal(a.target)
 			a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 		case <-a.disconnected:
 			return
@@ -172,6 +173,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 		log.Fatalln(err) // TODO send to manager
 	}
 	payload = nil // to release memory
+	//runtime.GC() ?
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
 	a.sendResponse(&model.BatchResponse{ResponseType: model.ResponseAckTask, TaskID: task.ID, TargetID: a.target.ID, Stage: model.StageTransfer})
@@ -205,15 +207,26 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}
 }
 
-func (a *agent) sendRunLogs() {
-	log.Printf("Sending runner logs to manager.")
-	a.sendResponse(&model.BatchResponse{
-		ResponseType: model.ResponseRunnerLog,
-		Responses:    a.buf.Collect(),
-		TargetID:     a.target.ID,
-		TaskID:       a.target.Tasks.LatestBatchResponse.TaskID,
-		Stage:        model.StageRun,
-	})
+func (a *agent) sendLogs(payload []byte) {
+	var request model.LogRequest
+	err := json.Unmarshal(payload, &request)
+	if err != nil {
+		log.Fatalln(err) // TODO send to manager
+	}
+
+	log.Printf("Sending logs for: %s", request.Stage)
+	switch request.Stage {
+	case model.StageRun:
+		a.sendResponse(&model.BatchResponse{
+			ResponseType: model.ResponseRunnerLog,
+			Responses:    a.buf.Collect(),
+			TargetID:     a.target.ID,
+			TaskID:       a.target.Tasks.LatestBatchResponse.TaskID,
+			Stage:        model.StageRun,
+		})
+	default:
+		log.Printf("Enexpected stage: %s", request.Stage)
+	}
 
 }
 

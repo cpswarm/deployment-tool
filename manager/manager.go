@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/mholt/archiver"
 	"github.com/satori/go.uuid"
 )
@@ -115,7 +114,7 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 			log.Fatal(err)
 		}
 		for _, tag := range targetTags {
-			m.pipe.RequestCh <- model.Message{tag, b}
+			m.pipe.RequestCh <- model.Message{model.TargetTag(tag), b}
 		}
 
 		time.Sleep(time.Second)
@@ -141,9 +140,10 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 }
 
 func (m *manager) requestLogs(targetID string, stage model.StageType) error {
+	b, _ := json.Marshal(&model.LogRequest{stage})
 	m.pipe.RequestCh <- model.Message{
-		Topic:   model.RequestTargetID + model.PrefixSeperator + targetID,
-		Payload: []byte(stage),
+		Topic:   model.TargetTopic(targetID),
+		Payload: b,
 	}
 	m.Targets[targetID].Tasks.Current.Stage(stage).RequestedAt = time.Now().Format(time.RFC3339)
 	return nil
@@ -161,6 +161,7 @@ func (m *manager) processResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
+
 			m.Lock()
 			if _, found := m.Targets[target.ID]; !found {
 				m.Targets[target.ID] = new(Target)
@@ -169,7 +170,7 @@ func (m *manager) processResponses() {
 			m.Targets[target.ID].Tags = target.Tags
 			m.Targets[target.ID].Tasks.Current.ID = target.Tasks.LatestBatchResponse.TaskID
 			m.Targets[target.ID].Tasks.Current.Status = target.Tasks.LatestBatchResponse.ResponseType
-			//m.Targets[target.ID].Tasks.History
+			m.Targets[target.ID].Tasks.History[target.Tasks.LatestBatchResponse.TaskID] = target.Tasks.LatestBatchResponse.ResponseType
 			m.Unlock()
 			log.Printf("Received target advertisement: %s Tags: %s", target.ID, target.Tags)
 		default:
@@ -181,7 +182,7 @@ func (m *manager) processResponses() {
 				continue
 			}
 
-			spew.Dump(response)
+			//spew.Dump(response)
 
 			if _, found := m.Targets[response.TargetID]; !found {
 				log.Println("Response from unknown target:", response.TargetID)
@@ -194,7 +195,9 @@ func (m *manager) processResponses() {
 				// TODO temporary fix for payload-less responses
 				response.Responses = append(response.Responses, model.Response{Output: string(response.ResponseType)})
 			}
-			m.Targets[response.TargetID].Tasks.Current.Stage(response.Stage).InsertLogs(response.Responses)
+			m.Targets[response.TargetID].Tasks.Current.ID = response.TaskID
+			m.Targets[response.TargetID].Tasks.Current.Status = response.ResponseType
+			m.Targets[response.TargetID].Tasks.Current.Stage(response.Stage).InsertLogs(response.Responses) // TODO logs not flushed from task to task
 			m.Targets[response.TargetID].Tasks.History[response.TaskID] = response.ResponseType
 			m.Unlock()
 		}
