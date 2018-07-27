@@ -41,3 +41,11 @@ func (b *Buffer) Collect() []model.Response {
 
 	return append(b.list[b.index:], b.list[:b.index]...)
 }
+
+func (b *Buffer) Flush() {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	b.list = nil
+	b.index = 0
+}

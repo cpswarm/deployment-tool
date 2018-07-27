@@ -203,7 +203,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}()
 	success := exec.responseBatchCollector(task.Install, task.Log, resCh)
 	if success {
-		a.run(task.Run, task.Log, task.ID)
+		go a.run(task.Run, task.Log, task.ID)
 	}
 }
 
@@ -244,6 +244,7 @@ func (a *agent) run(commands []string, logging model.Log, taskID string) {
 	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
 	// start a new executor
 	exec := newExecutor(wd)
+	a.buf.Flush()
 
 	// execute and collect results
 	resCh := make(chan model.Response)
@@ -254,8 +255,7 @@ func (a *agent) run(commands []string, logging model.Log, taskID string) {
 		}
 		log.Printf("Run ended for task: %s", taskID)
 	}()
-	go exec.responseCollector(commands, resCh)
-
+	exec.responseCollector(commands, resCh)
 }
 
 func (a *agent) saveConfig() {
