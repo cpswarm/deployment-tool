@@ -131,7 +131,7 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 		// TODO which messages are received, what is pending?
 		pending = false
 		for _, target := range m.Targets {
-			if _, found := target.Tasks.History[task.ID]; !found {
+			if _, found := target.History[task.ID]; !found {
 				pending = true
 			}
 		}
@@ -145,7 +145,6 @@ func (m *manager) requestLogs(targetID string, stage model.StageType) error {
 		Topic:   model.TargetTopic(targetID),
 		Payload: b,
 	}
-	m.Targets[targetID].Tasks.Current.GetStageLogs(stage).RequestedAt = time.Now().Format(time.RFC3339)
 	return nil
 
 }
@@ -161,17 +160,26 @@ func (m *manager) processResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
+			log.Printf("processResponses %+v", target.Tasks)
 
 			m.Lock()
 			if _, found := m.Targets[target.ID]; !found {
 				m.Targets[target.ID] = new(Target)
-				m.Targets[target.ID].Tasks.History = make(map[string]model.ResponseType)
+				m.Targets[target.ID].History = make(map[string]string)
 			}
 			m.Targets[target.ID].Tags = target.Tags
-			m.Targets[target.ID].Tasks.Current.ID = target.Tasks.LatestBatchResponse.TaskID
-			m.Targets[target.ID].Tasks.Current.CurrentStage = target.Tasks.LatestBatchResponse.Stage
-			m.Targets[target.ID].Tasks.Current.Status = target.Tasks.LatestBatchResponse.ResponseType
-			m.Targets[target.ID].Tasks.History[target.Tasks.LatestBatchResponse.TaskID] = target.Tasks.LatestBatchResponse.ResponseType
+			// create aliases
+			task := &m.Targets[target.ID].Task
+			response := &target.Tasks.LatestBatchResponse
+			stageLogs := task.GetStageLogs(response.Stage)
+			// update current task
+			task.ID = response.TaskID
+			task.CurrentStage = response.Stage
+			task.Error = response.ResponseType == model.ResponseError
+			stageLogs.Status = response.ResponseType
+			stageLogs.Updated = time.Now().Format(time.RFC3339)
+			// update history
+			m.Targets[target.ID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)
 			m.Unlock()
 			log.Printf("Received target advertisement: %s Tags: %s", target.ID, target.Tags)
 		default:
@@ -182,26 +190,32 @@ func (m *manager) processResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-
+			log.Printf("processResponses %+v", response)
 			//spew.Dump(response)
 
 			if _, found := m.Targets[response.TargetID]; !found {
 				log.Println("Response from unknown target:", response.TargetID)
 				continue
 			}
-			log.Printf("processResponses %+v", response)
 
 			m.Lock()
-			if len(response.Responses) == 0 {
-				// TODO temporary fix for payload-less responses
-				response.Responses = append(response.Responses, model.Response{Output: string(response.ResponseType)})
-			}
-			m.Targets[response.TargetID].Tasks.Current.ID = response.TaskID
-			m.Targets[response.TargetID].Tasks.Current.CurrentStage = response.Stage
-			m.Targets[response.TargetID].Tasks.Current.Status = response.ResponseType
-			m.Targets[response.TargetID].Tasks.Current.GetStageLogs(response.Stage).InsertLogs(response.Responses) // TODO logs not flushed from task to task
-			m.Targets[response.TargetID].Tasks.History[response.TaskID] = response.ResponseType
+			// create aliases
+			task := &m.Targets[response.TargetID].Task
+			stageLogs := task.GetStageLogs(response.Stage)
+			// update current task
+			task.ID = response.TaskID
+			task.CurrentStage = response.Stage
+			task.Error = response.ResponseType == model.ResponseError
+			stageLogs.Status = response.ResponseType
+			stageLogs.InsertLogs(response.Responses) // TODO logs not flushed from task to task
+			stageLogs.Updated = time.Now().Format(time.RFC3339)
+			// update history
+			m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)
 			m.Unlock()
 		}
 	}
+}
+
+func (m *manager) formatStageStatus(stage model.StageType, status model.ResponseType) string {
+	return fmt.Sprintf("%s-%s", stage, status)
 }

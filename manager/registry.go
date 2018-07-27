@@ -47,27 +47,23 @@ type DeploymentInfo struct {
 // TARGET
 //
 type Target struct {
-	Tags  []string
-	Tasks Tasks
+	Tags    []string
+	Task    Task              // active task
+	History map[string]string // task history -> taskID: stage_status
 }
 
-type Tasks struct {
-	Current CurrentTask
-	History map[string]model.ResponseType // id: status
-}
-
-type CurrentTask struct {
+type Task struct {
 	ID           string
 	CurrentStage model.StageType
-	Status       model.ResponseType
+	Error        bool
 	StageLogs    StageLogs
 }
 
-func (t *CurrentTask) GetStageLogs(stage model.StageType) *StageLog {
+func (t *Task) GetStageLogs(stage model.StageType) *StageLog {
 	switch stage {
 	case model.StageUnspecified:
 		// do nothing
-		return nil
+		return &StageLog{}
 	case model.StageAssemble:
 		return &t.StageLogs.Assemble
 	case model.StageTransfer:
@@ -92,8 +88,9 @@ type StageLogs struct {
 }
 
 type StageLog struct {
-	RequestedAt string
-	Logs        []model.Response `json:",omitempty"'`
+	Status  model.ResponseType `json:",omitempty"'`
+	Updated string             `json:",omitempty"'`
+	Logs    []model.Response   `json:",omitempty"'`
 }
 
 func (s *StageLog) InsertLogs(responses []model.Response) {
