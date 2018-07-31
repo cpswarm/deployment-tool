@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"code.linksmart.eu/dt/deployment-tool/agent/buffer"
 	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/pbnjay/memory"
 	"github.com/satori/go.uuid"
@@ -27,9 +26,8 @@ type agent struct {
 	target       model.Target
 	configPath   string
 	pipe         model.Pipe
-	buf          buffer.Buffer
 	disconnected chan bool
-	runners      []*executor
+	runner       *runner
 }
 
 func startAgent() *agent {
@@ -37,8 +35,8 @@ func startAgent() *agent {
 	a := &agent{
 		pipe:         model.NewPipe(),
 		configPath:   "config.json",
-		buf:          buffer.NewBuffer(LogBufferCapacity),
 		disconnected: make(chan bool),
+		runner:       newRunner(),
 	}
 
 	a.loadConf()
@@ -47,7 +45,7 @@ func startAgent() *agent {
 	}
 	// autostart
 	if len(a.target.Tasks.Run) > 0 {
-		go a.run(a.target.Tasks.Run, a.target.Tasks.Logging, a.target.Tasks.LatestBatchResponse.TaskID)
+		go a.runner.run(a.target.Tasks.Run, a.target.Tasks.LatestBatchResponse.TaskID)
 	}
 
 	go a.startWorker()
@@ -204,7 +202,9 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}()
 	success := exec.executeAndCollectBatch(task.Install, task.Log, resCh)
 	if success {
-		go a.run(task.Run, task.Log, task.ID)
+		a.target.Tasks.Run = task.Run
+		a.saveConfig()
+		go a.runner.run(task.Run, task.ID)
 	}
 }
 
@@ -220,7 +220,7 @@ func (a *agent) sendLogs(payload []byte) {
 	case model.StageRun:
 		a.sendResponse(&model.BatchResponse{
 			ResponseType: model.ResponseLog,
-			Responses:    a.buf.Collect(),
+			Responses:    a.runner.buf.Collect(),
 			TargetID:     a.target.ID,
 			TaskID:       a.target.Tasks.LatestBatchResponse.TaskID,
 			Stage:        model.StageRun,
@@ -229,47 +229,6 @@ func (a *agent) sendLogs(payload []byte) {
 		log.Printf("Enexpected stage: %s", request.Stage)
 	}
 
-}
-
-func (a *agent) run(commands []string, logging model.Log, taskID string) {
-	// stop existing runners
-	for i := 0; i < len(a.runners); i++ {
-		a.runners[i].stop()
-	}
-	a.runners = make([]*executor, len(commands))
-
-	if len(commands) == 0 {
-		return
-	}
-	a.target.Tasks.Run = commands
-	a.target.Tasks.Logging = logging
-	a.saveConfig()
-
-	log.Printf("run() Running task: %s", taskID)
-
-	wd, _ := os.Getwd()
-	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
-
-	resCh := make(chan model.Response)
-	go func() {
-		for res := range resCh {
-			a.buf.Insert(res)
-			log.Printf("run() %v", res)
-		}
-		log.Printf("run() closing collector routine.")
-	}()
-
-	// run in parallel and wait for them to finish
-	wg := &sync.WaitGroup{}
-	for i := 0; i < len(commands); i++ {
-		a.runners[i] = newExecutor(wd)
-		wg.Add(1)
-		go a.runners[i].executeAndCollectWg([]string{commands[i]}, resCh, wg)
-	}
-	wg.Wait()
-
-	close(resCh)
-	log.Println("run() All processes are ended.")
 }
 
 func (a *agent) saveConfig() {
