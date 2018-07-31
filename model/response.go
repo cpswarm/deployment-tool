@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 type ResponseType string
 
 const (
@@ -23,14 +25,20 @@ type BatchResponse struct {
 	TargetID string
 }
 
-// UnixTime is the integer type used for logging timestamps. For the time being, we use uint32 i.e. good for 1970-2106
-type UnixTime uint32
+// UnixTimeType is the integer type used for logging timestamps. For the time being, we use uint32 i.e. good for 1970-2106
+type UnixTimeType uint32
+
+// UnixTime returns the current unix time
+func UnixTime() UnixTimeType {
+	return UnixTimeType(time.Now().Unix())
+}
+
 type Response struct {
 	Command string `json:",omitempty"'`
 	Output  string
 	Error   bool
-	LineNum uint32   `json:",omitempty"'`
-	Time    UnixTime `json:",omitempty"'`
+	LineNum uint32       `json:",omitempty"'`
+	Time    UnixTimeType `json:",omitempty"'`
 }
 
 type Target struct {

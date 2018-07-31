@@ -32,6 +32,7 @@ func (e *executor) storeArtifacts(b []byte) {
 	}
 }
 
+// executeAndCollectBatch executes multiple commands and reports the results based on the given logging interval
 func (e *executor) executeAndCollectBatch(commands []string, logging model.Log, out chan model.BatchResponse) bool {
 
 	batch := model.BatchResponse{
@@ -81,10 +82,13 @@ LOOP:
 	}
 
 	out <- batch
+	close(out)
 	log.Printf("Final Batch: %+v", batch)
 	return !containsErrors
 }
 
+// executeAndCollectWg executes multiple commands and uses a wait group to signal the completion
+// NOTE: unlike executeAndCollect, this function does not close the channel upon completion
 func (e *executor) executeAndCollectWg(commands []string, out chan model.Response, wg *sync.WaitGroup) {
 
 	stdout, stderr := make(chan logLine), make(chan logLine)
@@ -106,6 +110,7 @@ func (e *executor) executeAndCollectWg(commands []string, out chan model.Respons
 	wg.Done()
 }
 
+// executeAndCollect executes multiple commands and closes the channel upon completion
 func (e *executor) executeAndCollect(commands []string, out chan model.Response) {
 
 	stdout, stderr := make(chan logLine), make(chan logLine)
@@ -124,10 +129,10 @@ func (e *executor) executeAndCollect(commands []string, out chan model.Response)
 		}
 	}
 
-	//log.Println("closing executeAndCollect")
 	close(out)
 }
 
+// executeMultiple sequentially executes multiple commands
 func (e *executor) executeMultiple(commands []string, stdout, stderr chan logLine, callback chan error) {
 	for _, command := range commands {
 		e.execute(command, stdout, stderr)
@@ -140,13 +145,10 @@ type logLine struct {
 	command string
 	line    string
 	lineNum uint32
-	time    model.UnixTime
+	time    model.UnixTimeType
 }
 
-func (e *executor) unixTime() model.UnixTime {
-	return model.UnixTime(time.Now().Unix())
-}
-
+// execute executes a command
 func (e *executor) execute(command string, stdout, stderr chan logLine) {
 	bashCommand := []string{"/bin/sh", "-c", command}
 	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
@@ -174,10 +176,10 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 		for scanner.Scan() {
 			atomic.AddUint32(&line, 1)
 			//log.Println(scanner.Text())
-			stdout <- logLine{command, scanner.Text(), line, e.unixTime()}
+			stdout <- logLine{command, scanner.Text(), line, model.UnixTime()}
 		}
 		if err = scanner.Err(); err != nil {
-			stderr <- logLine{command, err.Error(), line, e.unixTime()}
+			stderr <- logLine{command, err.Error(), line, model.UnixTime()}
 			log.Println("Error:", err)
 		}
 		stream.Close()
@@ -190,10 +192,10 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 		for scanner.Scan() {
 			atomic.AddUint32(&line, 1)
 			//log.Println("stderr:", scanner.Text())
-			stderr <- logLine{command, scanner.Text(), line, e.unixTime()}
+			stderr <- logLine{command, scanner.Text(), line, model.UnixTime()}
 		}
 		if err = scanner.Err(); err != nil {
-			stderr <- logLine{command, err.Error(), line, e.unixTime()}
+			stderr <- logLine{command, err.Error(), line, model.UnixTime()}
 			log.Println("Error:", err)
 		}
 		stream.Close()
@@ -204,11 +206,11 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 	err = e.cmd.Run()
 	if err != nil {
 		atomic.AddUint32(&line, 1)
-		stderr <- logLine{command, err.Error(), line, e.unixTime()}
+		stderr <- logLine{command, err.Error(), line, model.UnixTime()}
 		return
 	}
 	atomic.AddUint32(&line, 1)
-	stdout <- logLine{command, "exit status 0", line, e.unixTime()}
+	stdout <- logLine{command, "exit status 0", line, model.UnixTime()}
 	e.cmd = nil
 }
 
