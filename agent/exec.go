@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -31,7 +32,7 @@ func (e *executor) storeArtifacts(b []byte) {
 	}
 }
 
-func (e *executor) responseBatchCollector(commands []string, logging model.Log, out chan model.BatchResponse) bool {
+func (e *executor) executeAndCollectBatch(commands []string, logging model.Log, out chan model.BatchResponse) bool {
 
 	batch := model.BatchResponse{
 		ResponseType: model.ResponseLog,
@@ -48,7 +49,7 @@ func (e *executor) responseBatchCollector(commands []string, logging model.Log, 
 	log.Println("Will send logs every", interval)
 
 	resCh := make(chan model.Response)
-	go e.responseCollector(commands, resCh)
+	go e.executeAndCollect(commands, resCh)
 	var containsErrors bool
 	ticker := time.NewTicker(interval)
 LOOP:
@@ -62,7 +63,6 @@ LOOP:
 			containsErrors = res.Error
 			//log.Printf("%s -- %d -- %s -- %s -- %f", res.Command, res.LineNum, res.Stdout, res.Stderr, res.TimeElapsed)
 			batch.Responses = append(batch.Responses, res)
-			batch.TimeElapsed = res.TimeElapsed
 		case <-ticker.C:
 			if len(batch.Responses) == 0 {
 				break
@@ -85,8 +85,7 @@ LOOP:
 	return !containsErrors
 }
 
-func (e *executor) responseCollector(commands []string, out chan model.Response) {
-	start := time.Now()
+func (e *executor) executeAndCollectWg(commands []string, out chan model.Response, wg *sync.WaitGroup) {
 
 	stdout, stderr := make(chan logLine), make(chan logLine)
 	callback := make(chan error)
@@ -96,15 +95,36 @@ func (e *executor) responseCollector(commands []string, out chan model.Response)
 	for open := true; open; {
 		select {
 		case x := <-stdout:
-			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds()}
+			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time}
 		case x := <-stderr:
-			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, TimeElapsed: time.Since(start).Seconds(), Error: true}
+			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time, Error: true}
 		case _, open = <-callback:
 			// do nothing
 		}
 	}
 
-	//log.Println("closing responseCollector")
+	wg.Done()
+}
+
+func (e *executor) executeAndCollect(commands []string, out chan model.Response) {
+
+	stdout, stderr := make(chan logLine), make(chan logLine)
+	callback := make(chan error)
+
+	go e.executeMultiple(commands, stdout, stderr, callback)
+
+	for open := true; open; {
+		select {
+		case x := <-stdout:
+			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time}
+		case x := <-stderr:
+			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time, Error: true}
+		case _, open = <-callback:
+			// do nothing
+		}
+	}
+
+	//log.Println("closing executeAndCollect")
 	close(out)
 }
 
@@ -120,6 +140,11 @@ type logLine struct {
 	command string
 	line    string
 	lineNum uint32
+	time    model.UnixTime
+}
+
+func (e *executor) unixTime() model.UnixTime {
+	return model.UnixTime(time.Now().Unix())
 }
 
 func (e *executor) execute(command string, stdout, stderr chan logLine) {
@@ -149,10 +174,10 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 		for scanner.Scan() {
 			atomic.AddUint32(&line, 1)
 			//log.Println(scanner.Text())
-			stdout <- logLine{command, scanner.Text(), line}
+			stdout <- logLine{command, scanner.Text(), line, e.unixTime()}
 		}
 		if err = scanner.Err(); err != nil {
-			stderr <- logLine{command, err.Error(), line}
+			stderr <- logLine{command, err.Error(), line, e.unixTime()}
 			log.Println("Error:", err)
 		}
 		stream.Close()
@@ -165,10 +190,10 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 		for scanner.Scan() {
 			atomic.AddUint32(&line, 1)
 			//log.Println("stderr:", scanner.Text())
-			stderr <- logLine{command, scanner.Text(), line}
+			stderr <- logLine{command, scanner.Text(), line, e.unixTime()}
 		}
 		if err = scanner.Err(); err != nil {
-			stderr <- logLine{command, err.Error(), line}
+			stderr <- logLine{command, err.Error(), line, e.unixTime()}
 			log.Println("Error:", err)
 		}
 		stream.Close()
@@ -179,12 +204,12 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 	err = e.cmd.Run()
 	if err != nil {
 		atomic.AddUint32(&line, 1)
-		stderr <- logLine{command, err.Error(), line}
+		stderr <- logLine{command, err.Error(), line, e.unixTime()}
 		return
 	}
 	atomic.AddUint32(&line, 1)
-	stdout <- logLine{command, "exit status 0", line}
-
+	stdout <- logLine{command, "exit status 0", line, e.unixTime()}
+	e.cmd = nil
 }
 
 func (e *executor) stop() {
@@ -192,7 +217,6 @@ func (e *executor) stop() {
 		return
 	}
 	pid := e.cmd.Process.Pid
-	log.Printf("Stopping process: %d", pid)
 
 	err := e.cmd.Process.Signal(syscall.SIGTERM)
 	if err != nil {

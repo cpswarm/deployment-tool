@@ -35,10 +35,6 @@ func startManager(pipe model.Pipe) (*manager, error) {
 
 func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) {
 
-	if len(descr.Stages.Run) > 1 {
-		return nil, fmt.Errorf("activation request error: execution of multiple processes is currently not supported")
-	}
-
 	m.RLock()
 TARGETS:
 	for id, target := range m.Targets {

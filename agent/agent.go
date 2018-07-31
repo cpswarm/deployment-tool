@@ -18,7 +18,7 @@ import (
 
 const (
 	AdvInterval       = 30 * time.Second
-	LogBufferCapacity = 10
+	LogBufferCapacity = 100
 )
 
 type agent struct {
@@ -29,6 +29,7 @@ type agent struct {
 	pipe         model.Pipe
 	buf          buffer.Buffer
 	disconnected chan bool
+	runners      []*executor
 }
 
 func startAgent() *agent {
@@ -46,7 +47,7 @@ func startAgent() *agent {
 	}
 	// autostart
 	if len(a.target.Tasks.Run) > 0 {
-		a.run(a.target.Tasks.Run, a.target.Tasks.Logging, a.target.Tasks.LatestBatchResponse.TaskID)
+		go a.run(a.target.Tasks.Run, a.target.Tasks.Logging, a.target.Tasks.LatestBatchResponse.TaskID)
 	}
 
 	go a.startWorker()
@@ -201,7 +202,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 			a.sendResponse(&res)
 		}
 	}()
-	success := exec.responseBatchCollector(task.Install, task.Log, resCh)
+	success := exec.executeAndCollectBatch(task.Install, task.Log, resCh)
 	if success {
 		go a.run(task.Run, task.Log, task.ID)
 	}
@@ -231,6 +232,12 @@ func (a *agent) sendLogs(payload []byte) {
 }
 
 func (a *agent) run(commands []string, logging model.Log, taskID string) {
+	// stop existing runners
+	for i := 0; i < len(a.runners); i++ {
+		a.runners[i].stop()
+	}
+	a.runners = make([]*executor, len(commands))
+
 	if len(commands) == 0 {
 		return
 	}
@@ -238,24 +245,31 @@ func (a *agent) run(commands []string, logging model.Log, taskID string) {
 	a.target.Tasks.Logging = logging
 	a.saveConfig()
 
-	log.Printf("Running task: %s", taskID)
+	log.Printf("run() Running task: %s", taskID)
 
 	wd, _ := os.Getwd()
 	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
-	// start a new executor
-	exec := newExecutor(wd)
-	a.buf.Flush()
 
-	// execute and collect results
 	resCh := make(chan model.Response)
 	go func() {
 		for res := range resCh {
 			a.buf.Insert(res)
-			log.Printf("Run: %v", a.buf.Collect())
+			log.Printf("run() %v", res)
 		}
-		log.Printf("Run ended for task: %s", taskID)
+		log.Printf("run() closing collector routine.")
 	}()
-	exec.responseCollector(commands, resCh)
+
+	// run in parallel and wait for them to finish
+	wg := &sync.WaitGroup{}
+	for i := 0; i < len(commands); i++ {
+		a.runners[i] = newExecutor(wd)
+		wg.Add(1)
+		go a.runners[i].executeAndCollectWg([]string{commands[i]}, resCh, wg)
+	}
+	wg.Wait()
+
+	close(resCh)
+	log.Println("run() All processes are ended.")
 }
 
 func (a *agent) saveConfig() {
