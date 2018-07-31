@@ -24,12 +24,8 @@ func newRunner() *runner {
 
 func (r *runner) run(commands []string, taskID string) {
 	// stop existing runners
-	for i := 0; i < len(r.runners); i++ {
-		r.runners[i].stop()
-	}
-	r.wg.Wait() // wait for pending runs
+	r.stop()
 	r.runners = make([]*executor, len(commands))
-	r.buf.Flush()
 
 	// nothing to run
 	if len(commands) == 0 {
@@ -60,4 +56,13 @@ func (r *runner) run(commands []string, taskID string) {
 
 	close(resCh)
 	log.Println("run() All processes are ended.")
+}
+
+func (r *runner) stop() {
+	log.Println("Shutting down the runner...")
+	for i := 0; i < len(r.runners); i++ {
+		r.runners[i].stop()
+	}
+	r.wg.Wait() // wait for pending runs
+	r.buf.Flush()
 }

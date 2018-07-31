@@ -272,5 +272,6 @@ func (a *agent) sendTransferResponse(status model.ResponseType, taskID, message 
 }
 
 func (a *agent) close() {
+	a.runner.stop()
 	a.saveConfig()
 }
