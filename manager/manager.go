@@ -156,7 +156,7 @@ func (m *manager) processResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			log.Printf("processResponses %+v", target.Tasks)
+			log.Printf("processResponses %+v", target)
 
 			m.Lock()
 			if _, found := m.Targets[target.ID]; !found {
@@ -166,16 +166,15 @@ func (m *manager) processResponses() {
 			m.Targets[target.ID].Tags = target.Tags
 			// create aliases
 			task := &m.Targets[target.ID].Task
-			response := &target.Tasks.LatestBatchResponse
-			stageLogs := task.GetStageLogs(response.Stage)
+			stageLogs := task.GetStageLogs(target.TaskStage)
 			// update current task
-			task.ID = response.TaskID
-			task.CurrentStage = response.Stage
-			task.Error = response.ResponseType == model.ResponseError
-			stageLogs.Status = response.ResponseType
+			task.ID = target.TaskID
+			task.CurrentStage = target.TaskStage
+			task.Error = target.TaskStatus == model.ResponseError
+			stageLogs.Status = target.TaskStatus
 			stageLogs.Updated = time.Now().Format(time.RFC3339)
 			// update history
-			m.Targets[target.ID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)
+			m.Targets[target.ID].History[target.TaskID] = m.formatStageStatus(target.TaskStage, target.TaskStatus)
 			m.Unlock()
 			log.Printf("Received target advertisement: %s Tags: %s", target.ID, target.Tags)
 		default:

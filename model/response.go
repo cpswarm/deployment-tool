@@ -46,12 +46,10 @@ type Target struct {
 	ID   string
 	Tags []string
 
-	Tasks *TaskHistory
-}
-
-type TaskHistory struct {
-	LatestBatchResponse BatchResponse
-	Run                 []string
-	Logging             Log
-	History             []string
+	// active task
+	TaskID      string
+	TaskStage   StageType
+	TaskStatus  ResponseType
+	TaskRun     []string `json:",omitempty"'`
+	TaskHistory []string `json:",omitempty"'`
 }

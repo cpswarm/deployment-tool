@@ -23,7 +23,8 @@ const (
 type agent struct {
 	sync.Mutex
 
-	target       model.Target
+	target model.Target
+
 	configPath   string
 	pipe         model.Pipe
 	disconnected chan bool
@@ -40,12 +41,10 @@ func startAgent() *agent {
 	}
 
 	a.loadConf()
-	if a.target.Tasks == nil {
-		a.target.Tasks = new(model.TaskHistory)
-	}
+
 	// autostart
-	if len(a.target.Tasks.Run) > 0 {
-		go a.runner.run(a.target.Tasks.Run, a.target.Tasks.LatestBatchResponse.TaskID)
+	if len(a.target.TaskRun) > 0 {
+		go a.runner.run(a.target.TaskRun, a.target.TaskID)
 	}
 
 	go a.startWorker()
@@ -119,15 +118,13 @@ func (a *agent) advertiseTarget() {
 	log.Printf("Will advertise target every %s", AdvInterval)
 	defer log.Println("Stopped advertisement routine.")
 
-	b, _ := json.Marshal(a.target)
-	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
+	a.sendAdvertisement()
 
 	t := time.NewTicker(AdvInterval)
 	for {
 		select {
 		case <-t.C:
-			b, _ := json.Marshal(a.target)
-			a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
+			a.sendAdvertisement()
 		case <-a.disconnected:
 			return
 		}
@@ -148,8 +145,8 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	if taskA.Size <= sizeLimit {
 		log.Printf("task announcement. Size: %v", taskA.Size)
 		log.Printf("Total system memory: %d\n", memory.TotalMemory())
-		for i := len(a.target.Tasks.History) - 1; i >= 0; i-- {
-			if a.target.Tasks.History[i] == taskA.ID {
+		for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
+			if a.target.TaskHistory[i] == taskA.ID {
 				log.Println("Dropping announcement for task", taskA.ID)
 				return
 			}
@@ -176,7 +173,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
 	a.sendTransferResponse(model.ResponseLog, task.ID, "received task")
-	a.target.Tasks.History = append(a.target.Tasks.History, task.ID)
+	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
 	// set work directory
 	wd, _ := os.Getwd()
@@ -202,8 +199,13 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}()
 	success := exec.executeAndCollectBatch(task.Install, task.Log, resCh)
 	if success {
-		a.target.Tasks.Run = task.Run
+		// update and save the task info
+		a.target.TaskID = task.ID
+		a.target.TaskStage = model.StageInstall
+		a.target.TaskStatus = model.ResponseSuccess
+		a.target.TaskRun = task.Run
 		a.saveConfig()
+
 		go a.runner.run(task.Run, task.ID)
 	}
 }
@@ -222,7 +224,7 @@ func (a *agent) sendLogs(payload []byte) {
 			ResponseType: model.ResponseLog,
 			Responses:    a.runner.buf.Collect(),
 			TargetID:     a.target.ID,
-			TaskID:       a.target.Tasks.LatestBatchResponse.TaskID,
+			TaskID:       a.target.TaskID,
 			Stage:        model.StageRun,
 		})
 	default:
@@ -250,16 +252,9 @@ func (a *agent) saveConfig() {
 
 func (a *agent) sendResponse(resp *model.BatchResponse) {
 	resp.TargetID = a.target.ID
-	// serialize
-	b, err := json.Marshal(resp)
-	if err != nil {
-		log.Println(err)
-	}
-	// send to channel
+
+	b, _ := json.Marshal(resp)
 	a.pipe.ResponseCh <- model.Message{string(resp.ResponseType), b}
-	// update the status
-	a.target.Tasks.LatestBatchResponse = *resp
-	a.saveConfig()
 }
 
 func (a *agent) sendTransferResponse(status model.ResponseType, taskID, message string) {
@@ -269,6 +264,18 @@ func (a *agent) sendTransferResponse(status model.ResponseType, taskID, message 
 		TaskID:       taskID,
 		Responses:    []model.Response{{Output: message, Error: status == model.ResponseError}},
 	})
+}
+
+func (a *agent) sendAdvertisement() {
+	t := model.Target{
+		ID:         a.target.ID,
+		Tags:       a.target.Tags,
+		TaskID:     a.target.TaskID,
+		TaskStage:  a.target.TaskStage,
+		TaskStatus: a.target.TaskStatus,
+	}
+	b, _ := json.Marshal(t)
+	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 }
 
 func (a *agent) close() {
