@@ -214,29 +214,30 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 	e.cmd = nil
 }
 
-func (e *executor) stop() {
+func (e *executor) stop() bool {
 	if e.cmd == nil || e.cmd.Process == nil {
-		return
+		return true
 	}
 	pid := e.cmd.Process.Pid
 
 	err := e.cmd.Process.Signal(syscall.SIGTERM)
 	if err != nil {
 		log.Println("Error terminating process:", err)
-		return
+		return false
 	}
 	err = e.cmd.Process.Release()
 	if err != nil {
 		log.Println("Error releasing process:", err)
 	} else {
 		log.Println("Terminated process:", pid)
-		return
+		return true
 	}
 
 	err = e.cmd.Process.Kill()
 	if err != nil {
 		log.Println("Error killing process:", err)
-		return
+		return false
 	}
 	log.Println("Killed process:", pid)
+	return true
 }

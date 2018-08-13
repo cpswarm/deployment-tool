@@ -44,7 +44,7 @@ func startAgent() *agent {
 
 	// autostart
 	if len(a.target.TaskRun) > 0 {
-		go a.runner.run(a.target.TaskRun, a.target.TaskID)
+		go a.run(a.target.TaskRun, a.target.TaskID)
 	}
 
 	go a.startWorker()
@@ -162,6 +162,7 @@ func (a *agent) handleAnnouncement(payload []byte) {
 
 func (a *agent) handleTask(id string, payload []byte) {
 	log.Printf("handleTask: %s", id)
+	a.runner.stop()
 
 	var task model.Task
 	err := json.Unmarshal(payload, &task)
@@ -199,14 +200,10 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}()
 	success := exec.executeAndCollectBatch(task.Install, task.Log, resCh)
 	if success {
-		// update and save the task info
-		a.target.TaskID = task.ID
-		a.target.TaskStage = model.StageInstall
-		a.target.TaskStatus = model.ResponseSuccess
 		a.target.TaskRun = task.Run
 		a.saveConfig()
 
-		go a.runner.run(task.Run, task.ID)
+		go a.run(task.Run, task.ID)
 	}
 }
 
@@ -251,6 +248,11 @@ func (a *agent) saveConfig() {
 }
 
 func (a *agent) sendResponse(resp *model.BatchResponse) {
+	a.target.TaskID = resp.TaskID
+	a.target.TaskStage = resp.Stage
+	a.target.TaskStatus = resp.ResponseType
+	a.saveConfig()
+
 	resp.TargetID = a.target.ID
 
 	b, _ := json.Marshal(resp)
@@ -275,7 +277,7 @@ func (a *agent) sendAdvertisement() {
 		TaskStatus: a.target.TaskStatus,
 	}
 	b, _ := json.Marshal(t)
-	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
+	a.pipe.ResponseCh <- model.Message{string(model.ResponseAdvertisement), b}
 }
 
 func (a *agent) close() {

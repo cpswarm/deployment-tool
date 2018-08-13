@@ -7,11 +7,11 @@ type ResponseType string
 const (
 	// Response types
 	ResponseLog     ResponseType = "LOG"     // stage stdout and stderr
-	ResponseSuccess              = "SUCCESS" // stage ended without errors
-	ResponseError                = "ERROR"   // stage ended with errors
+	ResponseSuccess ResponseType = "SUCCESS" // stage ended without errors
+	ResponseError   ResponseType = "ERROR"   // stage ended with errors
 
-	ResponseClientError   = "CLIENT_ERROR" // client errors
-	ResponseAdvertisement = "ADV"          // agent advertisement
+	ResponseClientError   ResponseType = "CLIENT_ERROR" // client errors
+	ResponseAdvertisement ResponseType = "ADV"          // agent advertisement
 )
 
 type BatchResponse struct {
