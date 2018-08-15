@@ -1,0 +1,68 @@
+<html>
+
+<head>
+    <title>Deployment Manager UI</title>
+
+    <script src="lib/axios.min.js"></script>
+    <script src="lib/jquery-3.3.1.min.js"></script>
+    <script src="lib/highlighter.js"></script>
+
+</head>
+
+<body>
+    <pre></pre>
+
+    <script>
+
+        function getTargets() {
+            axios.get('http://localhost:8080/targets?quiet')
+                    .then(function (response) {
+                        // console.log(response);
+                        json = syntaxHighlight(JSON.stringify(response.data, null, 2));
+                        $('pre').html(json);
+                        // setTimeout(function () { getTargets(); }, 1000);
+                    })
+                    .catch(function (error) {
+                        // handle error
+                        console.log(error);
+                        setTimeout(function () {
+                            getTargets();
+                        }, 5000);
+                    })
+                    .then(function () {
+
+                    });
+        }
+
+        function listen() {
+            if (!("WebSocket" in window)) {
+                alert("WebSocket is not supported by your Browser!");
+                return;
+            }
+
+            var ws = new WebSocket("ws://localhost:8080/ws");
+            ws.onopen = function () {
+                console.log("Socket connected.")
+            }
+            ws.onmessage = function (event) {
+                // console.log(event.data);
+                var obj = JSON.parse(event.data);
+                json = syntaxHighlight(JSON.stringify(obj, null, 2));
+                $('pre').html(json);
+            }
+            ws.onclose = function () {
+                console.log("Socket disconnected.");
+                setTimeout(function () {
+                    listen();
+                }, 5000);
+            };
+
+        }
+
+        getTargets();
+        listen();
+
+    </script>
+</body>
+
+</html>

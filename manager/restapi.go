@@ -8,6 +8,7 @@ import (
 
 	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
 )
 
@@ -40,6 +41,9 @@ func (a *restAPI) setupRouter() {
 	// tasks
 	r.HandleFunc("/tasks", a.ListTasks).Methods("GET")
 	r.HandleFunc("/tasks", a.AddTask).Methods("POST")
+	// static
+	r.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("static"))))
+	r.PathPrefix("/ws").HandlerFunc(a.websocket)
 
 	r.Use(loggingMiddleware)
 
@@ -48,9 +52,16 @@ func (a *restAPI) setupRouter() {
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println(r.Method, r.RequestURI)
+		q := r.URL.Query()
+		_, quiet := q["quiet"]
+		if !quiet {
+			log.Println(r.Method, r.RequestURI)
+		}
+
 		next.ServeHTTP(w, r)
-		log.Println(r.Method, r.URL, "responded.")
+		if !quiet {
+			log.Println(r.Method, r.URL, "responded.")
+		}
 	})
 }
 
@@ -162,6 +173,28 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	HTTPResponseSuccess(w, http.StatusOK, "Requested logs for stage: ", stage)
 	return
+}
+
+func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
+	upgrader := websocket.Upgrader{} // use default options
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("ws upgrade error:", err)
+		return
+	}
+	defer c.Close()
+	for {
+		a.manager.update.L.Lock()
+		a.manager.update.Wait()
+		b, _ := json.Marshal(a.manager.Targets)
+		err = c.WriteMessage(websocket.TextMessage, b)
+		if err != nil {
+			log.Println("ws write error:", err)
+			a.manager.update.L.Unlock()
+			break
+		}
+		a.manager.update.L.Unlock()
+	}
 }
 
 // HTTPResponseError serializes and writes an error response

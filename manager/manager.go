@@ -18,12 +18,14 @@ type manager struct {
 	sync.RWMutex
 	registry
 
-	pipe model.Pipe
+	pipe   model.Pipe
+	update *sync.Cond
 }
 
 func startManager(pipe model.Pipe) (*manager, error) {
 	m := &manager{
-		pipe: pipe,
+		pipe:   pipe,
+		update: sync.NewCond(&sync.Mutex{}),
 	}
 
 	m.Targets = make(map[string]*Target)
@@ -219,6 +221,8 @@ func (m *manager) processResponses() {
 			m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)
 			m.Unlock()
 		}
+		// sent update notification
+		m.update.Broadcast()
 	}
 }
 
