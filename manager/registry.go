@@ -59,7 +59,7 @@ type Task struct {
 	StageLogs    StageLogs
 }
 
-func (t *Task) GetStageLogs(stage model.StageType) *StageLog {
+func (t *Task) GetStageLog(stage model.StageType) *StageLog {
 	switch stage {
 	case model.StageUnspecified:
 		// do nothing
@@ -95,4 +95,8 @@ type StageLog struct {
 
 func (s *StageLog) InsertLogs(responses []model.Response) {
 	s.Logs = append(s.Logs, responses...)
+}
+
+func (s *StageLog) Flush() {
+	*s = StageLog{}
 }

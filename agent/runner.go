@@ -39,15 +39,19 @@ func (a *agent) run(commands []string, taskID string) {
 
 	resCh := make(chan model.Response)
 	go func() {
+		execError := false
 		for res := range resCh {
 			if res.Error {
+				execError = true
 				a.sendRunResponse(model.ResponseError, taskID, res.Output)
 			}
 			r.buf.Insert(res)
 			log.Printf("run() %v", res)
 		}
 		log.Printf("run() closing collector routine.")
-		a.sendRunResponse(model.ResponseSuccess, taskID, "")
+		if !execError {
+			a.sendRunResponse(model.ResponseSuccess, taskID, "")
+		}
 	}()
 
 	// run in parallel and wait for them to finish

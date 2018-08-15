@@ -97,6 +97,10 @@ func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
 }
 
 func (m *manager) sendTask(task *model.Task, targetTags []string) {
+	// clear status of existing tasks
+	for _, target := range m.Targets {
+		target.Task = Task{}
+	}
 	pending := true
 
 	for pending {
@@ -167,7 +171,7 @@ func (m *manager) processResponses() {
 			m.Targets[target.ID].Tags = target.Tags
 			// create aliases
 			task := &m.Targets[target.ID].Task
-			stageLogs := task.GetStageLogs(target.TaskStage)
+			stageLogs := task.GetStageLog(target.TaskStage)
 			// update current task
 			task.ID = target.TaskID
 			task.CurrentStage = target.TaskStage
@@ -177,7 +181,7 @@ func (m *manager) processResponses() {
 			// update history
 			m.Targets[target.ID].History[target.TaskID] = m.formatStageStatus(target.TaskStage, target.TaskStatus)
 			m.Unlock()
-			log.Println("Received target advertisemen", target.ID, target.Tags, target.TaskID, target.TaskStage, target.TaskStatus)
+			//log.Println("Received adv", target.ID, target.Tags, target.TaskID, target.TaskStage, target.TaskStatus)
 		default:
 			var response model.BatchResponse
 			err := json.Unmarshal(resp.Payload, &response)
@@ -202,7 +206,7 @@ func (m *manager) processResponses() {
 			m.Lock()
 			// create aliases
 			task := &m.Targets[response.TargetID].Task
-			stageLogs := task.GetStageLogs(response.Stage)
+			stageLogs := task.GetStageLog(response.Stage)
 			// update current task
 			task.ID = response.TaskID
 			task.CurrentStage = response.Stage
@@ -221,14 +225,15 @@ func (m *manager) processResponses() {
 func (m *manager) processResponseRun(response *model.BatchResponse) {
 	// create aliases
 	task := &m.Targets[response.TargetID].Task
-	stageLogs := task.GetStageLogs(response.Stage)
+	stageLog := task.GetStageLog(response.Stage)
 
 	if task.ID == response.TaskID {
 		task.CurrentStage = response.Stage
 		task.Error = response.ResponseType == model.ResponseError
-		stageLogs.Status = response.ResponseType
-		stageLogs.InsertLogs(response.Responses) // TODO logs not flushed from task to task
-		stageLogs.Updated = time.Now().Format(time.RFC3339)
+		stageLog.Flush() // flush logs at every response
+		stageLog.Status = response.ResponseType
+		stageLog.InsertLogs(response.Responses)
+		stageLog.Updated = time.Now().Format(time.RFC3339)
 	}
 	// update history
 	m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)

@@ -218,7 +218,7 @@ func (a *agent) sendLogs(payload []byte) {
 	switch request.Stage {
 	case model.StageRun:
 		a.sendResponse(&model.BatchResponse{
-			ResponseType: model.ResponseLog,
+			ResponseType: a.target.TaskStatus,
 			Responses:    a.runner.buf.Collect(),
 			TargetID:     a.target.ID,
 			TaskID:       a.target.TaskID,
