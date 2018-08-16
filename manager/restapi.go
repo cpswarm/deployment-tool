@@ -52,16 +52,9 @@ func (a *restAPI) setupRouter() {
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query()
-		_, quiet := q["quiet"]
-		if !quiet {
-			log.Println(r.Method, r.RequestURI)
-		}
-
+		log.Println(r.Method, r.RequestURI)
 		next.ServeHTTP(w, r)
-		if !quiet {
-			log.Println(r.Method, r.URL, "responded.")
-		}
+		log.Println(r.Method, r.URL, "responded.")
 	})
 }
 

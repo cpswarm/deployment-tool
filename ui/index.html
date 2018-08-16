@@ -15,7 +15,7 @@
     <script>
 
         function getTargets() {
-            axios.get('http://localhost:8080/targets?quiet')
+            axios.get('http://localhost:8080/targets')
                     .then(function (response) {
                         // console.log(response);
                         json = syntaxHighlight(JSON.stringify(response.data, null, 2));
@@ -42,7 +42,8 @@
 
             var ws = new WebSocket("ws://localhost:8080/ws");
             ws.onopen = function () {
-                console.log("Socket connected.")
+                console.log("Socket connected.");
+                document.body.style.backgroundColor = "#fff";
             }
             ws.onmessage = function (event) {
                 // console.log(event.data);
@@ -52,6 +53,7 @@
             }
             ws.onclose = function () {
                 console.log("Socket disconnected.");
+                document.body.style.backgroundColor = "#fcc";
                 setTimeout(function () {
                     listen();
                 }, 5000);
