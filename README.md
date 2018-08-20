@@ -39,3 +39,9 @@ export GOPATH=$(pwd)
 go install code.linksmart.eu/dt/deployment-tool/manager
 go install code.linksmart.eu/dt/deployment-tool/agent
 ```
+
+#### Build with static linked dependencies (armv7)
+```
+sudo sh build/zeromq/install-armv7.sh
+CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lsodium -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a code.linksmart.eu/dt/deployment-tool/agent
+```

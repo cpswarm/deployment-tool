@@ -7,4 +7,4 @@ COPY temp src/code.linksmart.eu/dt/deployment-tool/
 ENV GOPATH=/home
 
 # the armv7 compilation on a macOS host only works during build time:
-RUN go install code.linksmart.eu/dt/deployment-tool/agent
+RUN go install -v code.linksmart.eu/dt/deployment-tool/agent
