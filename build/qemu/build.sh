@@ -13,7 +13,8 @@ cp -rv ../../model temp/$package
 cp -rv ../../vendor temp/$package
 
 echo "Compiling... (IF HUNG, KILL THE CONTAINER!)"
-docker run --rm -v $(pwd)/temp:/home/src -v $(pwd)/bin:/home/bin --env GOPATH=/home -it farshidtz/zeromq:multiarch-ubuntu-core-armhf-xenial-go go install -v $package/agent
+docker run --rm -v $(pwd)/temp:/home/src -v $(pwd)/bin:/home/bin farshidtz/zeromq:multiarch-ubuntu-core-armhf-xenial-go \
+    go build -v -o bin/agent-linux-arm $package/agent
 
 echo "Cleaning up..."
 rm -fr temp
