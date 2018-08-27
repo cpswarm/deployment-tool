@@ -162,7 +162,6 @@ func (a *agent) handleAnnouncement(payload []byte) {
 
 func (a *agent) handleTask(id string, payload []byte) {
 	log.Printf("handleTask: %s", id)
-	a.runner.stop()
 
 	var task model.Task
 	err := json.Unmarshal(payload, &task)
@@ -178,11 +177,12 @@ func (a *agent) handleTask(id string, payload []byte) {
 
 	// set work directory
 	wd, _ := os.Getwd()
-	wd = fmt.Sprintf("%s/tasks/%s", wd, task.ID)
-	log.Println("Task work directory:", wd)
+	wd = fmt.Sprintf("%s/tasks", wd)
+	taskDir := fmt.Sprintf("%s/%s", wd, task.ID)
+	log.Println("Task work directory:", taskDir)
 
 	// start a new executor
-	exec := newExecutor(wd)
+	exec := newExecutor(taskDir)
 
 	// decompress and store
 	exec.storeArtifacts(task.Artifacts)
@@ -200,10 +200,35 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}()
 	success := exec.executeAndCollectBatch(task.Install, task.Log, resCh)
 	if success {
+		a.runner.stop()              // stop runner for old task
+		a.removeOldTask(wd, task.ID) // remove old task files
 		a.target.TaskRun = task.Run
 		a.saveConfig()
 
 		go a.run(task.Run, task.ID)
+	}
+}
+
+func (a *agent) removeOldTask(wd, taskID string) {
+	_, err := os.Stat(wd)
+	if err != nil && os.IsNotExist(err) {
+		// nothing to remove
+		return
+	}
+	files, err := ioutil.ReadDir(wd)
+	if err != nil {
+		log.Printf("Error reading work dir: %s", err)
+		return
+	}
+	for i := 0; i < len(files); i++ {
+		if files[i].Name() != taskID {
+			filename := fmt.Sprintf("%s/%s", wd, files[i].Name())
+			log.Printf("Removing old task dir: %s", files[i].Name())
+			err = os.RemoveAll(filename)
+			if err != nil {
+				log.Printf("Error removing old task dir: %s", err)
+			}
+		}
 	}
 }
 

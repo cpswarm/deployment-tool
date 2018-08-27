@@ -83,8 +83,8 @@ func newTaskID() string {
 	// inverse the UUIDv1 chunks to make them alphanumerically sortable
 	split := strings.Split(uuid.NewV1().String(), "-")
 	var reverse []string
-	for _, chunk := range split {
-		reverse = append([]string{chunk}, reverse...)
+	for i := len(split) - 1; i >= 0; i-- {
+		reverse = append(reverse, split[i])
 	}
 	return strings.Join(reverse, "-")
 }
