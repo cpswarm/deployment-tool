@@ -1,4 +1,4 @@
-FROM farshidtz/zeromq-armv7
+FROM farshidtz/zeromq:arm32v7-debian
 
 ARG GO_VER=1.10.3
 
@@ -11,4 +11,4 @@ RUN wget --quiet https://dl.google.com/go/$GO_ARCHIVE && \
 ENV PATH=$PATH:/usr/local/go/bin
 
 # BUILD
-# docker build -f Dockerfile-zeromq-go -t farshidtz/zeromq-armv7:go .
+# docker build -f Dockerfile-zeromq-go -t farshidtz/zeromq:arm32v7-debian-go .

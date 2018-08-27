@@ -1,4 +1,4 @@
-FROM farshidtz/zeromq-armv7:go
+FROM farshidtz/zeromq:arm32v7-debian-go
 
 WORKDIR /home
 

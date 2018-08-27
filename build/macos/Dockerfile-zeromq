@@ -17,4 +17,4 @@ RUN wget https://github.com/zeromq/libzmq/releases/download/v$ZEROMQ_VER/zeromq-
 RUN rm -fr /home/zeromq-$ZEROMQ_VER
 
 # BUILD
-# docker build -f Dockerfile-zeromq -t farshidtz/zeromq-armv7 .
+# docker build -f Dockerfile-zeromq -t farshidtz/zeromq:arm32v7-debian .
