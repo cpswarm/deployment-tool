@@ -63,11 +63,11 @@ func (a *agent) loadConf() {
 
 	b, err := ioutil.ReadFile("config.json")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error reading config file: %s", err)
 	}
 	err = json.Unmarshal(b, &a.target)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error parsing config file: %s", err)
 	}
 	log.Println("Loaded config file:", a.configPath)
 
