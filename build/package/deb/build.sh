@@ -1,5 +1,6 @@
 #!/bin/sh
 
+set -e
 #wget https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/NB/Binary-Distributions/deployment-agent-linux-arm
 
 mkdir -p linksmart-deployment-agent/DEBIAN
