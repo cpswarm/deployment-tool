@@ -1,0 +1,5 @@
+Package: linksmart-deployment-agent
+Version: 0.3
+Maintainer: LinkSmart®
+Architecture: armhf
+Description: LinkSmart® Deployment Agent

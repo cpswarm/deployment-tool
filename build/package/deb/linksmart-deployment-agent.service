@@ -1,0 +1,12 @@
+[Unit]
+Description=LinkSmart® Deployment Agent
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/local/linksmart-deployment-agent
+ExecStart=/usr/local/bin/linksmart-deployment-agent
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
