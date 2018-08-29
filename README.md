@@ -19,12 +19,21 @@ This repository consists of the following packages:
 | Package Validation               | -          |
 | Tamper Detection                 | -          |
 
-### Dependencies
-* [ZeroMQ v4.x.x](http://zeromq.org/intro:get-the-software)
 
-**Install via apt**
+## Dependencies
+* [ZeroMQ v4.x.x](http://zeromq.org/intro:get-the-software).   
+Runtime: libzmq5, Build: libzmq3-dev
+
+
+## Install (Debian)
 ```
-sudo apt install libzmq5
+wget https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/Debian-Package/deployment-agent-linux-arm.deb
+sudo apt install ./deployment-agent-linux-arm.deb
+```
+
+### Run after boot
+```
+sudo systemctl enable linksmart-deployment-agent
 ```
 
 ## Compile from source
