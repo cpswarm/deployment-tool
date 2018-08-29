@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/var/local/linksmart-deployment-agent
-ExecStart=/usr/local/bin/deployment-agent
+ExecStart=/usr/local/bin/linksmart-deployment-agent
 Restart=on-failure
 
 [Install]

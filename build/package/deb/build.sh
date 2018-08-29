@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 if [ -z "$1" ]
 then
@@ -6,17 +7,18 @@ then
       exit 1
 fi
 
-set -e
+name=linksmart-deployment-agent
 
-mv $1 deployment-agent
+mv $1 $name.bin
 
-mkdir -p linksmart-deployment-agent/DEBIAN
-mkdir -p linksmart-deployment-agent/lib/systemd/system
-mkdir -p linksmart-deployment-agent/usr/local/bin
-mkdir -p linksmart-deployment-agent/var/local/linksmart-deployment-agent
+mkdir -p $name/DEBIAN
+mkdir -p $name/lib/systemd/system
+mkdir -p $name/usr/local/bin
+mkdir -p $name/var/local/$name
 
-cp control linksmart-deployment-agent/DEBIAN/
-cp linksmart-deployment-agent.service linksmart-deployment-agent/lib/systemd/system/
-mv deployment-agent linksmart-deployment-agent/usr/local/bin/
+cp control $name/DEBIAN/
+cp service $name/lib/systemd/system/$name.service
+mv $name.bin $name/usr/local/bin/$name
 
-dpkg-deb --build linksmart-deployment-agent
+dpkg-deb --build $name
+mv $name.deb $1.deb
