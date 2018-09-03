@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -12,16 +13,11 @@ func main() {
 	log.Println("started deployment agent")
 	defer log.Println("bye.")
 
-	managerEndpoint := os.Getenv("MANAGER")
-
-	if managerEndpoint == "" {
-		managerEndpoint = "tcp://localhost"
-	}
-
 	agent := startAgent()
 	defer agent.close()
 
-	zmqClient, err := startZMQClient(managerEndpoint+":5556", managerEndpoint+":5557", agent.pipe)
+	subEndpoint, pubEndpoint := endpoints()
+	zmqClient, err := startZMQClient(subEndpoint, pubEndpoint, agent.pipe)
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
@@ -30,4 +26,21 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 	<-sig
+}
+
+func endpoints() (string, string) {
+	prot := "tcp"
+	addr := os.Getenv("MANAGER")
+	if addr == "" {
+		addr = "localhost"
+	}
+	sub := os.Getenv("SUB")
+	if sub == "" {
+		sub = "5556"
+	}
+	pub := os.Getenv("PUB")
+	if pub == "" {
+		pub = "5557"
+	}
+	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, sub)
 }
