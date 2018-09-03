@@ -42,5 +42,5 @@ func endpoints() (string, string) {
 	if pub == "" {
 		pub = "5557"
 	}
-	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, sub)
+	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, pub)
 }
