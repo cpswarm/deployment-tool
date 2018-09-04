@@ -73,7 +73,7 @@ func (a *agent) loadState() error {
 func (a *agent) loadConf() {
 	err := a.loadState()
 	if err != nil {
-		log.Println("Unable to load state file. Starting fresh.")
+		log.Printf("Unable to load state file: %s. Starting fresh.", StateFile)
 	}
 
 	var changed bool
@@ -85,10 +85,12 @@ func (a *agent) loadConf() {
 		log.Println("Generated target ID:", a.target.AutoGenID)
 		a.target.ID = a.target.AutoGenID
 		changed = true
-	} else if id == "" {
+	} else if id == "" && a.target.ID != a.target.AutoGenID {
+		log.Println("Taking previously generated ID:", a.target.AutoGenID)
 		a.target.ID = a.target.AutoGenID
 		changed = true
-	} else {
+	} else if id != "" && id != a.target.ID {
+		log.Println("Taking ID from env var:", id)
 		a.target.ID = id
 		changed = true
 	}
