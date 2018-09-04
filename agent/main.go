@@ -15,17 +15,8 @@ const (
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.SetOutput(os.Stdout)
 	log.Println("started deployment agent")
 	defer log.Println("bye.")
-
-	wd, _ := os.Getwd()
-	log.Println("Working directory:", wd)
-	err := godotenv.Load(EnvFile)
-	if err == nil {
-		log.Println("Loaded environment file:", EnvFile)
-	}
 
 	agent := startAgent()
 	defer agent.close()
@@ -57,4 +48,17 @@ func endpoints() (string, string) {
 		pub = "5557"
 	}
 	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, pub)
+}
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetOutput(os.Stdout)
+
+	// load env file
+	wd, _ := os.Getwd()
+	log.Println("Working directory:", wd)
+	err := godotenv.Load(EnvFile)
+	if err == nil {
+		log.Println("Loaded environment file:", EnvFile)
+	}
 }
