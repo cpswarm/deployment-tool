@@ -39,6 +39,12 @@
   version = "v1.2.0"
 
 [[projects]]
+  name = "github.com/joho/godotenv"
+  packages = ["."]
+  revision = "a79fa1e548e2c689c241d10173efd51e5d689d5b"
+  version = "v1.2.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/mholt/archiver"
   packages = ["."]
@@ -100,6 +106,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1f7e54203fab12d6b5c3e6cb62fd2e3ef79e1288669a3187f5e3e9db13c595b5"
+  inputs-digest = "d513cec920a7dd908c1c24c0e3a63dc0b1e3d09074c89161b68071a1846c58eb"
   solver-name = "gps-cdcl"
   solver-version = 1

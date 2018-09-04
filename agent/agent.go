@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,7 +27,6 @@ type agent struct {
 
 	target model.Target
 
-	configPath   string
 	pipe         model.Pipe
 	disconnected chan bool
 	runner       *runner
@@ -35,7 +36,6 @@ func startAgent() *agent {
 
 	a := &agent{
 		pipe:         model.NewPipe(),
-		configPath:   "config.json",
 		disconnected: make(chan bool),
 		runner:       newRunner(),
 	}
@@ -51,33 +51,65 @@ func startAgent() *agent {
 	return a
 }
 
-func (a *agent) loadConf() {
-	if _, err := os.Stat(a.configPath); os.IsNotExist(err) {
-		log.Println("Configuration file not found.")
-
-		a.target.ID = uuid.NewV4().String()
-		log.Println("Generated target ID:", a.target.ID)
-		a.saveConfig()
-		return
+func (a *agent) loadState() error {
+	if _, err := os.Stat(StateFile); os.IsNotExist(err) {
+		return err
 	}
 
-	b, err := ioutil.ReadFile("config.json")
+	b, err := ioutil.ReadFile(StateFile)
 	if err != nil {
-		log.Fatalf("Error reading config file: %s", err)
+		return fmt.Errorf("error reading state file: %s", err)
 	}
+
 	err = json.Unmarshal(b, &a.target)
 	if err != nil {
-		log.Fatalf("Error parsing config file: %s", err)
+		return fmt.Errorf("error parsing state file: %s", err)
 	}
-	log.Println("Loaded config file:", a.configPath)
 
-	if a.target.ID == "" {
-		a.target.ID = uuid.NewV4().String()
-		log.Println("Generated target ID:", a.target.ID)
+	log.Println("Loaded state file:", StateFile)
+	return nil
+}
+
+func (a *agent) loadConf() {
+	err := a.loadState()
+	if err != nil {
+		log.Println("Unable to load state file. Starting fresh.")
+	}
+
+	var changed bool
+
+	// LOAD ENV VARIABLES
+	id := os.Getenv("ID")
+	if id == "" && a.target.AutoGenID == "" {
+		a.target.AutoGenID = uuid.NewV4().String()
+		log.Println("Generated target ID:", a.target.AutoGenID)
+		a.target.ID = a.target.AutoGenID
+		changed = true
+	} else if id == "" {
+		a.target.ID = a.target.AutoGenID
+		changed = true
+	} else {
+		a.target.ID = id
+		changed = true
+	}
+
+	var tags []string
+	tagsString := os.Getenv("TAGS")
+	if tagsString != "" {
+		tags = strings.Split(tagsString, ",")
+		for i := 0; i < len(tags); i++ {
+			tags[i] = strings.TrimSpace(tags[i])
+		}
+	}
+	if !reflect.DeepEqual(tags, a.target.Tags) {
+		a.target.Tags = tags
+		changed = true
+	}
+
+	if changed {
 		a.saveConfig()
 	}
 }
-
 func (a *agent) startWorker() {
 	log.Printf("Subscribing to topics...")
 	topicMap := make(map[string]bool)
@@ -264,12 +296,12 @@ func (a *agent) saveConfig() {
 		log.Println(err)
 		return
 	}
-	err = ioutil.WriteFile(a.configPath, b, 0600)
+	err = ioutil.WriteFile(StateFile, b, 0600)
 	if err != nil {
 		log.Println("ERROR:", err)
 		return
 	}
-	log.Println("Saved configuration:", a.configPath)
+	log.Println("Saved configuration:", StateFile)
 }
 
 func (a *agent) sendResponse(resp *model.BatchResponse) {

@@ -43,8 +43,9 @@ type Response struct {
 
 type Target struct {
 	// identification attributes
-	ID   string
-	Tags []string
+	ID        string
+	AutoGenID string
+	Tags      []string
 
 	// active task
 	TaskID      string

@@ -5,6 +5,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
+
+	"github.com/joho/godotenv"
+)
+
+const (
+	EnvFile   = ".env"
+	StateFile = "state.json"
 )
 
 func main() {
@@ -12,6 +19,13 @@ func main() {
 	log.SetOutput(os.Stdout)
 	log.Println("started deployment agent")
 	defer log.Println("bye.")
+
+	wd, _ := os.Getwd()
+	log.Println("Working directory:", wd)
+	err := godotenv.Load(EnvFile)
+	if err == nil {
+		log.Println("Loaded environment file:", EnvFile)
+	}
 
 	agent := startAgent()
 	defer agent.close()
