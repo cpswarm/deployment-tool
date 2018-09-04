@@ -76,9 +76,9 @@ func (a *agent) loadConf() {
 		log.Printf("Unable to load state file: %s. Starting fresh.", StateFile)
 	}
 
+	// LOAD AND REPLACE WITH ENV VARIABLES
 	var changed bool
 
-	// LOAD ENV VARIABLES
 	id := os.Getenv("ID")
 	if id == "" && a.target.AutoGenID == "" {
 		a.target.AutoGenID = uuid.NewV4().String()
@@ -273,7 +273,6 @@ func (a *agent) sendLogs(payload []byte) {
 		log.Fatalln(err) // TODO send to manager
 	}
 
-	log.Printf("Sending logs for: %s", request.Stage)
 	switch request.Stage {
 	case model.StageRun:
 		a.sendResponse(&model.BatchResponse{
@@ -287,6 +286,7 @@ func (a *agent) sendLogs(payload []byte) {
 		log.Printf("Enexpected stage: %s", request.Stage)
 	}
 
+	log.Printf("Sent logs for: %s", request.Stage)
 }
 
 func (a *agent) saveConfig() {

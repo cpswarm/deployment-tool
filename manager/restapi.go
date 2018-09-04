@@ -179,6 +179,7 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 	for {
 		a.manager.update.L.Lock()
 		a.manager.update.Wait()
+		log.Println("ws sending update!")
 		b, _ := json.Marshal(a.manager.Targets)
 		err = c.WriteMessage(websocket.TextMessage, b)
 		if err != nil {
