@@ -7,8 +7,6 @@ import (
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.SetOutput(os.Stdout)
 	log.Println("started deployment manager")
 	defer log.Println("bye.")
 
@@ -28,4 +26,13 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 	<-sig
+}
+
+func init() {
+	loggingFlags := log.LstdFlags
+	if os.Getenv("DEBUG") != "" {
+		loggingFlags = log.LstdFlags | log.Lshortfile
+	}
+	log.SetFlags(loggingFlags)
+	log.SetOutput(os.Stdout)
 }

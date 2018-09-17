@@ -51,7 +51,7 @@ func endpoints() (string, string) {
 }
 
 func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
 
 	// load env file
@@ -60,5 +60,9 @@ func init() {
 	err := godotenv.Load(EnvFile)
 	if err == nil {
 		log.Println("Loaded environment file:", EnvFile)
+	}
+
+	if os.Getenv("DEBUG") != "" {
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
 }
