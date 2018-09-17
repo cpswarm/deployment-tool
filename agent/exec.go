@@ -222,12 +222,12 @@ func (e *executor) stop() bool {
 
 	err := e.cmd.Process.Signal(syscall.SIGTERM)
 	if err != nil {
-		log.Println("Error terminating process:", err)
+		log.Printf("Error terminating process %d: %s", pid, err)
 		return false
 	}
 	err = e.cmd.Process.Release()
 	if err != nil {
-		log.Println("Error releasing process:", err)
+		log.Printf("Error releasing process %d: %s", pid, err)
 	} else {
 		log.Println("Terminated process:", pid)
 		return true
@@ -235,7 +235,7 @@ func (e *executor) stop() bool {
 
 	err = e.cmd.Process.Kill()
 	if err != nil {
-		log.Println("Error killing process:", err)
+		log.Printf("Error killing process %d: %s", pid, err)
 		return false
 	}
 	log.Println("Killed process:", pid)
