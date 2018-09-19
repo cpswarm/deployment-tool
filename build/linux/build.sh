@@ -13,7 +13,7 @@ cp -rv ../../model temp/$package
 cp -rv ../../vendor temp/$package
 
 echo "Compiling... (IF HUNG, KILL THE CONTAINER!)"
-docker run --rm -v $(pwd)/temp:/home/src -v $(pwd)/bin:/home/bin -v $(pwd)/static-build.sh:/home/cmd.sh -it farshidtz/zeromq:golang-linux-amd64-stretch sh cmd.sh
+docker run --rm -v $(pwd)/temp:/home/src -v $(pwd)/bin:/home/bin -v $(pwd)/static-build.sh:/home/cmd.sh farshidtz/zeromq:golang-linux-amd64-stretch sh cmd.sh
 
 echo "Cleaning up..."
 rm -fr temp
