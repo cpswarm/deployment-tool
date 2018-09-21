@@ -16,13 +16,19 @@ mkdir -p $name/usr/local/bin
 mkdir -p $name/var/local/$name
 
 # build control file
-echo "Package: "$name >> control
-echo "Version: "$version >> control
-echo "Architecture: "$arch >> control
-echo "Maintainer: LinkSmart®" >> control
-echo "Description: LinkSmart® Deployment Agent" >> control
+control=$name/DEBIAN/control
+echo "Package:" $name >> $control
+echo "Version:" $version >> $control
+echo "Architecture:" $arch >> $control
+echo "Maintainer: LinkSmart®" >> $control
+echo "Description: LinkSmart® Deployment Agent" >> $control
 
-mv control $name/DEBIAN/
+# build post install script
+postinst=$name/DEBIAN/postinst
+echo "systemctl daemon-reload" >> $postinst
+echo "systemctl enable" $name >> $postinst
+echo "systemctl restart" $name >> $postinst
+
 cp service $name/lib/systemd/system/$name.service
 mv $name.bin $name/usr/local/bin/$name
 
