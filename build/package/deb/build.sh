@@ -1,24 +1,30 @@
 #!/bin/sh
 set -e
 
-if [ -z "$1" ]
-then
-      echo "name of executable not given as argument."
-      exit 1
-fi
-
+exec=$1
+version=$2
 name=linksmart-deployment-agent
+arch=armhf
 
-mv $1 $name.bin
+echo $exec $version $name $arch
+
+mv $exec $name.bin
 
 mkdir -p $name/DEBIAN
 mkdir -p $name/lib/systemd/system
 mkdir -p $name/usr/local/bin
 mkdir -p $name/var/local/$name
 
-cp control $name/DEBIAN/
+# build control file
+echo "Package: "$name >> control
+echo "Version: "$version >> control
+echo "Architecture: "$arch >> control
+echo "Maintainer: LinkSmart®" >> control
+echo "Description: LinkSmart® Deployment Agent" >> control
+
+mv control $name/DEBIAN/
 cp service $name/lib/systemd/system/$name.service
 mv $name.bin $name/usr/local/bin/$name
 
 dpkg-deb --build $name
-mv $name.deb $1.deb
+mv $name.deb $exec.deb
