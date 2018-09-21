@@ -28,6 +28,7 @@ postinst=$name/DEBIAN/postinst
 echo "systemctl daemon-reload" >> $postinst
 echo "systemctl enable" $name >> $postinst
 echo "systemctl restart" $name >> $postinst
+chmod +x $postinst
 
 cp service $name/lib/systemd/system/$name.service
 mv $name.bin $name/usr/local/bin/$name
