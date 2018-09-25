@@ -43,8 +43,8 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/tasks", a.ListTasks).Methods("GET")
 	r.HandleFunc("/tasks", a.AddTask).Methods("POST")
 	// static
-	staticDir := os.Getenv("UI")
-	r.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(staticDir))))
+	ui := http.Dir(os.Getenv("WORKDIR") + "/ui")
+	r.PathPrefix("/ui").Handler(http.StripPrefix("/ui", http.FileServer(ui)))
 	r.PathPrefix("/ws").HandlerFunc(a.websocket)
 
 	r.Use(loggingMiddleware)
@@ -174,18 +174,18 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 	upgrader := websocket.Upgrader{} // use default options
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Print("ws upgrade error:", err)
+		log.Print("websocket: upgrade error:", err)
 		return
 	}
 	defer c.Close()
 	for {
 		a.manager.update.L.Lock()
 		a.manager.update.Wait()
-		log.Println("ws sending update!")
+		log.Println("websocket: sending update!")
 		b, _ := json.Marshal(a.manager.Targets)
 		err = c.WriteMessage(websocket.TextMessage, b)
 		if err != nil {
-			log.Println("ws write error:", err)
+			log.Println("websocket: write error:", err)
 			a.manager.update.L.Unlock()
 			break
 		}

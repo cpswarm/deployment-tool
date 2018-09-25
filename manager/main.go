@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 )
 
 func main() {
@@ -35,4 +36,15 @@ func init() {
 	}
 	log.SetFlags(loggingFlags)
 	log.SetOutput(os.Stdout)
+
+	if os.Getenv("WORKDIR") == "" {
+		dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = os.Setenv("WORKDIR", dir)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
