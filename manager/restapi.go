@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/gorilla/mux"
@@ -42,7 +43,8 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/tasks", a.ListTasks).Methods("GET")
 	r.HandleFunc("/tasks", a.AddTask).Methods("POST")
 	// static
-	r.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("static"))))
+	staticDir := os.Getenv("UI")
+	r.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(staticDir))))
 	r.PathPrefix("/ws").HandlerFunc(a.websocket)
 
 	r.Use(loggingMiddleware)
