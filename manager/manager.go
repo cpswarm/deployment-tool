@@ -202,24 +202,23 @@ func (m *manager) processResponses() {
 
 			if response.Stage == model.StageRun {
 				m.processResponseRun(&response)
-				continue
+			} else {
+				m.Lock()
+				// create aliases
+				task := &m.Targets[response.TargetID].Task
+				stageLogs := task.GetStageLog(response.Stage)
+				// update current task
+				task.ID = response.TaskID
+				task.CurrentStage = response.Stage
+				task.Error = response.ResponseType == model.ResponseError
+				stageLogs.Status = response.ResponseType
+				stageLogs.InsertLogs(response.Responses) // TODO logs not flushed from task to task
+				stageLogs.Updated = time.Now().Format(time.RFC3339)
+
+				// update history
+				m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)
+				m.Unlock()
 			}
-
-			m.Lock()
-			// create aliases
-			task := &m.Targets[response.TargetID].Task
-			stageLogs := task.GetStageLog(response.Stage)
-			// update current task
-			task.ID = response.TaskID
-			task.CurrentStage = response.Stage
-			task.Error = response.ResponseType == model.ResponseError
-			stageLogs.Status = response.ResponseType
-			stageLogs.InsertLogs(response.Responses) // TODO logs not flushed from task to task
-			stageLogs.Updated = time.Now().Format(time.RFC3339)
-
-			// update history
-			m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)
-			m.Unlock()
 		}
 		// sent update notification
 		m.update.Broadcast()
