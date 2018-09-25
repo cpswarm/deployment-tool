@@ -3,24 +3,115 @@
 <head>
     <title>Deployment Manager UI</title>
 
-    <script src="lib/axios.min.js"></script>
-    <script src="lib/jquery-3.3.1.min.js"></script>
-    <script src="lib/highlighter.js"></script>
+    <link rel="stylesheet" href="lib/bootstrap-4.0.0.min.css">
 
+    <script src="lib/axios.min.js"></script>
+    <script src="lib/vue.js"></script>
+    <script src="lib/jquery-3.2.1.slim.min.js"></script>
+    <script src="lib/popper-1.12.9.min.js"></script>
+    <script src="lib/bootstrap-4.0.0.min.js"></script>
 </head>
 
 <body>
-    <pre></pre>
+
+    <table id="app" class="table table-sm table-striped">
+        <thead>
+        <tr>
+            <th scope="col">ID</th>
+            <th scope="col">Tags</th>
+            <th scope="col">Task</th>
+            <!--<th scope="col">History</th>-->
+        </tr>
+        </thead>
+        <tbody>
+        <tr v-for="(target, id) in targets">
+            <!-- ID -->
+            <th scope="row" v-bind:class="target.Task.Error ? 'table-danger' : 'table-success'">{{ id }}</th>
+            <!-- TAGS -->
+            <td>
+               <table>
+                   <tr v-for="tag in target.Tags"><td>{{ tag }}</td></tr>
+               </table>
+            </td>
+            <!-- TASK -->
+            <td>
+                <table v-if="target.Task.ID">
+                    <tr><td>Task ID</td><td>{{ target.Task.ID }}</td></tr>
+                    <tr><td>Current Stage</td><td>{{ target.Task.CurrentStage }}</td></tr>
+                    <!--<tr><td>Error</td><td>{{ target.Task.Error }}</td></tr>-->
+                    <tr><td>Stages</td><td>
+                        <table>
+                            <tr v-if="target.Task.StageLogs.Transfer.Status"><td>Transfer</td><td>
+
+                                <table>
+                                    <tr><td>{{ target.Task.StageLogs.Transfer.Status }}</td></tr>
+                                    <tr v-for="log in target.Task.StageLogs.Transfer.Logs" v-bind:class="log.Error ? 'table-danger' : 'table-success'"><td>{{ log.Output }}</td></tr>
+                                    <tr><td>Updated at {{ target.Task.StageLogs.Transfer.Updated }}</td></tr>
+                                </table>
+
+                            </td></tr>
+                            <tr v-if="target.Task.StageLogs.Install.Status"><td>Install</td><td>
+                                <table>
+                                    <tr><td colspan="2">{{ target.Task.StageLogs.Install.Status }}</td></tr>
+                                    <tr v-for="log in target.Task.StageLogs.Install.Logs" v-bind:class="log.Error ? 'table-danger' : 'table-success'"><td>{{ log.Command }}</td><td>{{ log.Output }}</td></tr>
+                                    <tr><td colspan="2">Updated at {{ target.Task.StageLogs.Install.Updated }}</td></tr>
+                                </table>
+                            </td></tr>
+                            <tr v-if="target.Task.StageLogs.Run.Status"><td>Run</td><td>
+                                <table>
+                                    <tr><td colspan="2">{{ target.Task.StageLogs.Run.Status }}</td></tr>
+                                    <tr v-for="log in target.Task.StageLogs.Run.Logs" v-bind:class="log.Error ? 'table-danger' : 'table-success'"><td>{{ log.Command }}</td><td>{{ log.Output }}</td></tr>
+                                    <tr><td colspan="2">Updated at {{ target.Task.StageLogs.Run.Updated }}</td></tr>
+                                </table>
+                                <button type="button" v-on:click="fetchLogs(id)" class="btn btn-outline-dark">Fetch</button>
+                            </td></tr>
+
+                        </table>
+                    </td></tr>
+                </table>
+            </td>
+            <!-- HISTORY -->
+            <!--
+            <td>
+                <table>
+                    <tr v-for="(value, key) in target.History"><td>{{ key }}</td><td>{{ value }}</td></tr>
+                </table>
+            </td>
+            -->
+        </tr>
+        </tbody>
+    </table>
 
     <script>
+
+        var app = new Vue({
+            el: '#app',
+            data: {
+                targets: {}
+            },
+            methods: {
+                fetchLogs: function (id) {
+                    axios.put('http://localhost:8080/targets/'+id+'/logs/RUN')
+                        .then(function (response) {
+                            // alert(response.data.message);
+                            // console.log(response.data.message);
+                        })
+                        .catch(function (error) {
+                            alert(error);
+                        });
+                }
+            }
+        })
+
+        function view(targets){
+            app.targets = targets;
+        }
+
 
         function getTargets() {
             axios.get('http://localhost:8080/targets')
                     .then(function (response) {
-                        // console.log(response);
-                        json = syntaxHighlight(JSON.stringify(response.data, null, 2));
-                        $('pre').html(json);
-                        // setTimeout(function () { getTargets(); }, 1000);
+                        view(response.data);
                     })
                     .catch(function (error) {
                         // handle error
@@ -44,12 +135,12 @@
             ws.onopen = function () {
                 console.log("Socket connected.");
                 document.body.style.backgroundColor = "#fff";
+                getTargets();
             }
             ws.onmessage = function (event) {
                 // console.log(event.data);
                 var obj = JSON.parse(event.data);
-                json = syntaxHighlight(JSON.stringify(obj, null, 2));
-                $('pre').html(json);
+                view(obj);
             }
             ws.onclose = function () {
                 console.log("Socket disconnected.");
@@ -65,6 +156,7 @@
         listen();
 
     </script>
+
 </body>
 
 </html>
