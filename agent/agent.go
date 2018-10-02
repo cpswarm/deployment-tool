@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
-	"github.com/pbnjay/memory"
 	"github.com/satori/go.uuid"
 )
 
 const (
-	AdvInterval       = 30 * time.Second
-	LogBufferCapacity = 100
+	AdvInterval           = 30 * time.Second
+	RunBufferCapacity     = 100
+	InstallBufferCapacity = 255
 )
 
 type agent struct {
@@ -29,7 +29,12 @@ type agent struct {
 
 	pipe         model.Pipe
 	disconnected chan bool
-	runner       *runner
+	installer    installer
+	runner       runner
+}
+
+type logCollector interface {
+	sendResponse(resp *model.BatchResponse)
 }
 
 func startAgent() *agent {
@@ -37,14 +42,15 @@ func startAgent() *agent {
 	a := &agent{
 		pipe:         model.NewPipe(),
 		disconnected: make(chan bool),
-		runner:       newRunner(),
 	}
+	a.runner = newRunner(logCollector(a))
+	a.installer = newInstaller(logCollector(a))
 
 	a.loadConf()
 
 	// autostart
 	if len(a.target.TaskRun) > 0 {
-		go a.run(a.target.TaskRun, a.target.TaskID)
+		go a.runner.run(a.target.TaskRun, a.target.TaskID)
 	}
 
 	go a.startWorker()
@@ -174,24 +180,23 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	payload = nil // to release memory
 
 	log.Printf("handleAnnouncement: %s", taskA.ID)
+	a.sendTransferResponse(model.ResponseLog, taskA.ID, "received announcement")
 
-	sizeLimit := memory.TotalMemory() / 2 // TODO calculate this based on the available memory
-	if taskA.Size <= sizeLimit {
-		log.Printf("task announcement. Size: %v", taskA.Size)
-		log.Printf("Total system memory: %d\n", memory.TotalMemory())
-		for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
-			if a.target.TaskHistory[i] == taskA.ID {
-				log.Println("Dropping announcement for task", taskA.ID)
-				return
-			}
+	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
+		if a.target.TaskHistory[i] == taskA.ID {
+			log.Println("Dropping announcement for task", taskA.ID)
+			return
 		}
+	}
+	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
+
+	if a.installer.evaluate(taskA) {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.sendTransferResponse(model.ResponseLog, taskA.ID, "received announcement")
+		a.sendTransferResponse(model.ResponseLog, taskA.ID, "subscribed to task")
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
 		a.sendTransferResponse(model.ResponseError, taskA.ID, "not enough memory")
 	}
-
 }
 
 func (a *agent) handleTask(id string, payload []byte) {
@@ -209,60 +214,17 @@ func (a *agent) handleTask(id string, payload []byte) {
 	a.sendTransferResponse(model.ResponseLog, task.ID, "received task")
 	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
-	// set work directory
-	wd, _ := os.Getwd()
-	wd = fmt.Sprintf("%s/tasks", wd)
-	taskDir := fmt.Sprintf("%s/%s", wd, task.ID)
-	log.Println("Task work directory:", taskDir)
-
-	// start a new executor
-	exec := newExecutor(taskDir)
-
-	// decompress and store
-	exec.storeArtifacts(task.Artifacts)
-	task.Artifacts = nil // release memory
+	a.installer.store(task.Artifacts, task.ID)
 	a.sendTransferResponse(model.ResponseSuccess, task.ID, "stored artifacts")
 
-	// execute and collect results
-	resCh := make(chan model.BatchResponse)
-	go func() {
-		for res := range resCh {
-			res.TaskID = task.ID
-			res.Stage = model.StageInstall
-			a.sendResponse(&res)
-		}
-	}()
-	success := exec.executeAndCollectBatch(task.Install, task.Log, resCh)
+	success := a.installer.install(task.Install, task.ID)
 	if success {
-		a.runner.stop()              // stop runner for old task
-		a.removeOldTask(wd, task.ID) // remove old task files
+		a.runner.stop()            // stop runner for old task
+		a.installer.clean(task.ID) // remove old task files
 		a.target.TaskRun = task.Run
 		a.saveConfig()
 
-		go a.run(task.Run, task.ID)
-	}
-}
-
-func (a *agent) removeOldTask(wd, taskID string) {
-	_, err := os.Stat(wd)
-	if err != nil && os.IsNotExist(err) {
-		// nothing to remove
-		return
-	}
-	files, err := ioutil.ReadDir(wd)
-	if err != nil {
-		log.Printf("Error reading work dir: %s", err)
-		return
-	}
-	for i := 0; i < len(files); i++ {
-		if files[i].Name() != taskID {
-			filename := fmt.Sprintf("%s/%s", wd, files[i].Name())
-			log.Printf("Removing old task dir: %s", files[i].Name())
-			err = os.RemoveAll(filename)
-			if err != nil {
-				log.Printf("Error removing old task dir: %s", err)
-			}
-		}
+		go a.runner.run(task.Run, task.ID)
 	}
 }
 
