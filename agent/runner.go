@@ -15,12 +15,14 @@ type runner struct {
 	buf       buffer.Buffer
 	executors []*executor
 	wg        sync.WaitGroup
+	shutdown  chan bool
 }
 
 func newRunner(lc logCollector) runner {
 	return runner{
 		logCollector: lc,
 		buf:          buffer.NewBuffer(RunBufferCapacity),
+		shutdown:     make(chan bool, 1),
 	}
 }
 
@@ -49,12 +51,13 @@ func (r *runner) run(commands []string, taskID string) {
 			r.buf.Insert(res)
 			log.Printf("run() %v", res)
 		}
-
-		log.Printf("run() closing collector routine.")
+		log.Printf("run() Closing collector routine.")
 
 		if !execError {
 			r.sendRunResponse(model.ResponseSuccess, taskID, "")
 		}
+
+		r.shutdown <- true
 	}()
 
 	// run in parallel and wait for them to finish
@@ -83,12 +86,14 @@ func (r *runner) sendRunResponse(status model.ResponseType, taskID, message stri
 }
 
 func (r *runner) stop() bool {
-	log.Println("Shutting down the runner...")
+	log.Println("stop() Shutting down the runner...")
 	var success bool
 	for i := 0; i < len(r.executors); i++ {
 		success = r.executors[i].stop()
 	}
-	r.wg.Wait() // wait for pending runs
+
+	<-r.shutdown // wait for all logs
 	r.buf.Flush()
+	log.Println("stop() Success:", success)
 	return success
 }
