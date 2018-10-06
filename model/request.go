@@ -14,6 +14,7 @@ const (
 	StageRun                   = "RUN"
 	// Other consts
 	PrefixSeperator = "-"
+	DefaultLogInterval = 3 * time.Second
 )
 
 type StageType string
@@ -28,8 +29,16 @@ type Task struct {
 }
 
 type Log struct {
-	Interval  string
-	Verbosity string
+	Interval string
+	Level    string
+}
+
+func (l Log) GetInterval() time.Duration {
+	interval, err := time.ParseDuration(l.Interval)
+	if err != nil {
+		return DefaultLogInterval
+	}
+	return interval
 }
 
 type TaskAnnouncement struct {

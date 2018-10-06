@@ -39,20 +39,10 @@ func (e *executor) executeAndCollectBatch(commands []string, logging model.Log, 
 		ResponseType: model.ResponseLog,
 	}
 
-	// logging attributes
-	interval, err := time.ParseDuration(logging.Interval)
-	if err != nil {
-		log.Println(err)
-		batch.ResponseType = model.ResponseClientError
-		out <- batch
-		return false
-	}
-	log.Println("Will send logs every", interval)
-
 	resCh := make(chan model.Response)
 	go e.executeAndCollect(commands, resCh)
 	var containsErrors bool
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(logging.GetInterval())
 LOOP:
 	for {
 		select {
