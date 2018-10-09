@@ -7,22 +7,19 @@ import (
 	"log"
 	"os"
 
-	"code.linksmart.eu/dt/deployment-tool/agent/buffer"
 	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/mholt/archiver"
 	"github.com/pbnjay/memory"
 )
 
 type installer struct {
-	logCollector
-	buf      buffer.Buffer
+	logger   LogWriter
 	executor *executor
 }
 
-func newInstaller(lc logCollector) installer {
+func newInstaller(logger LogWriter) installer {
 	return installer{
-		logCollector: lc,
-		buf:          buffer.NewBuffer(InstallBufferCapacity),
+		logger: logger,
 	}
 }
 
@@ -56,29 +53,54 @@ func (i *installer) install(commands []string, taskID string) bool {
 	log.Printf("install() Installing task: %s", taskID)
 
 	// execute and collect results
-	resCh := make(chan model.BatchResponse)
-	go func() {
-		for res := range resCh {
-			res.TaskID = taskID
-			res.Stage = model.StageInstall
-			i.sendResponse(&res)
-		}
-	}()
+	//resCh := make(chan model.Response)
+	//go func() {
+	//	for res := range resCh {
+	//		res.TaskID = taskID
+	//		res.Stage = model.StageInstall
+	//		i.sendResponse(&res)
+	//	}
+	//}()
 
-	logOpt := model.Log{
-		Interval:  "3s",
-		Verbosity: "INFO",
-	}
+	//logOpt := model.LogOpts{
+	//	Interval: "3s",
+	//}
 
 	wd, _ := os.Getwd()
 	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
 
 	exec := newExecutor(wd)
 
-	success := exec.executeAndCollectBatch(commands, logOpt, resCh)
+	logCh := make(chan model.Log)
+	go exec.executeAndCollect(commands, logCh)
+
+	var containsError bool
+	for logM := range logCh {
+		containsError = logM.Error // TODO take exit error instead
+		i.logger.Insert(model.StageInstall, &logM)
+	}
+	log.Printf("install() Closing collector routine.")
+
+	//
+	//// execute and collect results
+	//logCh := make(chan model.Log)
+	//go func() {
+	//	for logM := range logCh {
+	//		i.logger.Insert(model.StageInstall, &logM)
+	//	}
+	//	log.Printf("install() Closing collector routine.")
+	//}()
+	//
+	//wd, _ := os.Getwd()
+	//wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
+	//
+	//exec := newExecutor(wd)
+	//
+	////success := exec.executeAndCollectBatch(commands, logOpt, resCh)
+	//exec.executeAndCollect(commands, logCh)
 
 	log.Println("install() Installation ended.")
-	return success
+	return !containsError
 }
 
 // clean removed old task directory
@@ -111,8 +133,8 @@ func (i *installer) clean(taskID string) {
 }
 
 func (r *installer) stop() bool {
-	log.Println("Shutting down the runner...")
+	log.Println("Shutting down the installer...")
 	success := r.executor.stop()
-	r.buf.Flush()
+	//r.buf.Flush()
 	return success
 }

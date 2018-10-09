@@ -14,7 +14,6 @@ const (
 	StageRun                   = "RUN"
 	// Other consts
 	PrefixSeperator = "-"
-	DefaultLogInterval = 3 * time.Second
 )
 
 type StageType string
@@ -25,25 +24,13 @@ type Task struct {
 	Artifacts []byte
 	Install   []string
 	Run       []string
-	Log       Log
-}
-
-type Log struct {
-	Interval string
-	Level    string
-}
-
-func (l Log) GetInterval() time.Duration {
-	interval, err := time.ParseDuration(l.Interval)
-	if err != nil {
-		return DefaultLogInterval
-	}
-	return interval
+	Debug     bool
 }
 
 type TaskAnnouncement struct {
-	ID   string
-	Size uint64
+	ID    string
+	Size  uint64
+	Debug bool
 }
 
 type LogRequest struct {

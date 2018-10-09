@@ -17,9 +17,7 @@ import (
 )
 
 const (
-	AdvInterval           = 30 * time.Second
-	RunBufferCapacity     = 100
-	InstallBufferCapacity = 255
+	AdvInterval = 30 * time.Second
 )
 
 type agent struct {
@@ -29,12 +27,13 @@ type agent struct {
 
 	pipe         model.Pipe
 	disconnected chan bool
+	logger       Logger
 	installer    installer
 	runner       runner
 }
 
 type logCollector interface {
-	sendResponse(resp *model.BatchResponse)
+	sendResponse(*model.Response)
 }
 
 func startAgent() *agent {
@@ -43,13 +42,15 @@ func startAgent() *agent {
 		pipe:         model.NewPipe(),
 		disconnected: make(chan bool),
 	}
-	a.runner = newRunner(logCollector(a))
-	a.installer = newInstaller(logCollector(a))
+	a.logger = NewLogger(a.pipe.ResponseCh)
+	a.runner = newRunner(a.logger.Writer())
+	a.installer = newInstaller(a.logger.Writer())
 
 	a.loadConf()
 
 	// autostart
 	if len(a.target.TaskRun) > 0 {
+		a.logger.SetOpts(a.target.ID, a.target.TaskID, a.target.Debug)
 		go a.runner.run(a.target.TaskRun, a.target.TaskID)
 	}
 
@@ -115,7 +116,7 @@ func (a *agent) loadConf() {
 	}
 
 	if changed {
-		a.saveConfig()
+		a.saveState()
 	}
 }
 func (a *agent) startWorker() {
@@ -179,8 +180,10 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	}
 	payload = nil // to release memory
 
+	a.logger.SetOpts(a.target.ID, taskA.ID, taskA.Debug)
+
 	log.Printf("handleAnnouncement: %s", taskA.ID)
-	a.sendTransferResponse(model.ResponseLog, taskA.ID, "received announcement")
+	a.sendTransferResponse(taskA.ID, model.ProcessStart, false)
 
 	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
 		if a.target.TaskHistory[i] == taskA.ID {
@@ -192,13 +195,14 @@ func (a *agent) handleAnnouncement(payload []byte) {
 
 	if a.installer.evaluate(taskA) {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.sendTransferResponse(model.ResponseLog, taskA.ID, "subscribed to task")
+		a.sendTransferResponse(taskA.ID, "subscribed to task", false)
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
-		a.sendTransferResponse(model.ResponseError, taskA.ID, "not enough memory")
+		a.sendTransferResponse(taskA.ID, "not enough memory", true)
 	}
 }
 
+// TODO make this sequenctial
 func (a *agent) handleTask(id string, payload []byte) {
 	log.Printf("handleTask: %s", id)
 
@@ -210,19 +214,21 @@ func (a *agent) handleTask(id string, payload []byte) {
 	payload = nil // to release memory
 	//runtime.GC() ?
 
+	a.target.Debug = task.Debug
+
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendTransferResponse(model.ResponseLog, task.ID, "received task")
+	a.sendTransferResponse(task.ID, "received task", false)
 	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
 	a.installer.store(task.Artifacts, task.ID)
-	a.sendTransferResponse(model.ResponseSuccess, task.ID, "stored artifacts")
+	a.sendTransferResponse(task.ID, model.ProcessExit, false)
 
 	success := a.installer.install(task.Install, task.ID)
 	if success {
 		a.runner.stop()            // stop runner for old task
 		a.installer.clean(task.ID) // remove old task files
 		a.target.TaskRun = task.Run
-		a.saveConfig()
+		a.saveState()
 
 		go a.runner.run(task.Run, task.ID)
 	}
@@ -235,23 +241,10 @@ func (a *agent) sendLogs(payload []byte) {
 		log.Fatalln(err) // TODO send to manager
 	}
 
-	switch request.Stage {
-	case model.StageRun:
-		a.sendResponse(&model.BatchResponse{
-			ResponseType: a.target.TaskStatus,
-			Responses:    a.runner.buf.Collect(),
-			TargetID:     a.target.ID,
-			TaskID:       a.target.TaskID,
-			Stage:        model.StageRun,
-		})
-	default:
-		log.Printf("Enexpected stage: %s", request.Stage)
-	}
-
-	log.Printf("Sent logs for: %s", request.Stage)
+	a.logger.Report(request.Stage)
 }
 
-func (a *agent) saveConfig() {
+func (a *agent) saveState() {
 	a.Lock()
 	defer a.Unlock()
 
@@ -265,28 +258,12 @@ func (a *agent) saveConfig() {
 		log.Println("ERROR:", err)
 		return
 	}
-	log.Println("Saved configuration:", StateFile)
+	log.Println("Saved state:", StateFile)
 }
 
-func (a *agent) sendResponse(resp *model.BatchResponse) {
-	a.target.TaskID = resp.TaskID
-	a.target.TaskStage = resp.Stage
-	a.target.TaskStatus = resp.ResponseType
-	a.saveConfig()
 
-	resp.TargetID = a.target.ID
-
-	b, _ := json.Marshal(resp)
-	a.pipe.ResponseCh <- model.Message{string(resp.ResponseType), b}
-}
-
-func (a *agent) sendTransferResponse(status model.ResponseType, taskID, message string) {
-	a.sendResponse(&model.BatchResponse{
-		Stage:        model.StageTransfer,
-		ResponseType: status,
-		TaskID:       taskID,
-		Responses:    []model.Response{{Output: message, Error: status == model.ResponseError}},
-	})
+func (a *agent) sendTransferResponse(taskID, message string, isError bool) {
+	a.logger.Insert(model.StageTransfer, &model.Log{Output: message, Error: isError})
 }
 
 func (a *agent) sendAdvertisement() {
@@ -303,5 +280,5 @@ func (a *agent) sendAdvertisement() {
 
 func (a *agent) close() {
 	a.runner.stop()
-	a.saveConfig()
+	a.saveState()
 }

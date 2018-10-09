@@ -19,7 +19,7 @@ type registry struct {
 type TaskDescription struct {
 	Stages Stages
 	Target DeploymentTarget
-	Log    model.Log
+	Debug  bool
 
 	DeploymentInfo DeploymentInfo
 }
@@ -90,10 +90,10 @@ type StageLogs struct {
 type StageLog struct {
 	Status  model.ResponseType `json:",omitempty"'`
 	Updated string             `json:",omitempty"'`
-	Logs    []model.Response   `json:",omitempty"'`
+	Logs    []model.Log        `json:",omitempty"'`
 }
 
-func (s *StageLog) InsertLogs(responses []model.Response) {
+func (s *StageLog) InsertLogs(responses []model.Log) {
 	s.Logs = append(s.Logs, responses...)
 }
 

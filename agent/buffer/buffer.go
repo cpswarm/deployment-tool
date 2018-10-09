@@ -7,20 +7,20 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
-func NewBuffer(capacity uint8) Buffer {
-	return Buffer{
+func NewBuffer(capacity uint8) *Buffer {
+	return &Buffer{
 		capacity: capacity,
 	}
 }
 
 type Buffer struct {
 	mutex    sync.RWMutex
-	list     []model.Response
+	list     []model.Log
 	capacity uint8
 	index    uint8
 }
 
-func (b *Buffer) Insert(line model.Response) {
+func (b *Buffer) Insert(line model.Log) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -35,7 +35,7 @@ func (b *Buffer) Insert(line model.Response) {
 	}
 }
 
-func (b *Buffer) Collect() []model.Response {
+func (b *Buffer) Collect() []model.Log {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 

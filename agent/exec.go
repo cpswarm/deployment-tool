@@ -9,7 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
-	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/mholt/archiver"
@@ -32,94 +31,47 @@ func (e *executor) storeArtifacts(b []byte) {
 	}
 }
 
-// executeAndCollectBatch executes multiple commands and reports the results based on the given logging interval
-func (e *executor) executeAndCollectBatch(commands []string, logging model.Log, out chan model.BatchResponse) bool {
-
-	batch := model.BatchResponse{
-		ResponseType: model.ResponseLog,
-	}
-
-	resCh := make(chan model.Response)
-	go e.executeAndCollect(commands, resCh)
-	var containsErrors bool
-	ticker := time.NewTicker(logging.GetInterval())
-LOOP:
-	for {
-		select {
-		case res, open := <-resCh:
-			if !open {
-				break LOOP
-			}
-			log.Printf("[res] %+v", res)
-			containsErrors = res.Error
-			//log.Printf("%s -- %d -- %s -- %s -- %f", res.Command, res.LineNum, res.Stdout, res.Stderr, res.TimeElapsed)
-			batch.Responses = append(batch.Responses, res)
-		case <-ticker.C:
-			if len(batch.Responses) == 0 {
-				break
-			}
-			out <- batch
-			log.Printf("Batch: %+v", batch)
-
-			// flush responses
-			batch.Responses = []model.Response{}
-		}
-	}
-	if containsErrors {
-		batch.ResponseType = model.ResponseError
-	} else {
-		batch.ResponseType = model.ResponseSuccess
-	}
-
-	out <- batch
-	close(out)
-	log.Printf("Final Batch: %+v", batch)
-	return !containsErrors
-}
-
 // executeAndCollectWg executes multiple commands and uses a wait group to signal the completion
 // NOTE: unlike executeAndCollect, this function does not close the channel upon completion
-func (e *executor) executeAndCollectWg(commands []string, out chan model.Response, wg *sync.WaitGroup) {
+func (e *executor) executeAndCollectWg(commands []string, out chan model.Log, wg *sync.WaitGroup) {
 
 	stdout, stderr := make(chan logLine), make(chan logLine)
 	callback := make(chan error)
 
 	go e.executeMultiple(commands, stdout, stderr, callback)
 
-	for open := true; open; {
+	defer wg.Done()
+	for {
 		select {
 		case x := <-stdout:
-			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time}
+			out <- model.Log{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time}
 		case x := <-stderr:
-			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time, Error: true}
-		case _, open = <-callback:
-			// do nothing
+			out <- model.Log{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time, Error: true}
+		case <-callback:
+			return
 		}
 	}
-
-	wg.Done()
 }
 
 // executeAndCollect executes multiple commands and closes the channel upon completion
-func (e *executor) executeAndCollect(commands []string, out chan model.Response) {
+func (e *executor) executeAndCollect(commands []string, out chan model.Log) {
 
 	stdout, stderr := make(chan logLine), make(chan logLine)
 	callback := make(chan error)
 
 	go e.executeMultiple(commands, stdout, stderr, callback)
 
-	for open := true; open; {
+	defer close(out)
+	for {
 		select {
 		case x := <-stdout:
-			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time}
+			out <- model.Log{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time}
 		case x := <-stderr:
-			out <- model.Response{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time, Error: true}
-		case _, open = <-callback:
-			// do nothing
+			out <- model.Log{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time, Error: true}
+		case <-callback:
+			return
 		}
 	}
-
-	close(out)
 }
 
 // executeMultiple sequentially executes multiple commands
@@ -127,7 +79,7 @@ func (e *executor) executeMultiple(commands []string, stdout, stderr chan logLin
 	for _, command := range commands {
 		e.execute(command, stdout, stderr)
 	}
-	close(callback)
+	close(callback) // TODO use callback to return exit errors
 }
 
 // one line of log for a command

@@ -6,23 +6,20 @@ import (
 	"os"
 	"sync"
 
-	"code.linksmart.eu/dt/deployment-tool/agent/buffer"
 	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
 type runner struct {
-	logCollector
-	buf       buffer.Buffer
+	logger LogWriter
 	executors []*executor
 	wg        sync.WaitGroup
 	shutdown  chan bool
 }
 
-func newRunner(lc logCollector) runner {
+func newRunner(logger LogWriter) runner {
 	return runner{
-		logCollector: lc,
-		buf:          buffer.NewBuffer(RunBufferCapacity),
-		shutdown:     make(chan bool, 1),
+		logger: logger,
+		shutdown: make(chan bool, 1),
 	}
 }
 
@@ -35,29 +32,27 @@ func (r *runner) run(commands []string, taskID string) {
 	}
 
 	log.Printf("run() Running task: %s", taskID)
-	r.sendRunResponse(model.ResponseLog, taskID, "")
+	r.sendRunResponse(taskID, &model.Log{Output: model.ProcessStart}) // TODO report successful start of each process
 
 	wd, _ := os.Getwd()
 	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
 
-	resCh := make(chan model.Response)
+	resCh := make(chan model.Log)
 	go func() {
 		execError := false
 		for res := range resCh {
 			if res.Error {
 				execError = true
-				r.sendRunResponse(model.ResponseError, taskID, res.Output)
 			}
-			r.buf.Insert(res)
+
+			r.sendRunResponse(taskID, &res)
 			log.Printf("run() %v", res)
 		}
-		log.Printf("run() Closing collector routine.")
 
-		if !execError {
-			r.sendRunResponse(model.ResponseSuccess, taskID, "")
-		}
+		r.sendRunResponse(taskID, &model.Log{Output: model.ProcessExit, Error: execError})
 
 		r.shutdown <- true
+		log.Printf("run() Closing collector routine.")
 	}()
 
 	// run in parallel and wait for them to finish
@@ -72,20 +67,16 @@ func (r *runner) run(commands []string, taskID string) {
 	log.Println("run() All processes are ended.")
 }
 
-func (r *runner) sendRunResponse(status model.ResponseType, taskID, message string) {
-	var response []model.Response
-	if message != "" || status == model.ResponseError {
-		response = []model.Response{{Output: message, Error: status == model.ResponseError}}
-	}
-	r.sendResponse(&model.BatchResponse{
-		Stage:        model.StageRun,
-		ResponseType: status,
-		TaskID:       taskID,
-		Responses:    response,
-	})
+// TODO add the command to identify logs on manager
+func (r *runner) sendRunResponse(taskID string, logM *model.Log) {
+	log.Println("sendRunResponse()", logM)
+	r.logger.Insert(model.StageRun, logM)
 }
 
 func (r *runner) stop() bool {
+	if len(r.executors) == 0 {
+		return true
+	}
 	log.Println("stop() Shutting down the runner...")
 	var success bool
 	for i := 0; i < len(r.executors); i++ {
@@ -93,7 +84,6 @@ func (r *runner) stop() bool {
 	}
 
 	<-r.shutdown // wait for all logs
-	r.buf.Flush()
 	log.Println("stop() Success:", success)
 	return success
 }

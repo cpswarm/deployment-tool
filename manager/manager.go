@@ -65,7 +65,7 @@ TARGETS:
 		Artifacts: compressedArchive,
 		Install:   descr.Stages.Install,
 		Run:       descr.Stages.Run,
-		Log:       descr.Log,
+		Debug:     descr.Debug,
 	}
 
 	//m.tasks = append(m.tasks, task)
@@ -110,7 +110,7 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 		//log.Printf("sendTask: %+v", task)
 
 		// send announcement
-		taskA := model.TaskAnnouncement{ID: task.ID, Size: uint64(len(task.Artifacts))}
+		taskA := model.TaskAnnouncement{ID: task.ID, Size: uint64(len(task.Artifacts)), Debug: task.Debug}
 		b, err := json.Marshal(&taskA)
 		if err != nil {
 			log.Fatal(err)
@@ -185,7 +185,7 @@ func (m *manager) processResponses() {
 			m.Unlock()
 			//log.Println("Received adv", target.ID, target.Tags, target.TaskID, target.TaskStage, target.TaskStatus)
 		default:
-			var response model.BatchResponse
+			var response model.Response
 			err := json.Unmarshal(resp.Payload, &response)
 			if err != nil {
 				log.Printf("error parsing response: %s", err)
@@ -196,7 +196,7 @@ func (m *manager) processResponses() {
 			//spew.Dump(response)
 
 			if _, found := m.Targets[response.TargetID]; !found {
-				log.Println("Response from unknown target:", response.TargetID)
+				log.Println("Log from unknown target:", response.TargetID)
 				continue
 			}
 
@@ -210,13 +210,13 @@ func (m *manager) processResponses() {
 				// update current task
 				task.ID = response.TaskID
 				task.CurrentStage = response.Stage
-				task.Error = response.ResponseType == model.ResponseError
-				stageLogs.Status = response.ResponseType
-				stageLogs.InsertLogs(response.Responses) // TODO logs not flushed from task to task
+				//task.Error = response.ResponseType == model.ResponseError
+				stageLogs.Status = "UNKNOWN"
+				stageLogs.InsertLogs(response.Logs) // TODO logs not flushed from task to task
 				stageLogs.Updated = time.Now().Format(time.RFC3339)
 
 				// update history
-				m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)
+				m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, "UNKNOWN")
 				m.Unlock()
 			}
 		}
@@ -225,21 +225,21 @@ func (m *manager) processResponses() {
 	}
 }
 
-func (m *manager) processResponseRun(response *model.BatchResponse) {
+func (m *manager) processResponseRun(response *model.Response) {
 	// create aliases
 	task := &m.Targets[response.TargetID].Task
 	stageLog := task.GetStageLog(response.Stage)
 
 	if task.ID == response.TaskID {
 		task.CurrentStage = response.Stage
-		task.Error = response.ResponseType == model.ResponseError
+		//task.Error = response.ResponseType == model.ResponseError
 		stageLog.Flush() // flush logs at every response
-		stageLog.Status = response.ResponseType
-		stageLog.InsertLogs(response.Responses)
+		stageLog.Status = "UNKNOWN"
+		stageLog.InsertLogs(response.Logs)
 		stageLog.Updated = time.Now().Format(time.RFC3339)
 	}
 	// update history
-	m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, response.ResponseType)
+	m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, "UNKNOWN")
 }
 
 func (m *manager) formatStageStatus(stage model.StageType, status model.ResponseType) string {

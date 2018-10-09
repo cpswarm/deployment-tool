@@ -5,20 +5,21 @@ import "time"
 type ResponseType string
 
 const (
-	// Response types
+	// Log types
 	ResponseLog     ResponseType = "LOG"     // stage stdout and stderr
 	ResponseSuccess ResponseType = "SUCCESS" // stage ended without errors
 	ResponseError   ResponseType = "ERROR"   // stage ended with errors
+	ProcessStart                 = "START"
+	ProcessExit                  = "EXIT"
 
 	ResponseClientError   ResponseType = "CLIENT_ERROR" // client errors
 	ResponseAdvertisement ResponseType = "ADV"          // agent advertisement
+
 )
 
-type BatchResponse struct {
-	Stage        StageType
-	ResponseType ResponseType
-	Responses    []Response
-	//TimeElapsed  float64
+type Response struct {
+	Stage StageType
+	Logs  []Log
 
 	// identifiers
 	TaskID   string
@@ -33,7 +34,7 @@ func UnixTime() UnixTimeType {
 	return UnixTimeType(time.Now().Unix())
 }
 
-type Response struct {
+type Log struct {
 	Command string `json:",omitempty"'`
 	Output  string
 	Error   bool
@@ -43,7 +44,7 @@ type Response struct {
 
 type Target struct {
 	// identification attributes
-	ID        string
+	ID        string // TODO change this to alias and always generate UUID ? alias==tag ? //
 	AutoGenID string
 	Tags      []string
 
@@ -51,6 +52,7 @@ type Target struct {
 	TaskID      string
 	TaskStage   StageType
 	TaskStatus  ResponseType
+	Debug       bool
 	TaskRun     []string `json:",omitempty"'`
 	TaskHistory []string `json:",omitempty"'`
 }
