@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
@@ -161,7 +160,7 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := a.manager.requestLogs(id, model.StageType(stage))
+	err := a.manager.requestLogs(id, stage)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return
@@ -200,6 +199,7 @@ func HTTPResponseError(w http.ResponseWriter, code int, message ...interface{}) 
 		message = make([]interface{}, 1)
 		message[0] = http.StatusText(code)
 	}
+	log.Println("Request error:", message)
 	body, _ := json.Marshal(&map[string]string{
 		"error": fmt.Sprint(message...),
 	})

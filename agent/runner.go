@@ -1,25 +1,23 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
 	"sync"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
 type runner struct {
-	logger LogWriter
+	logger    chan<- model.Log
 	executors []*executor
 	wg        sync.WaitGroup
-	shutdown  chan bool
+	//shutdown  chan bool
 }
 
-func newRunner(logger LogWriter) runner {
+func newRunner(logger chan<- model.Log) runner {
 	return runner{
 		logger: logger,
-		shutdown: make(chan bool, 1),
+		//shutdown: make(chan bool, 1),
 	}
 }
 
@@ -32,45 +30,25 @@ func (r *runner) run(commands []string, taskID string) {
 	}
 
 	log.Printf("run() Running task: %s", taskID)
-	r.sendRunResponse(taskID, &model.Log{Output: model.ProcessStart}) // TODO report successful start of each process
-
-	wd, _ := os.Getwd()
-	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
-
-	resCh := make(chan model.Log)
-	go func() {
-		execError := false
-		for res := range resCh {
-			if res.Error {
-				execError = true
-			}
-
-			r.sendRunResponse(taskID, &res)
-			log.Printf("run() %v", res)
-		}
-
-		r.sendRunResponse(taskID, &model.Log{Output: model.ProcessExit, Error: execError})
-
-		r.shutdown <- true
-		log.Printf("run() Closing collector routine.")
-	}()
+	r.sendLog(taskID, "", model.StageStart, false, model.UnixTime())
+	defer r.sendLog(taskID, "", model.StageEnd, false, model.UnixTime())
 
 	// run in parallel and wait for them to finish
-	for i := 0; i < len(commands); i++ {
-		r.executors[i] = newExecutor(wd)
+	for i, command := range commands {
+		r.executors[i] = newExecutor(taskID, model.StageRun, r.logger)
 		r.wg.Add(1)
-		go r.executors[i].executeAndCollectWg([]string{commands[i]}, resCh, &r.wg)
+		go func(c string, e *executor) {
+			defer r.wg.Done()
+			e.execute(c)
+		}(command, r.executors[i])
 	}
 	r.wg.Wait()
 
-	close(resCh)
 	log.Println("run() All processes are ended.")
 }
 
-// TODO add the command to identify logs on manager
-func (r *runner) sendRunResponse(taskID string, logM *model.Log) {
-	log.Println("sendRunResponse()", logM)
-	r.logger.Insert(model.StageRun, logM)
+func (r *runner) sendLog(task, command, output string, error bool, time model.UnixTimeType) {
+	r.logger <- model.Log{task, model.StageRun, command, output, error, time}
 }
 
 func (r *runner) stop() bool {
@@ -83,7 +61,7 @@ func (r *runner) stop() bool {
 		success = r.executors[i].stop()
 	}
 
-	<-r.shutdown // wait for all logs
+	//<-r.shutdown // wait for all logs
 	log.Println("stop() Success:", success)
 	return success
 }

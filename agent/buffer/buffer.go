@@ -7,8 +7,8 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
-func NewBuffer(capacity uint8) *Buffer {
-	return &Buffer{
+func NewBuffer(capacity uint8) Buffer {
+	return Buffer{
 		capacity: capacity,
 	}
 }

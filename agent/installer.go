@@ -13,11 +13,11 @@ import (
 )
 
 type installer struct {
-	logger   LogWriter
+	logger   chan<- model.Log
 	executor *executor
 }
 
-func newInstaller(logger LogWriter) installer {
+func newInstaller(logger chan<- model.Log) installer {
 	return installer{
 		logger: logger,
 	}
@@ -47,60 +47,30 @@ func (i *installer) store(artifacts []byte, taskID string) {
 func (i *installer) install(commands []string, taskID string) bool {
 	// nothing to execute
 	if len(commands) == 0 {
+		log.Printf("install() Nothing to execute.")
 		return true
 	}
 
 	log.Printf("install() Installing task: %s", taskID)
+	i.sendLog(taskID, "", model.StageStart, false, model.UnixTime())
+	defer i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime())
 
-	// execute and collect results
-	//resCh := make(chan model.Response)
-	//go func() {
-	//	for res := range resCh {
-	//		res.TaskID = taskID
-	//		res.Stage = model.StageInstall
-	//		i.sendResponse(&res)
-	//	}
-	//}()
-
-	//logOpt := model.LogOpts{
-	//	Interval: "3s",
-	//}
-
-	wd, _ := os.Getwd()
-	wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
-
-	exec := newExecutor(wd)
-
-	logCh := make(chan model.Log)
-	go exec.executeAndCollect(commands, logCh)
-
-	var containsError bool
-	for logM := range logCh {
-		containsError = logM.Error // TODO take exit error instead
-		i.logger.Insert(model.StageInstall, &logM)
+	// execute sequentially, return if one fails
+	i.executor = newExecutor(taskID, model.StageInstall, i.logger)
+	for _, command := range commands {
+		success := i.executor.execute(command)
+		if !success {
+			log.Printf("install() Ended due to error.")
+			return false
+		}
 	}
-	log.Printf("install() Closing collector routine.")
 
-	//
-	//// execute and collect results
-	//logCh := make(chan model.Log)
-	//go func() {
-	//	for logM := range logCh {
-	//		i.logger.Insert(model.StageInstall, &logM)
-	//	}
-	//	log.Printf("install() Closing collector routine.")
-	//}()
-	//
-	//wd, _ := os.Getwd()
-	//wd = fmt.Sprintf("%s/tasks/%s", wd, taskID)
-	//
-	//exec := newExecutor(wd)
-	//
-	////success := exec.executeAndCollectBatch(commands, logOpt, resCh)
-	//exec.executeAndCollect(commands, logCh)
+	log.Printf("install() Ended.")
+	return true
+}
 
-	log.Println("install() Installation ended.")
-	return !containsError
+func (i *installer) sendLog(task, command, output string, error bool, time model.UnixTimeType) {
+	i.logger <- model.Log{task, model.StageInstall, command, output, error, time}
 }
 
 // clean removed old task directory
@@ -135,6 +105,5 @@ func (i *installer) clean(taskID string) {
 func (r *installer) stop() bool {
 	log.Println("Shutting down the installer...")
 	success := r.executor.stop()
-	//r.buf.Flush()
 	return success
 }

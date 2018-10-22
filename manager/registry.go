@@ -54,12 +54,12 @@ type Target struct {
 
 type Task struct {
 	ID           string
-	CurrentStage model.StageType
+	CurrentStage string
 	Error        bool
 	StageLogs    StageLogs
 }
 
-func (t *Task) GetStageLog(stage model.StageType) *StageLog {
+func (t *Task) GetStageLog(stage string) *StageLog {
 	switch stage {
 	case model.StageUnspecified:
 		// do nothing
@@ -88,13 +88,13 @@ type StageLogs struct {
 }
 
 type StageLog struct {
-	Status  model.ResponseType `json:",omitempty"'`
-	Updated string             `json:",omitempty"'`
-	Logs    []model.Log        `json:",omitempty"'`
+	Status  string      `json:",omitempty"'`
+	Updated string      `json:",omitempty"'`
+	Logs    []model.Log `json:",omitempty"'`
 }
 
-func (s *StageLog) InsertLogs(responses []model.Log) {
-	s.Logs = append(s.Logs, responses...)
+func (s *StageLog) InsertLogs(log model.Log) {
+	s.Logs = append(s.Logs, log)
 }
 
 func (s *StageLog) Flush() {

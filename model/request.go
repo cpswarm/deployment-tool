@@ -6,17 +6,15 @@ const (
 	RequestTargetID  = "ID"
 	RequestTargetTag = "TAG"
 	// Stage types
-	StageUnspecified StageType = ""
-	StageAssemble              = "ASSEMBLE"
-	StageTransfer              = "TRANSFER"
-	StageInstall               = "INSTALL"
-	StageTest                  = "TEST"
-	StageRun                   = "RUN"
+	StageUnspecified = ""
+	StageAssemble    = "ASSEMBLE"
+	StageTransfer    = "TRANSFER"
+	StageInstall     = "INSTALL"
+	StageTest        = "TEST"
+	StageRun         = "RUN"
 	// Other consts
-	PrefixSeperator = "-"
+	PrefixSeparator = "-"
 )
-
-type StageType string
 
 // Task is a struct with all the information for deployment on a target
 type Task struct {
@@ -34,13 +32,13 @@ type TaskAnnouncement struct {
 }
 
 type LogRequest struct {
-	Stage StageType
+	IfModifiedSince UnixTimeType
 }
 
 func TargetTopic(id string) string {
-	return RequestTargetID + PrefixSeperator + id
+	return RequestTargetID + PrefixSeparator + id
 }
 
 func TargetTag(tag string) string {
-	return RequestTargetTag + PrefixSeperator + tag
+	return RequestTargetTag + PrefixSeparator + tag
 }

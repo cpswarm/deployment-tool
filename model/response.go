@@ -2,28 +2,24 @@ package model
 
 import "time"
 
-type ResponseType string
-
 const (
-	// Log types
-	ResponseLog     ResponseType = "LOG"     // stage stdout and stderr
-	ResponseSuccess ResponseType = "SUCCESS" // stage ended without errors
-	ResponseError   ResponseType = "ERROR"   // stage ended with errors
-	ProcessStart                 = "START"
-	ProcessExit                  = "EXIT"
+	// Response types (topics)
+	ResponseLog           = "LOG" // logs
+	ResponseAdvertisement = "ADV" // device advertisement
+	//ResponseSuccess = "SUCCESS" // stage ended without errors
+	//ResponseError   = "ERROR"   // stage ended with errors
+	//ResponseClientError   = "CLIENT_ERROR" // client errors
 
-	ResponseClientError   ResponseType = "CLIENT_ERROR" // client errors
-	ResponseAdvertisement ResponseType = "ADV"          // agent advertisement
-
+	// Log output constants
+	ExecStart  = "EXEC-START"
+	ExecEnd    = "EXEC-END"
+	StageStart = "STAGE-START"
+	StageEnd   = "STAGE-END"
 )
 
 type Response struct {
-	Stage StageType
-	Logs  []Log
-
-	// identifiers
-	TaskID   string
 	TargetID string
+	Logs     []Log
 }
 
 // UnixTimeType is the integer type used for logging timestamps. For the time being, we use uint32 i.e. good for 1970-2106
@@ -35,10 +31,11 @@ func UnixTime() UnixTimeType {
 }
 
 type Log struct {
+	Task    string
+	Stage   string
 	Command string `json:",omitempty"'`
 	Output  string
 	Error   bool
-	LineNum uint32       `json:",omitempty"'`
 	Time    UnixTimeType `json:",omitempty"'`
 }
 
@@ -49,9 +46,9 @@ type Target struct {
 	Tags      []string
 
 	// active task
-	TaskID      string
-	TaskStage   StageType
-	TaskStatus  ResponseType
+	TaskID    string
+	TaskStage string
+	//TaskStatus  string
 	Debug       bool
 	TaskRun     []string `json:",omitempty"'`
 	TaskHistory []string `json:",omitempty"'`

@@ -42,15 +42,14 @@ func startAgent() *agent {
 		pipe:         model.NewPipe(),
 		disconnected: make(chan bool),
 	}
-	a.logger = NewLogger(a.pipe.ResponseCh)
+	a.loadConf()
+
+	a.logger = NewLogger(a.target.ID, a.target.Debug, a.pipe.ResponseCh)
 	a.runner = newRunner(a.logger.Writer())
 	a.installer = newInstaller(a.logger.Writer())
 
-	a.loadConf()
-
 	// autostart
 	if len(a.target.TaskRun) > 0 {
-		a.logger.SetOpts(a.target.ID, a.target.TaskID, a.target.Debug)
 		go a.runner.run(a.target.TaskRun, a.target.TaskID)
 	}
 
@@ -128,7 +127,7 @@ func (a *agent) startWorker() {
 		topicMap[tag] = true
 	}
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetAll)}
-	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetID + model.PrefixSeperator + a.target.ID)}
+	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetID + model.PrefixSeparator + a.target.ID)}
 
 	log.Println("Listenning to requests...")
 	var latestMessageChecksum [16]byte
@@ -180,10 +179,8 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	}
 	payload = nil // to release memory
 
-	a.logger.SetOpts(a.target.ID, taskA.ID, taskA.Debug)
-
 	log.Printf("handleAnnouncement: %s", taskA.ID)
-	a.sendTransferResponse(taskA.ID, model.ProcessStart, false)
+	a.sendTransferResponse(taskA.ID, model.StageStart, false)
 
 	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
 		if a.target.TaskHistory[i] == taskA.ID {
@@ -221,7 +218,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
 	a.installer.store(task.Artifacts, task.ID)
-	a.sendTransferResponse(task.ID, model.ProcessExit, false)
+	a.sendTransferResponse(task.ID, model.StageEnd, false)
 
 	success := a.installer.install(task.Install, task.ID)
 	if success {
@@ -241,7 +238,7 @@ func (a *agent) sendLogs(payload []byte) {
 		log.Fatalln(err) // TODO send to manager
 	}
 
-	a.logger.Report(request.Stage)
+	a.logger.Report(request)
 }
 
 func (a *agent) saveState() {
@@ -261,18 +258,17 @@ func (a *agent) saveState() {
 	log.Println("Saved state:", StateFile)
 }
 
-
-func (a *agent) sendTransferResponse(taskID, message string, isError bool) {
-	a.logger.Insert(model.StageTransfer, &model.Log{Output: message, Error: isError})
+func (a *agent) sendTransferResponse(taskID, message string, error bool) {
+	a.logger.Writer() <- model.Log{taskID, model.StageTransfer, "", message, error, model.UnixTime()}
 }
 
 func (a *agent) sendAdvertisement() {
 	t := model.Target{
-		ID:         a.target.ID,
-		Tags:       a.target.Tags,
-		TaskID:     a.target.TaskID,
-		TaskStage:  a.target.TaskStage,
-		TaskStatus: a.target.TaskStatus,
+		ID:        a.target.ID,
+		Tags:      a.target.Tags,
+		TaskID:    a.target.TaskID,
+		TaskStage: a.target.TaskStage,
+		//TaskStatus: a.target.TaskStatus,
 	}
 	b, _ := json.Marshal(t)
 	a.pipe.ResponseCh <- model.Message{string(model.ResponseAdvertisement), b}

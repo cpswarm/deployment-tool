@@ -3,11 +3,11 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
-	"sync"
-	"sync/atomic"
 	"syscall"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
@@ -16,11 +16,22 @@ import (
 
 type executor struct {
 	workDir string
+	task    string
+	stage   string
+	out     chan<- model.Log
 	cmd     *exec.Cmd
 }
 
-func newExecutor(workDir string) *executor {
-	return &executor{workDir: workDir}
+func newExecutor(task, stage string, out chan<- model.Log) *executor {
+	wd, _ := os.Getwd()
+	wd = fmt.Sprintf("%s/tasks/%s", wd, task)
+
+	return &executor{
+		workDir: wd,
+		task:    task,
+		stage:   stage,
+		out:     out,
+	}
 }
 
 func (e *executor) storeArtifacts(b []byte) {
@@ -31,67 +42,10 @@ func (e *executor) storeArtifacts(b []byte) {
 	}
 }
 
-// executeAndCollectWg executes multiple commands and uses a wait group to signal the completion
-// NOTE: unlike executeAndCollect, this function does not close the channel upon completion
-func (e *executor) executeAndCollectWg(commands []string, out chan model.Log, wg *sync.WaitGroup) {
-
-	stdout, stderr := make(chan logLine), make(chan logLine)
-	callback := make(chan error)
-
-	go e.executeMultiple(commands, stdout, stderr, callback)
-
-	defer wg.Done()
-	for {
-		select {
-		case x := <-stdout:
-			out <- model.Log{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time}
-		case x := <-stderr:
-			out <- model.Log{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time, Error: true}
-		case <-callback:
-			return
-		}
-	}
-}
-
-// executeAndCollect executes multiple commands and closes the channel upon completion
-func (e *executor) executeAndCollect(commands []string, out chan model.Log) {
-
-	stdout, stderr := make(chan logLine), make(chan logLine)
-	callback := make(chan error)
-
-	go e.executeMultiple(commands, stdout, stderr, callback)
-
-	defer close(out)
-	for {
-		select {
-		case x := <-stdout:
-			out <- model.Log{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time}
-		case x := <-stderr:
-			out <- model.Log{Command: x.command, Output: x.line, LineNum: x.lineNum, Time: x.time, Error: true}
-		case <-callback:
-			return
-		}
-	}
-}
-
-// executeMultiple sequentially executes multiple commands
-func (e *executor) executeMultiple(commands []string, stdout, stderr chan logLine, callback chan error) {
-	for _, command := range commands {
-		e.execute(command, stdout, stderr)
-	}
-	close(callback) // TODO use callback to return exit errors
-}
-
-// one line of log for a command
-type logLine struct {
-	command string
-	line    string
-	lineNum uint32
-	time    model.UnixTimeType
-}
-
 // execute executes a command
-func (e *executor) execute(command string, stdout, stderr chan logLine) {
+func (e *executor) execute(command string) bool {
+	e.sendLog(command, model.ExecStart, false, model.UnixTime())
+
 	bashCommand := []string{"/bin/sh", "-c", command}
 	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
 
@@ -99,16 +53,20 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 	e.cmd.SysProcAttr = &syscall.SysProcAttr{}
 	e.cmd.SysProcAttr.Setsid = true
 
-	var line uint32
-
 	outStream, err := e.cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Error:", err)
+		e.sendLog(command, err.Error(), true, model.UnixTime())
+		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
+		return false
 	}
 
 	errStream, err := e.cmd.StderrPipe()
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Error:", err)
+		e.sendLog(command, err.Error(), true, model.UnixTime())
+		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
+		return false
 	}
 
 	// stdout reader
@@ -116,12 +74,11 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 		scanner := bufio.NewScanner(stream)
 
 		for scanner.Scan() {
-			atomic.AddUint32(&line, 1)
 			//log.Println(scanner.Text())
-			stdout <- logLine{command, scanner.Text(), line, model.UnixTime()}
+			e.sendLog(command, scanner.Text(), false, model.UnixTime())
 		}
 		if err = scanner.Err(); err != nil {
-			stderr <- logLine{command, err.Error(), line, model.UnixTime()}
+			e.sendLog(command, err.Error(), true, model.UnixTime())
 			log.Println("Error:", err)
 		}
 		stream.Close()
@@ -132,12 +89,11 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 		scanner := bufio.NewScanner(stream)
 
 		for scanner.Scan() {
-			atomic.AddUint32(&line, 1)
 			//log.Println("stderr:", scanner.Text())
-			stderr <- logLine{command, scanner.Text(), line, model.UnixTime()}
+			e.sendLog(command, scanner.Text(), true, model.UnixTime())
 		}
 		if err = scanner.Err(); err != nil {
-			stderr <- logLine{command, err.Error(), line, model.UnixTime()}
+			e.sendLog(command, err.Error(), true, model.UnixTime())
 			log.Println("Error:", err)
 		}
 		stream.Close()
@@ -147,13 +103,18 @@ func (e *executor) execute(command string, stdout, stderr chan logLine) {
 
 	err = e.cmd.Run()
 	if err != nil {
-		atomic.AddUint32(&line, 1)
-		stderr <- logLine{command, err.Error(), line, model.UnixTime()}
-		return
+		e.sendLog(command, err.Error(), true, model.UnixTime())
+		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
+		log.Println("Error:", err)
+		return false
 	}
-	atomic.AddUint32(&line, 1)
-	stdout <- logLine{command, "exit status 0", line, model.UnixTime()}
+	e.sendLog(command, model.ExecEnd, false, model.UnixTime())
 	e.cmd = nil
+	return true
+}
+
+func (e *executor) sendLog(command, output string, error bool, time model.UnixTimeType) {
+	e.out <- model.Log{e.task, e.stage, command, output, error, time}
 }
 
 func (e *executor) stop() bool {

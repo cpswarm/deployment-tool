@@ -31,7 +31,7 @@ func startManager(pipe model.Pipe) (*manager, error) {
 	m.Targets = make(map[string]*Target)
 	m.taskDescriptions = []TaskDescription{}
 
-	go m.processResponses()
+	go m.manageResponses()
 	return m, nil
 }
 
@@ -141,8 +141,9 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 	log.Println("Task received by all targets.")
 }
 
-func (m *manager) requestLogs(targetID string, stage model.StageType) error {
-	b, _ := json.Marshal(&model.LogRequest{stage})
+func (m *manager) requestLogs(targetID, stage string) error {
+	// TODO send request for missing logs only
+	b, _ := json.Marshal(&model.LogRequest{model.UnixTimeType(time.Now().Unix())})
 	m.pipe.RequestCh <- model.Message{
 		Topic:   model.TargetTopic(targetID),
 		Payload: b,
@@ -151,9 +152,9 @@ func (m *manager) requestLogs(targetID string, stage model.StageType) error {
 
 }
 
-func (m *manager) processResponses() {
+func (m *manager) manageResponses() {
 	for resp := range m.pipe.ResponseCh {
-		//log.Printf("processResponses() %s", resp.Payload)
+		//log.Printf("startLogManager() %s", resp.Payload)
 		switch resp.Topic {
 		case string(model.ResponseAdvertisement):
 			var target model.Target
@@ -177,11 +178,11 @@ func (m *manager) processResponses() {
 			// update current task
 			task.ID = target.TaskID
 			task.CurrentStage = target.TaskStage
-			task.Error = target.TaskStatus == model.ResponseError
-			stageLogs.Status = target.TaskStatus
+			//task.Error = target.TaskStatus == model.ResponseError // TODO
+			//stageLogs.Status = target.TaskStatus // TODO
 			stageLogs.Updated = time.Now().Format(time.RFC3339)
 			// update history
-			m.Targets[target.ID].History[target.TaskID] = m.formatStageStatus(target.TaskStage, target.TaskStatus)
+			m.Targets[target.ID].History[target.TaskID] = m.formatStageStatus(target.TaskStage, "UNKNOWN")
 			m.Unlock()
 			//log.Println("Received adv", target.ID, target.Tags, target.TaskID, target.TaskStage, target.TaskStatus)
 		default:
@@ -192,56 +193,38 @@ func (m *manager) processResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			log.Printf("processBatchResponse %+v", response)
-			//spew.Dump(response)
 
-			if _, found := m.Targets[response.TargetID]; !found {
-				log.Println("Log from unknown target:", response.TargetID)
-				continue
-			}
-
-			if response.Stage == model.StageRun {
-				m.processResponseRun(&response)
-			} else {
-				m.Lock()
-				// create aliases
-				task := &m.Targets[response.TargetID].Task
-				stageLogs := task.GetStageLog(response.Stage)
-				// update current task
-				task.ID = response.TaskID
-				task.CurrentStage = response.Stage
-				//task.Error = response.ResponseType == model.ResponseError
-				stageLogs.Status = "UNKNOWN"
-				stageLogs.InsertLogs(response.Logs) // TODO logs not flushed from task to task
-				stageLogs.Updated = time.Now().Format(time.RFC3339)
-
-				// update history
-				m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, "UNKNOWN")
-				m.Unlock()
-			}
+			m.processResponse(&response)
 		}
 		// sent update notification
 		m.update.Broadcast()
 	}
 }
 
-func (m *manager) processResponseRun(response *model.Response) {
-	// create aliases
-	task := &m.Targets[response.TargetID].Task
-	stageLog := task.GetStageLog(response.Stage)
+func (m *manager) processResponse(response *model.Response) {
+	log.Printf("processResponse %+v", response)
+	//spew.Dump(response)
 
-	if task.ID == response.TaskID {
-		task.CurrentStage = response.Stage
-		//task.Error = response.ResponseType == model.ResponseError
-		stageLog.Flush() // flush logs at every response
-		stageLog.Status = "UNKNOWN"
-		stageLog.InsertLogs(response.Logs)
-		stageLog.Updated = time.Now().Format(time.RFC3339)
+	if _, found := m.Targets[response.TargetID]; !found {
+		log.Println("Log from unknown target:", response.TargetID)
+		return
 	}
-	// update history
-	m.Targets[response.TargetID].History[response.TaskID] = m.formatStageStatus(response.Stage, "UNKNOWN")
+
+	for _, log := range response.Logs {
+		// create aliases
+		task := &m.Targets[response.TargetID].Task
+		stageLogs := task.GetStageLog(log.Stage)
+		// update current task
+		task.ID = log.Task
+		task.CurrentStage = log.Stage
+		stageLogs.InsertLogs(log) // TODO logs not flushed from task to task
+		stageLogs.Updated = time.Now().Format(time.RFC3339)
+		// update history
+		m.Targets[response.TargetID].History[log.Task] = m.formatStageStatus(log.Stage, "UNKNOWN")
+	}
+
 }
 
-func (m *manager) formatStageStatus(stage model.StageType, status model.ResponseType) string {
+func (m *manager) formatStageStatus(stage, status string) string {
 	return fmt.Sprintf("%s-%s", stage, status)
 }
