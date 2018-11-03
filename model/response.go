@@ -33,7 +33,7 @@ func UnixTime() UnixTimeType {
 type Log struct {
 	Task    string
 	Stage   string
-	Command string `json:",omitempty"'`
+	Command string `json:",omitempty"'` // TODO is command unique within a stage?
 	Output  string
 	Error   bool
 	Time    UnixTimeType `json:",omitempty"'`

@@ -6,7 +6,6 @@ const (
 	RequestTargetID  = "ID"
 	RequestTargetTag = "TAG"
 	// Stage types
-	StageUnspecified = ""
 	StageAssemble    = "ASSEMBLE"
 	StageTransfer    = "TRANSFER"
 	StageInstall     = "INSTALL"

@@ -6,10 +6,12 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/model"
 )
 
+const (
+	SystemLogsKey = "SYS"
+)
+
 type registry struct {
 	taskDescriptions []TaskDescription
-	//tasks            []model.Task
-	//targets map[string]*model.Target
 	Targets map[string]*Target
 }
 
@@ -47,36 +49,42 @@ type DeploymentInfo struct {
 // TARGET
 //
 type Target struct {
-	Tags    []string
-	Task    Task              // active task
-	History map[string]string // task history -> taskID: stage_status
+	Tags  []string
+	Tasks map[string]*Task
+}
+
+func newTarget() *Target {
+	return &Target{
+		Tasks: make(map[string]*Task),
+	}
+}
+
+func (t *Target) initTask(id string) {
+	if _, found := t.Tasks[id]; !found {
+		t.Tasks[id] = new(Task)
+	}
 }
 
 type Task struct {
-	ID           string
-	CurrentStage string
-	Error        bool
-	StageLogs    StageLogs
+	Stages  StageLogs
+	Updated string
 }
 
 func (t *Task) GetStageLog(stage string) *StageLog {
 	switch stage {
-	case model.StageUnspecified:
-		// do nothing
-		return &StageLog{}
 	case model.StageAssemble:
-		return &t.StageLogs.Assemble
+		return &t.Stages.Assemble
 	case model.StageTransfer:
-		return &t.StageLogs.Transfer
+		return &t.Stages.Transfer
 	case model.StageInstall:
-		return &t.StageLogs.Install
+		return &t.Stages.Install
 	case model.StageTest:
-		return &t.StageLogs.Test
+		return &t.Stages.Test
 	case model.StageRun:
-		return &t.StageLogs.Run
+		return &t.Stages.Run
 	}
-	log.Fatalln("Unknown/unsupported stage:", stage)
-	return nil
+	log.Println("ERROR: Unknown/unsupported stage:", stage)
+	return &StageLog{}
 }
 
 type StageLogs struct {
@@ -88,13 +96,23 @@ type StageLogs struct {
 }
 
 type StageLog struct {
-	Status  string      `json:",omitempty"'`
-	Updated string      `json:",omitempty"'`
-	Logs    []model.Log `json:",omitempty"'`
+	Logs map[string][]Log `json:",omitempty"'`
 }
 
-func (s *StageLog) InsertLogs(log model.Log) {
-	s.Logs = append(s.Logs, log)
+type Log struct {
+	Output string
+	Error  bool
+	Time   model.UnixTimeType
+}
+
+func (s *StageLog) InsertLogs(l model.Log) {
+	if l.Command == "" {
+		l.Command = SystemLogsKey
+	}
+	if s.Logs == nil {
+		s.Logs = make(map[string][]Log)
+	}
+	s.Logs[l.Command] = append(s.Logs[l.Command], Log{l.Output, l.Error, l.Time})
 }
 
 func (s *StageLog) Flush() {

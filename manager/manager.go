@@ -99,10 +99,6 @@ func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
 }
 
 func (m *manager) sendTask(task *model.Task, targetTags []string) {
-	// clear status of existing tasks
-	for _, target := range m.Targets {
-		target.Task = Task{}
-	}
 	pending := true
 
 	for pending {
@@ -133,7 +129,7 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 		// TODO which messages are received, what is pending?
 		pending = false
 		for _, target := range m.Targets {
-			if _, found := target.History[task.ID]; !found {
+			if _, found := target.Tasks[task.ID]; !found {
 				pending = true
 			}
 		}
@@ -154,7 +150,6 @@ func (m *manager) requestLogs(targetID, stage string) error {
 
 func (m *manager) manageResponses() {
 	for resp := range m.pipe.ResponseCh {
-		//log.Printf("startLogManager() %s", resp.Payload)
 		switch resp.Topic {
 		case string(model.ResponseAdvertisement):
 			var target model.Target
@@ -164,27 +159,8 @@ func (m *manager) manageResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			log.Printf("processTarget %+v", target)
+			m.processTarget(&target)
 
-			m.Lock()
-			if _, found := m.Targets[target.ID]; !found {
-				m.Targets[target.ID] = new(Target)
-				m.Targets[target.ID].History = make(map[string]string)
-			}
-			m.Targets[target.ID].Tags = target.Tags
-			// create aliases
-			task := &m.Targets[target.ID].Task
-			stageLogs := task.GetStageLog(target.TaskStage)
-			// update current task
-			task.ID = target.TaskID
-			task.CurrentStage = target.TaskStage
-			//task.Error = target.TaskStatus == model.ResponseError // TODO
-			//stageLogs.Status = target.TaskStatus // TODO
-			stageLogs.Updated = time.Now().Format(time.RFC3339)
-			// update history
-			m.Targets[target.ID].History[target.TaskID] = m.formatStageStatus(target.TaskStage, "UNKNOWN")
-			m.Unlock()
-			//log.Println("Received adv", target.ID, target.Tags, target.TaskID, target.TaskStage, target.TaskStatus)
 		default:
 			var response model.Response
 			err := json.Unmarshal(resp.Payload, &response)
@@ -193,7 +169,6 @@ func (m *manager) manageResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-
 			m.processResponse(&response)
 		}
 		// sent update notification
@@ -201,30 +176,38 @@ func (m *manager) manageResponses() {
 	}
 }
 
+func (m *manager) processTarget(target *model.Target) {
+	log.Printf("processTarget %+v", target)
+
+	m.Lock()
+	defer m.Unlock()
+
+	if _, found := m.Targets[target.ID]; !found {
+		m.Targets[target.ID] = newTarget()
+	}
+	m.Targets[target.ID].Tags = target.Tags
+}
+
 func (m *manager) processResponse(response *model.Response) {
 	log.Printf("processResponse %+v", response)
-	//spew.Dump(response)
+
+	m.Lock()
+	defer m.Unlock()
 
 	if _, found := m.Targets[response.TargetID]; !found {
 		log.Println("Log from unknown target:", response.TargetID)
 		return
 	}
 
-	for _, log := range response.Logs {
+	for _, l := range response.Logs {
+		m.Targets[response.TargetID].initTask(l.Task)
+
 		// create aliases
-		task := &m.Targets[response.TargetID].Task
-		stageLogs := task.GetStageLog(log.Stage)
-		// update current task
-		task.ID = log.Task
-		task.CurrentStage = log.Stage
-		stageLogs.InsertLogs(log) // TODO logs not flushed from task to task
-		stageLogs.Updated = time.Now().Format(time.RFC3339)
-		// update history
-		m.Targets[response.TargetID].History[log.Task] = m.formatStageStatus(log.Stage, "UNKNOWN")
+		task := m.Targets[response.TargetID].Tasks[l.Task]
+		stageLogs := task.GetStageLog(l.Stage)
+		// update task
+		task.Updated = time.Now().Format(time.RFC3339)
+		stageLogs.InsertLogs(l)
 	}
 
-}
-
-func (m *manager) formatStageStatus(stage, status string) string {
-	return fmt.Sprintf("%s-%s", stage, status)
 }
