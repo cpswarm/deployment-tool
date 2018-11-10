@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -8,6 +10,10 @@ import (
 )
 
 func main() {
+	if parseFlags() {
+		return
+	}
+
 	log.Println("started deployment manager")
 	defer log.Println("bye.")
 
@@ -47,4 +53,19 @@ func init() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func parseFlags() bool {
+	newKeys := flag.Bool("newkeypair", false, "Generate new Curve keypair")
+	flag.Parse()
+	if *newKeys {
+		err := NewCurveKeypair(PrivateKey, PublicKey)
+		if err != nil {
+			fmt.Println("Error creating keypair:", err)
+			os.Exit(1)
+		}
+		return true
+	}
+	// nothing is parsed
+	return false
 }
