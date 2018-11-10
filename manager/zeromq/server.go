@@ -1,4 +1,4 @@
-package main
+package zeromq
 
 import (
 	"fmt"
@@ -15,14 +15,14 @@ type zmqClient struct {
 	publisher  *zmq.Socket
 	subscriber *zmq.Socket
 
-	pipe model.Pipe
+	Pipe model.Pipe
 }
 
-func startZMQClient(pubEndpoint, subEndpoint string) (*zmqClient, error) {
+func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 
 	c := &zmqClient{
-		pipe: model.NewPipe(),
+		Pipe: model.NewPipe(),
 	}
 
 	//  Start authentication engine
@@ -75,7 +75,7 @@ func startZMQClient(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 }
 
 func (c *zmqClient) startPublisher() {
-	for request := range c.pipe.RequestCh {
+	for request := range c.Pipe.RequestCh {
 		_, err := c.publisher.Send(request.Topic+":"+string(request.Payload), 0)
 		if err != nil {
 			log.Printf("error publishing: %s", err)
@@ -96,11 +96,11 @@ func (c *zmqClient) startListener() {
 			continue
 		}
 		//log.Printf("startListener %+v", msg)
-		c.pipe.ResponseCh <- model.Message{parts[0], []byte(parts[1])}
+		c.Pipe.ResponseCh <- model.Message{parts[0], []byte(parts[1])}
 	}
 }
 
-func (c *zmqClient) close() error {
+func (c *zmqClient) Close() error {
 	log.Println("Closing ZeroMQ sockets...")
 
 	err := c.subscriber.Close()

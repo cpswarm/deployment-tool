@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+
+	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 )
 
 func main() {
@@ -17,13 +19,13 @@ func main() {
 	log.Println("started deployment manager")
 	defer log.Println("bye.")
 
-	zmqClient, err := startZMQClient("tcp://*:5556", "tcp://*:5557")
+	zmqServer, err := zeromq.StartServer("tcp://*:5556", "tcp://*:5557")
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
-	defer zmqClient.close()
+	defer zmqServer.Close()
 
-	m, err := startManager(zmqClient.pipe)
+	m, err := startManager(zmqServer.Pipe)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,7 +61,7 @@ func parseFlags() bool {
 	newKeys := flag.Bool("newkeypair", false, "Generate new Curve keypair")
 	flag.Parse()
 	if *newKeys {
-		err := NewCurveKeypair(PrivateKey, PublicKey)
+		err := zeromq.NewCurveKeypair(zeromq.PrivateKey, zeromq.PublicKey)
 		if err != nil {
 			fmt.Println("Error creating keypair:", err)
 			os.Exit(1)
