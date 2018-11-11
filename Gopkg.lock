@@ -3,6 +3,7 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:e54c39e0efe496d1092cf08eaf5109758af22e68d26732683009704db1d0afbe"
   name = "github.com/dsnet/compress"
   packages = [
     ".",
@@ -10,102 +11,175 @@
     "bzip2/internal/sais",
     "internal",
     "internal/errors",
-    "internal/prefix"
+    "internal/prefix",
   ]
+  pruneopts = "NUT"
   revision = "cc9eb1d7ad760af14e8f918698f745e80377af4f"
 
 [[projects]]
   branch = "master"
+  digest = "1:7f114b78210bf5b75f307fc97cff293633c835bab1e0ea8a744a44b39c042dfe"
   name = "github.com/golang/snappy"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
+  digest = "1:a1578f7323eca2b88021fdc9a79a99833d40b12c32a5ea4f284e2fad19ea2657"
+  name = "github.com/google/uuid"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "d460ce9f8df2e77fb1ba55ca87fafed96c607494"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:c01767916c59f084bb7c41a7d5877c0f3099b1595cfa066e84ec6ad6b084dd89"
   name = "github.com/gorilla/context"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
   version = "v1.1.1"
 
 [[projects]]
+  digest = "1:bf5cf1d53d703332e9bd8984c69784645b73a938317bf5ace9aadf20ac49379a"
   name = "github.com/gorilla/mux"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "e3702bed27f0d39777b0b37b664b6280e8ef8fbf"
   version = "v1.6.2"
 
 [[projects]]
+  digest = "1:3b708ebf63bfa9ba3313bedb8526bc0bb284e51474e65e958481476a9d4a12aa"
   name = "github.com/gorilla/websocket"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "ea4d1f681babbce9545c9c5f3d5194a789c89f5b"
   version = "v1.2.0"
 
 [[projects]]
+  digest = "1:bf3062fe212c239e6158040fda77ab256f8dcf4a61ab04bb9c538478a890a96d"
   name = "github.com/joho/godotenv"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "a79fa1e548e2c689c241d10173efd51e5d689d5b"
   version = "v1.2.0"
 
 [[projects]]
   branch = "master"
+  digest = "1:9ac1cfbfb6caf6155531fdbed9e4c84e77f3ab7574e1e03baf340b62208b0ca6"
   name = "github.com/mholt/archiver"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "e4ef56d48eb029648b0e895bb0b6a393ef0829c3"
 
 [[projects]]
   branch = "master"
+  digest = "1:2aad42cee2de3346961cb38e77eada96150d266b9a5e289f5f8c05696b22f875"
   name = "github.com/nwaples/rardecode"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "e06696f847aeda6f39a8f0b7cdff193b7690aef6"
 
 [[projects]]
   branch = "master"
+  digest = "1:4db5962a88cd63de6187a876406664f565c244ae9d6226a7420b5278940c8d97"
   name = "github.com/pbnjay/memory"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "16f8386fc07fd0642daed7965fd95e4d15bbf73a"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/pebbe/zmq4"
+  digest = "1:93b1d84c5fa6d1ea52f4114c37714cddd84d5b78f151b62bb101128dd51399bf"
+  name = "github.com/pborman/uuid"
   packages = ["."]
+  pruneopts = "NUT"
+  revision = "adf5a7427709b9deb95d29d3fa8a2bf9cfd388f1"
+  version = "v1.2"
+
+[[projects]]
+  branch = "master"
+  digest = "1:2b19047b5d73121a700b17b71ceb6278d69bcb04d24e5eb8b300fb73d5744020"
+  name = "github.com/pebbe/zmq4"
+  packages = [
+    ".",
+    "draft",
+    "examples/bstar",
+    "examples/clone",
+    "examples/flcliapi",
+    "examples/intface",
+    "examples/kvmsg",
+    "examples/kvsimple",
+    "examples/mdapi",
+  ]
+  pruneopts = "NUT"
   revision = "5b443b6471cea4b4f9f85025530c04c93233f76a"
 
 [[projects]]
+  digest = "1:e39e722511703c69078a9455ce2c132db079547fd37861b42045d26a9dcd9c27"
   name = "github.com/pierrec/lz4"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "2fcda4cb7018ce05a25959d2fe08c83e3329f169"
   version = "v1.1"
 
 [[projects]]
+  digest = "1:186e021e0c2fa61e181151d8b2fef4d2b6b217a55794bd591de73773b934a32a"
   name = "github.com/pierrec/xxHash"
   packages = ["xxHash32"]
+  pruneopts = "NUT"
   revision = "f051bb7f1d1aaf1b5a665d74fb6b0217712c69f7"
   version = "v0.1.1"
 
 [[projects]]
+  digest = "1:6bc0652ea6e39e22ccd522458b8bdd8665bf23bdc5a20eec90056e4dc7e273ca"
   name = "github.com/satori/go.uuid"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
   version = "v1.2.0"
 
 [[projects]]
+  digest = "1:07e8742c479bab0066149ad02a710024154e76874fd0a2dba002d87702725825"
   name = "github.com/ulikunitz/xz"
   packages = [
     ".",
     "internal/hash",
     "internal/xlog",
-    "lzma"
+    "lzma",
   ]
+  pruneopts = "NUT"
   revision = "0c6b41e72360850ca4f98dc341fd999726ea007f"
   version = "v0.5.4"
 
 [[projects]]
+  digest = "1:7c95b35057a0ff2e19f707173cc1a947fa43a6eb5c4d300d196ece0334046082"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
+  pruneopts = "NUT"
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
   version = "v2.2.1"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d513cec920a7dd908c1c24c0e3a63dc0b1e3d09074c89161b68071a1846c58eb"
+  input-imports = [
+    "github.com/gorilla/mux",
+    "github.com/gorilla/websocket",
+    "github.com/joho/godotenv",
+    "github.com/mholt/archiver",
+    "github.com/pbnjay/memory",
+    "github.com/pborman/uuid",
+    "github.com/pebbe/zmq4",
+    "github.com/pebbe/zmq4/draft",
+    "github.com/pebbe/zmq4/examples/bstar",
+    "github.com/pebbe/zmq4/examples/clone",
+    "github.com/pebbe/zmq4/examples/flcliapi",
+    "github.com/pebbe/zmq4/examples/intface",
+    "github.com/pebbe/zmq4/examples/kvmsg",
+    "github.com/pebbe/zmq4/examples/kvsimple",
+    "github.com/pebbe/zmq4/examples/mdapi",
+    "github.com/satori/go.uuid",
+    "gopkg.in/yaml.v2",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
