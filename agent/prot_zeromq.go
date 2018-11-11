@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -27,12 +29,19 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 		pipe: pipe,
 	}
 
-	var err error
+	zmq.AuthSetVerbose(true)
+
+	// load keys
+	serverPublic, clientSecret, clientPublic, err := c.loadKeys()
+	if err != nil {
+		return nil, err
+	}
 	// socket to receive from server
 	c.subscriber, err = zmq.NewSocket(zmq.SUB)
 	if err != nil {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
+	c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	err = c.subscriber.Connect(subEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
@@ -42,6 +51,7 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 	if err != nil {
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
+	c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	err = c.publisher.Connect(pubEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)
@@ -167,4 +177,36 @@ func (c *zmqClient) close() {
 		log.Println(err)
 	}
 
+}
+
+const (
+	EnvPrivateKey = "PRIVATE_KEY"
+	EnvPublicKey  = "PUBLIC_KEY"
+	EnvManagerKey = "MANAGER_KEY"
+)
+
+func (c *zmqClient) loadKeys() (string, string, string, error) {
+	if os.Getenv(EnvPrivateKey) == "" || os.Getenv(EnvPublicKey) == "" || os.Getenv(EnvManagerKey) == "" {
+		log.Printf("%s=%s", EnvPrivateKey, os.Getenv(EnvPrivateKey))
+		log.Printf("%s=%s", EnvPublicKey, os.Getenv(EnvPublicKey))
+		log.Printf("%s=%s", EnvManagerKey, os.Getenv(EnvManagerKey))
+		return "", "", "", fmt.Errorf("one or more variables are not set")
+	}
+
+	serverPublic, err := ioutil.ReadFile(os.Getenv(EnvManagerKey))
+	if err != nil {
+		return "", "", "", fmt.Errorf("error reading server public key: %s", err)
+	}
+
+	clientSecret, err := ioutil.ReadFile(os.Getenv(EnvPrivateKey))
+	if err != nil {
+		return "", "", "", fmt.Errorf("error reading client private key: %s", err)
+	}
+
+	clientPublic, err := ioutil.ReadFile(os.Getenv(EnvPublicKey))
+	if err != nil {
+		return "", "", "", fmt.Errorf("error reading client public key: %s", err)
+	}
+
+	return string(serverPublic), string(clientSecret), string(clientPublic), nil
 }

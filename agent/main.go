@@ -1,11 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 
+	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 	"github.com/joho/godotenv"
 )
 
@@ -15,6 +17,10 @@ const (
 )
 
 func main() {
+	if parseFlags() {
+		return
+	}
+
 	log.Println("started deployment agent")
 	defer log.Println("bye.")
 
@@ -65,4 +71,24 @@ func init() {
 	if os.Getenv("DEBUG") != "" {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
+}
+
+const (
+	PrivateKey = "agent.key"
+	PublicKey  = "agent.pub"
+)
+
+func parseFlags() bool {
+	newKeys := flag.Bool("newkeypair", false, "Generate new Curve keypair")
+	flag.Parse()
+	if *newKeys {
+		err := zeromq.NewCurveKeypair(PrivateKey, PublicKey)
+		if err != nil {
+			fmt.Println("Error creating keypair:", err)
+			os.Exit(1)
+		}
+		return true
+	}
+	// nothing is parsed
+	return false
 }

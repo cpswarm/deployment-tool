@@ -58,10 +58,10 @@ func init() {
 }
 
 func parseFlags() bool {
-	newKeys := flag.Bool("newkeypair", false, "Generate new Curve keypair")
+	name := flag.String("newkeypair", "", "Generate new Curve keypair with the given name")
 	flag.Parse()
-	if *newKeys {
-		err := zeromq.NewCurveKeypair(zeromq.PrivateKey, zeromq.PublicKey)
+	if *name != "" {
+		err := zeromq.NewCurveKeypair(*name+".key", *name+".pub")
 		if err != nil {
 			fmt.Println("Error creating keypair:", err)
 			os.Exit(1)

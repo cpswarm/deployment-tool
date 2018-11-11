@@ -15,7 +15,7 @@ const (
 	// key files
 	PrivateKey     = "manager.key"
 	PublicKey      = "manager.pub"
-	AuthorizedKeys = "authorized.pubs"
+	AuthorizedKeys = "authorized_keys"
 )
 
 func NewCurveKeypair(privateFile, publicFile string) error {
@@ -24,17 +24,29 @@ func NewCurveKeypair(privateFile, publicFile string) error {
 		return fmt.Errorf("error creating keypair: %s", err)
 	}
 
-	err = ioutil.WriteFile(privateFile, []byte(private), 0400)
+	// open both files
+	f, err := os.OpenFile(privateFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0400)
 	if err != nil {
-		return fmt.Errorf("error writing private key: %s", err)
+		return err
 	}
-	fmt.Println("Saved private key to", privateFile)
+	defer f.Close()
+	f2, err := os.OpenFile(publicFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0444)
+	if err != nil {
+		return err
+	}
+	defer f2.Close()
 
-	err = ioutil.WriteFile(publicFile, []byte(public), 0444)
-	if err != nil {
-		return fmt.Errorf("error writing public key: %s", err)
+	// write private key
+	if _, err := f.Write([]byte(private)); err != nil {
+		return err
 	}
-	fmt.Println("Saved public key to", publicFile)
+	// write public key
+	if _, err := f2.Write([]byte(public)); err != nil {
+		return err
+	}
+	fmt.Println("Saved key pair:")
+	fmt.Printf("\t%s (private key)\n", privateFile)
+	fmt.Printf("\t%s (public key) -> %s\n", publicFile, public)
 
 	return nil
 }
@@ -85,12 +97,9 @@ func AddClientKey(id, key string) error {
 		log.Println("Error opening client key file", err)
 		return err
 	}
+	defer f.Close()
 	if _, err := f.Write([]byte(fmt.Sprintf("%s %s\n", id, key))); err != nil {
 		log.Println("Error writing to client key file:", err)
-		return err
-	}
-	if err := f.Close(); err != nil {
-		log.Println("Error closing client key file:", err)
 		return err
 	}
 
