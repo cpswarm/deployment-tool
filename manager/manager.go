@@ -107,10 +107,7 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 
 		// send announcement
 		taskA := model.TaskAnnouncement{ID: task.ID, Size: uint64(len(task.Artifacts)), Debug: task.Debug}
-		b, err := json.Marshal(&taskA)
-		if err != nil {
-			log.Fatal(err)
-		}
+		b, _ := json.Marshal(&taskA)
 		for _, tag := range targetTags {
 			m.pipe.RequestCh <- model.Message{model.TargetTag(tag), b}
 		}
@@ -118,9 +115,9 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 		time.Sleep(time.Second)
 
 		// send actual task
-		b, err = json.Marshal(&task)
+		b, err := json.Marshal(&task)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error serializing task: %s", err)
 		}
 		m.pipe.RequestCh <- model.Message{task.ID, b}
 
@@ -137,7 +134,7 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 	log.Println("Task received by all targets.")
 }
 
-func (m *manager) requestLogs(targetID, stage string) error {
+func (m *manager) requestLogs(targetID string) error {
 	// TODO send request for missing logs only
 	b, _ := json.Marshal(&model.LogRequest{model.UnixTimeType(time.Now().Unix())})
 	m.pipe.RequestCh <- model.Message{

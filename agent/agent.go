@@ -48,13 +48,13 @@ func startAgent() *agent {
 	}
 	a.loadConf()
 
-	a.logger = NewLogger(a.target.ID, a.target.Debug, a.pipe.ResponseCh)
+	a.logger = NewLogger(a.target.ID, a.target.TaskDebug, a.pipe.ResponseCh)
 	a.runner = newRunner(a.logger.Writer())
 	a.installer = newInstaller(a.logger.Writer())
 
 	// autostart
 	if len(a.target.TaskRun) > 0 {
-		go a.runner.run(a.target.TaskRun, a.target.TaskID, a.target.Debug)
+		go a.runner.run(a.target.TaskRun, a.target.TaskID, a.target.TaskDebug)
 	}
 
 	go a.startWorker()
@@ -228,6 +228,8 @@ func (a *agent) handleTask(id string, payload []byte) {
 		a.runner.stop()            // stop runner for old task
 		a.installer.clean(task.ID) // remove old task files
 		a.target.TaskRun = task.Run
+		a.target.TaskID = task.ID
+		a.target.TaskDebug = task.Debug
 		a.saveState()
 
 		go a.runner.run(task.Run, task.ID, task.Debug)
@@ -263,11 +265,9 @@ func (a *agent) sendTransferResponse(taskID, message string, error, debug bool) 
 
 func (a *agent) sendAdvertisement() {
 	t := model.Target{
-		ID:        a.target.ID,
-		Tags:      a.target.Tags,
-		TaskID:    a.target.TaskID,
-		TaskStage: a.target.TaskStage,
-		//TaskStatus: a.target.TaskStatus,
+		ID:     a.target.ID,
+		Tags:   a.target.Tags,
+		TaskID: a.target.TaskID,
 	}
 	b, _ := json.Marshal(t)
 	a.pipe.ResponseCh <- model.Message{string(model.ResponseAdvertisement), b}

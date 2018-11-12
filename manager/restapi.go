@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -35,14 +34,14 @@ func startRESTAPI(bindAddr string, manager *manager) {
 func (a *restAPI) setupRouter() {
 	r := mux.NewRouter()
 	// targets
-	r.HandleFunc("/targets/{id}/logs/{stage}", a.GetTargetLogs).Methods("PUT")
+	r.HandleFunc("/targets/{id}/logs", a.GetTargetLogs).Methods("PUT")
 	r.HandleFunc("/targets/{id}", a.GetTarget).Methods("GET")
 	r.HandleFunc("/targets", a.GetTargets).Methods("GET")
 	// tasks
 	r.HandleFunc("/tasks", a.ListTasks).Methods("GET")
 	r.HandleFunc("/tasks", a.AddTask).Methods("POST")
 	// static
-	ui := http.Dir(os.Getenv("WORKDIR") + "/ui")
+	ui := http.Dir(WorkDir + "/ui")
 	r.PathPrefix("/ui").Handler(http.StripPrefix("/ui", http.FileServer(ui)))
 	r.PathPrefix("/ws").HandlerFunc(a.websocket)
 
@@ -156,22 +155,21 @@ func (a *restAPI) GetTarget(w http.ResponseWriter, r *http.Request) {
 func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	stage := vars["stage"]
 
 	a.manager.RLock()
 	defer a.manager.RUnlock()
 
 	if _, found := a.manager.Targets[id]; !found {
-		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		HTTPResponseError(w, http.StatusNotFound, id, " is not found!")
 		return
 	}
 
-	err := a.manager.requestLogs(id, stage)
+	err := a.manager.requestLogs(id)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	HTTPResponseSuccess(w, http.StatusOK, "Requested logs for stage: ", stage)
+	HTTPResponseSuccess(w, http.StatusOK, "Requested logs for ", id)
 	return
 }
 

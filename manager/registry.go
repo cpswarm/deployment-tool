@@ -13,7 +13,7 @@ const (
 
 type registry struct {
 	taskDescriptions []TaskDescription
-	Targets map[string]*Target
+	Targets          map[string]*Target
 }
 
 //
@@ -109,7 +109,7 @@ type StageLog struct {
 
 type Log struct {
 	Output string
-	Error  bool
+	Error  bool `json:",omitempty"'`
 	Time   model.UnixTimeType
 }
 

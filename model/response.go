@@ -42,15 +42,13 @@ type Log struct {
 
 type Target struct {
 	// identification attributes
-	ID        string // TODO change this to alias and always generate UUID ? alias==tag ? //
-	AutoGenID string
-	Tags      []string
+	ID        string   // TODO change this to alias and always generate UUID ? alias==tag ? //
+	AutoGenID string   `json:",omitempty"'`
+	Tags      []string `json:",omitempty"'`
 
 	// active task
-	TaskID    string
-	TaskStage string
-	//TaskStatus  string
-	Debug       bool
+	TaskID      string   `json:",omitempty"'`
+	TaskDebug   bool     `json:",omitempty"'`
 	TaskRun     []string `json:",omitempty"'`
 	TaskHistory []string `json:",omitempty"'`
 }

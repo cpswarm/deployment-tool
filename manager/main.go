@@ -37,23 +37,29 @@ func main() {
 	<-sig
 }
 
+var (
+	EnvDebug bool
+	WorkDir  string
+)
+
 func init() {
 	loggingFlags := log.LstdFlags
-	if os.Getenv("DEBUG") != "" {
-		loggingFlags = log.LstdFlags | log.Lshortfile
+	if os.Getenv("DEBUG") == "1" || os.Getenv("DEBUG") == "true" {
+		EnvDebug = true
+	}
+	if os.Getenv("VERBOSE") == "1" || os.Getenv("VERBOSE") == "true" {
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
 	log.SetFlags(loggingFlags)
 	log.SetOutput(os.Stdout)
 
-	if os.Getenv("WORKDIR") == "" {
+	WorkDir = os.Getenv("WORKDIR")
+	if WorkDir == "" {
 		dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = os.Setenv("WORKDIR", dir)
-		if err != nil {
-			log.Fatal(err)
-		}
+		WorkDir = dir
 	}
 }
 

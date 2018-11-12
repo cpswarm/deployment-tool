@@ -83,7 +83,7 @@ func (c *zmqClient) startListener() {
 	for {
 		msg, err := c.subscriber.Recv(0)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error receiving event: %s", err)
 		}
 		// split the prefix
 		parts := strings.SplitN(msg, model.TopicSeperator, 2)

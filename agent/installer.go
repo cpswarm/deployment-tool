@@ -86,7 +86,7 @@ func (i *installer) sendLog(task, command, output string, error bool, time model
 
 // clean removed old task directory
 func (i *installer) clean(taskID string) {
-	log.Println("installer: Removing old task files...", taskID)
+	log.Println("installer: Removing files for task:", taskID)
 	wd, _ := os.Getwd()
 	wd = fmt.Sprintf("%s/tasks", wd)
 
