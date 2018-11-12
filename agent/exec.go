@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -11,7 +10,6 @@ import (
 	"syscall"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
-	"github.com/mholt/archiver"
 )
 
 type executor struct {
@@ -36,14 +34,6 @@ func newExecutor(task, stage string, out chan<- model.Log, debug bool) *executor
 	}
 }
 
-func (e *executor) storeArtifacts(b []byte) {
-	log.Printf("Deploying %d bytes of artifacts.", len(b))
-	err := archiver.TarGz.Read(bytes.NewBuffer(b), e.workDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
 // execute executes a command
 func (e *executor) execute(command string) bool {
 	e.sendLog(command, model.ExecStart, false, model.UnixTime())
@@ -57,7 +47,7 @@ func (e *executor) execute(command string) bool {
 
 	outStream, err := e.cmd.StdoutPipe()
 	if err != nil {
-		log.Println("Error:", err)
+		log.Println("executor: Error:", err)
 		e.sendLog(command, err.Error(), true, model.UnixTime())
 		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
 		return false
@@ -65,7 +55,7 @@ func (e *executor) execute(command string) bool {
 
 	errStream, err := e.cmd.StderrPipe()
 	if err != nil {
-		log.Println("Error:", err)
+		log.Println("executor: Error:", err)
 		e.sendLog(command, err.Error(), true, model.UnixTime())
 		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
 		return false
@@ -76,12 +66,11 @@ func (e *executor) execute(command string) bool {
 		scanner := bufio.NewScanner(stream)
 
 		for scanner.Scan() {
-			//log.Println(scanner.Text())
 			e.sendLog(command, scanner.Text(), false, model.UnixTime())
 		}
 		if err = scanner.Err(); err != nil {
 			e.sendLog(command, err.Error(), true, model.UnixTime())
-			log.Println("Error:", err)
+			log.Println("executor: Error:", err)
 		}
 		stream.Close()
 	}(outStream)
@@ -91,23 +80,20 @@ func (e *executor) execute(command string) bool {
 		scanner := bufio.NewScanner(stream)
 
 		for scanner.Scan() {
-			//log.Println("stderr:", scanner.Text())
 			e.sendLog(command, scanner.Text(), true, model.UnixTime())
 		}
 		if err = scanner.Err(); err != nil {
 			e.sendLog(command, err.Error(), true, model.UnixTime())
-			log.Println("Error:", err)
+			log.Println("executor: Error:", err)
 		}
 		stream.Close()
 	}(errStream)
-
-	//defer log.Println("closing execute")
 
 	err = e.cmd.Run()
 	if err != nil {
 		e.sendLog(command, err.Error(), true, model.UnixTime())
 		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
-		log.Println("Error:", err)
+		log.Println("executor: Error:", err)
 		return false
 	}
 	e.sendLog(command, model.ExecEnd, false, model.UnixTime())
@@ -127,22 +113,22 @@ func (e *executor) stop() bool {
 
 	err := e.cmd.Process.Signal(syscall.SIGTERM)
 	if err != nil {
-		log.Printf("Error terminating process %d: %s", pid, err)
+		log.Printf("executor: Error terminating process %d: %s", pid, err)
 		return false
 	}
 	err = e.cmd.Process.Release()
 	if err != nil {
-		log.Printf("Error releasing process %d: %s", pid, err)
+		log.Printf("executor: Error releasing process %d: %s", pid, err)
 	} else {
-		log.Println("Terminated process:", pid)
+		log.Println("executor: Terminated process:", pid)
 		return true
 	}
 
 	err = e.cmd.Process.Kill()
 	if err != nil {
-		log.Printf("Error killing process %d: %s", pid, err)
+		log.Printf("executor: Error killing process %d: %s", pid, err)
 		return false
 	}
-	log.Println("Killed process:", pid)
+	log.Println("executor: Killed process:", pid)
 	return true
 }

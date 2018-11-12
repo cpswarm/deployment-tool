@@ -21,9 +21,9 @@ type zmqClient struct {
 }
 
 func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClient, error) {
-	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
-	log.Println("Sub endpoint:", subEndpoint)
-	log.Println("Pub endpoint:", pubEndpoint)
+	log.Printf("zeromq: Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
+	log.Println("zeromq: Sub endpoint:", subEndpoint)
+	log.Println("zeromq: Pub endpoint:", pubEndpoint)
 
 	c := &zmqClient{
 		pipe: pipe,
@@ -69,13 +69,13 @@ func (c *zmqClient) startListener() {
 	for {
 		msg, err := c.subscriber.Recv(0)
 		if err != nil {
-			log.Println("ERROR:", err) // TODO send to manager
+			log.Println("zeromq: Error receiving event:", err)
 			continue
 		}
 		// split the prefix
 		parts := strings.SplitN(msg, model.TopicSeperator, 2)
 		if len(parts) != 2 {
-			log.Fatalln("Unable to parse message") // TODO send to manager
+			log.Println("zeromq: Error parsing event.") // TODO send to manager
 			continue
 		}
 		// send to worker
@@ -85,7 +85,10 @@ func (c *zmqClient) startListener() {
 
 func (c *zmqClient) startResponder() {
 	for resp := range c.pipe.ResponseCh {
-		c.publisher.Send(resp.Topic+":"+string(resp.Payload), 0)
+		_, err := c.publisher.Send(resp.Topic+":"+string(resp.Payload), 0)
+		if err != nil {
+			log.Println("zeromq: Error sending event:", err)
+		}
 	}
 }
 
@@ -96,17 +99,17 @@ func (c *zmqClient) startOperator() {
 			topic := string(op.Payload) + model.TopicSeperator
 			err := c.subscriber.SetSubscribe(topic)
 			if err != nil {
-				log.Println(err)
+				log.Printf("zeromq: Error subscribing: %s", err)
 			}
-			log.Println("Subscribed to", topic)
+			log.Println("zeromq: Subscribed to", topic)
 		}
 		if op.Topic == model.OperationUnsubscribe {
 			topic := string(op.Payload) + model.TopicSeperator
 			err := c.subscriber.SetUnsubscribe(topic)
 			if err != nil {
-				log.Println(err)
+				log.Printf("zeromq: Error unsubscribing: %s", err)
 			}
-			log.Println("Unsubscribed from", topic)
+			log.Println("zeromq: Unsubscribed from", topic)
 		}
 	}
 }
@@ -116,31 +119,30 @@ func (c *zmqClient) monitor() {
 	pubMonitorAddr := "inproc://pub-monitor.rep"
 	err := c.publisher.Monitor(pubMonitorAddr, zmq.EVENT_CONNECTED|zmq.EVENT_DISCONNECTED)
 	if err != nil {
-		log.Println(err)
+		log.Printf("zeromq: Error starting monitor: %s", err)
 		return
 	}
 
 	c.pubMonitor, err = zmq.NewSocket(zmq.PAIR)
 	if err != nil {
-		log.Println(err)
+		log.Printf("zeromq: Error creating monitor socket: %s", err)
 		return
 	}
 
 	err = c.pubMonitor.Connect(pubMonitorAddr)
 	if err != nil {
-		log.Println(err)
+		log.Printf("zeromq: Error connecting minitor socket: %s", err)
 		return
 	}
 
-	//defer close(chMsg)
 	go func() {
 		for {
 			eventType, eventAddr, _, err := c.pubMonitor.RecvEvent(0)
 			if err != nil {
-				fmt.Printf("s.RecvEvent: %s", err) // TODO send this to manager
+				fmt.Printf("zeromq: Error receiving monitor event: %s", err)
 				continue
 			}
-			log.Printf("Event %s %s", eventType, eventAddr)
+			log.Printf("zeromq: Event %s %s", eventType, eventAddr)
 			switch eventType {
 			case zmq.EVENT_CONNECTED:
 				// send to worker
@@ -156,25 +158,25 @@ func (c *zmqClient) monitor() {
 }
 
 func (c *zmqClient) close() {
-	log.Println("Closing ZeroMQ sockets...")
+	log.Println("zeromq: Shutting down...")
 
 	// close subscriber
 	err := c.subscriber.Close()
 	if err != nil {
-		log.Println(err)
+		log.Printf("zeromq: Error closing sub socket: %s", err)
 	}
 
 	// close publisher monitor
 	c.pubMonitor.SetLinger(0)
 	err = c.pubMonitor.Close()
 	if err != nil {
-		log.Println(err)
+		log.Printf("zeromq: Error closing monitor socket: %s", err)
 	}
 
 	// close publisher
 	err = c.publisher.Close()
 	if err != nil {
-		log.Println(err)
+		log.Printf("zeromq: Error closing pub socket: %s", err)
 	}
 
 }

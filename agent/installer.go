@@ -33,10 +33,10 @@ func (i *installer) store(artifacts []byte, taskID string) {
 	wd, _ := os.Getwd()
 	wd = fmt.Sprintf("%s/tasks", wd)
 	taskDir := fmt.Sprintf("%s/%s", wd, taskID)
-	log.Println("Task work directory:", taskDir)
+	log.Println("installer: Task work directory:", taskDir)
 
 	// decompress and store
-	log.Printf("Deploying %d bytes of artifacts.", len(artifacts))
+	log.Printf("installer: Deploying %d bytes of artifacts.", len(artifacts))
 	err := archiver.TarGz.Read(bytes.NewBuffer(artifacts), taskDir)
 	if err != nil {
 		log.Fatal(err) // TODO send client error
@@ -47,11 +47,11 @@ func (i *installer) store(artifacts []byte, taskID string) {
 func (i *installer) install(commands []string, taskID string, debug bool) bool {
 	// nothing to execute
 	if len(commands) == 0 {
-		log.Printf("install() Nothing to execute.")
+		log.Printf("installer: Nothing to execute.")
 		return true
 	}
 
-	log.Printf("install() Installing task: %s", taskID)
+	log.Printf("installer: Installing task: %s", taskID)
 	i.sendLog(taskID, "", model.StageStart, false, model.UnixTime(), debug)
 	defer i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug)
 
@@ -60,12 +60,12 @@ func (i *installer) install(commands []string, taskID string, debug bool) bool {
 	for _, command := range commands {
 		success := i.executor.execute(command)
 		if !success {
-			log.Printf("install() Ended due to error.")
+			log.Printf("installer: Ended due to error.")
 			return false
 		}
 	}
 
-	log.Printf("install() Ended.")
+	log.Printf("installer: Install ended.")
 	return true
 }
 
@@ -75,7 +75,7 @@ func (i *installer) sendLog(task, command, output string, error bool, time model
 
 // clean removed old task directory
 func (i *installer) clean(taskID string) {
-	log.Println("clean()", taskID)
+	log.Println("installer: Removing old task files...", taskID)
 	wd, _ := os.Getwd()
 	wd = fmt.Sprintf("%s/tasks", wd)
 
@@ -86,24 +86,24 @@ func (i *installer) clean(taskID string) {
 	}
 	files, err := ioutil.ReadDir(wd)
 	if err != nil {
-		log.Printf("Error reading work dir: %s", err)
+		log.Printf("installer: Error reading work dir: %s", err)
 		return
 	}
 	for i := 0; i < len(files); i++ {
 		if files[i].Name() != taskID {
 			log.Println(files[i].Name(), taskID)
 			filename := fmt.Sprintf("%s/%s", wd, files[i].Name())
-			log.Printf("Removing: %s", filename)
+			log.Printf("installer: Removing: %s", filename)
 			err = os.RemoveAll(filename)
 			if err != nil {
-				log.Printf("Error removing: %s", err)
+				log.Printf("installer: Error removing: %s", err)
 			}
 		}
 	}
 }
 
 func (r *installer) stop() bool {
-	log.Println("Shutting down the installer...")
+	log.Println("installer: Shutting down...")
 	success := r.executor.stop()
 	return success
 }

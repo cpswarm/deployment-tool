@@ -29,7 +29,7 @@ func (r *runner) run(commands []string, taskID string, debug bool) {
 		return
 	}
 
-	log.Printf("run() Running task: %s", taskID)
+	log.Printf("runner: Running task: %s", taskID)
 	r.sendLog(taskID, "", model.StageStart, false, model.UnixTime(), debug)
 	defer r.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug)
 
@@ -44,7 +44,7 @@ func (r *runner) run(commands []string, taskID string, debug bool) {
 	}
 	r.wg.Wait()
 
-	log.Println("run() All processes are ended.")
+	log.Println("runner: All processes are ended.")
 }
 
 func (r *runner) sendLog(task, command, output string, error bool, time model.UnixTimeType, debug bool) {
@@ -55,13 +55,13 @@ func (r *runner) stop() bool {
 	if len(r.executors) == 0 {
 		return true
 	}
-	log.Println("stop() Shutting down the runner...")
+	log.Println("runner: Shutting down the runner...")
 	var success bool
 	for i := 0; i < len(r.executors); i++ {
 		success = r.executors[i].stop()
 	}
 
 	//<-r.shutdown // wait for all logs
-	log.Println("stop() Success:", success)
+	log.Println("runner: Success:", success)
 	return success
 }

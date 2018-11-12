@@ -56,6 +56,8 @@ func endpoints() (string, string) {
 	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, pub)
 }
 
+var EnvDebug = false
+
 func init() {
 	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
@@ -68,7 +70,10 @@ func init() {
 		log.Println("Loaded environment file:", EnvFile)
 	}
 
-	if os.Getenv("DEBUG") != "" {
+	if os.Getenv("DEBUG") == "1" || os.Getenv("DEBUG") == "true" {
+		EnvDebug = true
+	}
+	if os.Getenv("VERBOSE") == "1" || os.Getenv("VERBOSE") == "true" {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
 }

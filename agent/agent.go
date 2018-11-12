@@ -83,7 +83,7 @@ func (a *agent) loadState() error {
 func (a *agent) loadConf() {
 	err := a.loadState()
 	if err != nil {
-		log.Printf("Unable to load state file: %s. Starting fresh.", StateFile)
+		log.Printf("Error loading state file: %s. Starting fresh.", StateFile)
 	}
 
 	// LOAD AND REPLACE WITH ENV VARIABLES
@@ -134,7 +134,7 @@ func (a *agent) startWorker() {
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetAll)}
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetID + model.PrefixSeparator + a.target.ID)}
 
-	log.Println("Listenning to requests...")
+	log.Println("Listening to requests...")
 	var latestMessageChecksum [16]byte
 	for request := range a.pipe.RequestCh {
 		switch {
@@ -180,11 +180,11 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	var taskA model.TaskAnnouncement
 	err := json.Unmarshal(payload, &taskA)
 	if err != nil {
-		log.Fatalln(err) // TODO send to manager
+		log.Printf("Error parsing announcement: %s", err) // TODO send to manager
 	}
 	payload = nil // to release memory
 
-	log.Printf("handleAnnouncement: %s", taskA.ID)
+	log.Printf("Received announcement: %s", taskA.ID)
 	a.sendTransferResponse(taskA.ID, model.StageStart, false, taskA.Debug)
 
 	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
@@ -206,12 +206,12 @@ func (a *agent) handleAnnouncement(payload []byte) {
 
 // TODO make this sequenctial
 func (a *agent) handleTask(id string, payload []byte) {
-	log.Printf("handleTask: %s", id)
+	log.Printf("Received task: %s", id)
 
 	var task model.Task
 	err := json.Unmarshal(payload, &task)
 	if err != nil {
-		log.Fatalln(err) // TODO send to manager
+		log.Printf("Error parsing task: %s", err) // TODO send to manager
 	}
 	payload = nil // to release memory
 	//runtime.GC() ?
@@ -238,7 +238,7 @@ func (a *agent) sendLogs(payload []byte) {
 	var request model.LogRequest
 	err := json.Unmarshal(payload, &request)
 	if err != nil {
-		log.Fatalln(err) // TODO send to manager
+		log.Println("Error parsing log request: %s", err) // TODO send to manager
 	}
 
 	a.logger.Report(request)
@@ -248,14 +248,10 @@ func (a *agent) saveState() {
 	a.Lock()
 	defer a.Unlock()
 
-	b, err := json.MarshalIndent(&a.target, "", "\t")
+	b, _ := json.MarshalIndent(&a.target, "", "\t")
+	err := ioutil.WriteFile(StateFile, b, 0600)
 	if err != nil {
-		log.Println(err)
-		return
-	}
-	err = ioutil.WriteFile(StateFile, b, 0600)
-	if err != nil {
-		log.Println("ERROR:", err)
+		log.Printf("Error saving state: %s", err)
 		return
 	}
 	log.Println("Saved state:", StateFile)

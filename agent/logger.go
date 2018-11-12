@@ -73,6 +73,13 @@ func (l *logger) startTicker() {
 
 		select {
 		case logM := <-l.queue:
+			if EnvDebug {
+				if logM.Error {
+					log.Println("logger: Err:", logM.Output)
+				} else {
+					log.Println("logger: Log:", logM.Output)
+				}
+			}
 			// keep everything in memory (FIFO)
 			l.buffer.Insert(logM)
 			// buffer everything when in debug mode, otherwise just state info
@@ -84,7 +91,6 @@ func (l *logger) startTicker() {
 		case <-l.ticker.C:
 			// send out and flush
 			if len(tickBuffer) > 0 {
-				log.Printf("Sending %d log entries.", len(tickBuffer))
 				l.send(tickBuffer)
 				tickBuffer = nil
 			}
@@ -94,18 +100,17 @@ func (l *logger) startTicker() {
 				l.send(tickBuffer)
 				tickBuffer = nil
 			}
-			log.Println("Quit ticker")
+			log.Println("logger: Quit ticker")
 			return
 		}
 	}
 }
 
 func (l *logger) send(logs []model.Log) {
-
+	log.Printf("logger: Sending %d entries.", len(logs))
 	b, _ := json.Marshal(model.Response{
 		TargetID: l.targetID,
 		Logs:     logs,
 	})
 	l.responseCh <- model.Message{string(model.ResponseLog), b}
-	//log.Printf("Sent logs for: %s", string(b))
 }
