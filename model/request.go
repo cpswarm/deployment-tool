@@ -6,11 +6,11 @@ const (
 	RequestTargetID  = "ID"
 	RequestTargetTag = "TAG"
 	// Stage types
-	StageAssemble    = "ASSEMBLE"
-	StageTransfer    = "TRANSFER"
-	StageInstall     = "INSTALL"
-	StageTest        = "TEST"
-	StageRun         = "RUN"
+	StageAssemble = "ASSEMBLE"
+	StageTransfer = "TRANSFER"
+	StageInstall  = "INSTALL"
+	StageTest     = "TEST"
+	StageRun      = "RUN"
 	// Other consts
 	PrefixSeparator = "-"
 )

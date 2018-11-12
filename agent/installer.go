@@ -44,7 +44,7 @@ func (i *installer) store(artifacts []byte, taskID string) {
 	artifacts = nil // release memory
 }
 
-func (i *installer) install(commands []string, taskID string) bool {
+func (i *installer) install(commands []string, taskID string, debug bool) bool {
 	// nothing to execute
 	if len(commands) == 0 {
 		log.Printf("install() Nothing to execute.")
@@ -52,11 +52,11 @@ func (i *installer) install(commands []string, taskID string) bool {
 	}
 
 	log.Printf("install() Installing task: %s", taskID)
-	i.sendLog(taskID, "", model.StageStart, false, model.UnixTime())
-	defer i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime())
+	i.sendLog(taskID, "", model.StageStart, false, model.UnixTime(), debug)
+	defer i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug)
 
 	// execute sequentially, return if one fails
-	i.executor = newExecutor(taskID, model.StageInstall, i.logger)
+	i.executor = newExecutor(taskID, model.StageInstall, i.logger, debug)
 	for _, command := range commands {
 		success := i.executor.execute(command)
 		if !success {
@@ -69,8 +69,8 @@ func (i *installer) install(commands []string, taskID string) bool {
 	return true
 }
 
-func (i *installer) sendLog(task, command, output string, error bool, time model.UnixTimeType) {
-	i.logger <- model.Log{task, model.StageInstall, command, output, error, time}
+func (i *installer) sendLog(task, command, output string, error bool, time model.UnixTimeType, debug bool) {
+	i.logger <- model.Log{task, model.StageInstall, command, output, error, time, debug}
 }
 
 // clean removed old task directory

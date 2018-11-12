@@ -20,9 +20,10 @@ type executor struct {
 	stage   string
 	out     chan<- model.Log
 	cmd     *exec.Cmd
+	debug bool
 }
 
-func newExecutor(task, stage string, out chan<- model.Log) *executor {
+func newExecutor(task, stage string, out chan<- model.Log, debug bool) *executor {
 	wd, _ := os.Getwd()
 	wd = fmt.Sprintf("%s/tasks/%s", wd, task)
 
@@ -31,6 +32,7 @@ func newExecutor(task, stage string, out chan<- model.Log) *executor {
 		task:    task,
 		stage:   stage,
 		out:     out,
+		debug : debug,
 	}
 }
 
@@ -114,7 +116,7 @@ func (e *executor) execute(command string) bool {
 }
 
 func (e *executor) sendLog(command, output string, error bool, time model.UnixTimeType) {
-	e.out <- model.Log{e.task, e.stage, command, output, error, time}
+	e.out <- model.Log{e.task, e.stage, command, output, error, time, e.debug}
 }
 
 func (e *executor) stop() bool {

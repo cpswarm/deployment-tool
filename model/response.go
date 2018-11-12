@@ -35,8 +35,9 @@ type Log struct {
 	Stage   string
 	Command string `json:",omitempty"'` // TODO is command unique within a stage?
 	Output  string
-	Error   bool
+	Error   bool         `json:",omitempty"'`
 	Time    UnixTimeType `json:",omitempty"'`
+	Debug   bool         `json:"-"`
 }
 
 type Target struct {

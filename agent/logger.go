@@ -51,12 +51,7 @@ func NewLogger(targetID string, debug bool, responseCh chan<- model.Message) Log
 func (l *logger) Report(request model.LogRequest) {
 	// TODO sned logs after request.IfModifiedSince
 
-	b, _ := json.Marshal(model.Response{
-		TargetID: l.targetID,
-		Logs: l.buffer.Collect(),
-	})
-	l.responseCh <- model.Message{model.ResponseLog, b}
-	log.Printf("Reported logs.")
+	l.send(l.buffer.Collect())
 }
 
 func (l *logger) Writer() chan<- model.Log {
@@ -73,25 +68,31 @@ func (l *logger) Stop() {
 
 func (l *logger) startTicker() {
 	l.ticker = time.NewTicker(LogInterval)
-	var outBuffer []model.Log
+	var tickBuffer []model.Log
 	for {
 
 		select {
 		case logM := <-l.queue:
-			log.Println("startTickert() add to q", logM)
-			outBuffer = append(outBuffer, logM)
+			// keep everything in memory (FIFO)
+			l.buffer.Insert(logM)
+			// buffer everything when in debug mode, otherwise just state info
+			if logM.Debug ||
+				logM.Output == model.StageStart || logM.Output == model.StageEnd ||
+				logM.Output == model.ExecStart || logM.Output == model.ExecEnd {
+				tickBuffer = append(tickBuffer, logM)
+			}
 		case <-l.ticker.C:
-			//log.Println("startTickert() tick", outBuffer) // TODO
 			// send out and flush
-			if len(outBuffer) > 0 {
-				l.send(outBuffer)
-				outBuffer = nil
+			if len(tickBuffer) > 0 {
+				log.Printf("Sending %d log entries.", len(tickBuffer))
+				l.send(tickBuffer)
+				tickBuffer = nil
 			}
 		case <-l.tickerQuit:
 			// send out and flush
-			if len(outBuffer) > 0 {
-				l.send(outBuffer)
-				outBuffer = nil
+			if len(tickBuffer) > 0 {
+				l.send(tickBuffer)
+				tickBuffer = nil
 			}
 			log.Println("Quit ticker")
 			return
@@ -103,8 +104,8 @@ func (l *logger) send(logs []model.Log) {
 
 	b, _ := json.Marshal(model.Response{
 		TargetID: l.targetID,
-		Logs: logs,
+		Logs:     logs,
 	})
 	l.responseCh <- model.Message{string(model.ResponseLog), b}
-	log.Printf("Sent logs for: %s", string(b))
+	//log.Printf("Sent logs for: %s", string(b))
 }

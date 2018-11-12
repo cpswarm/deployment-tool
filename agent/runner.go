@@ -21,7 +21,7 @@ func newRunner(logger chan<- model.Log) runner {
 	}
 }
 
-func (r *runner) run(commands []string, taskID string) {
+func (r *runner) run(commands []string, taskID string, debug bool) {
 	r.executors = make([]*executor, len(commands))
 
 	// nothing to run
@@ -30,12 +30,12 @@ func (r *runner) run(commands []string, taskID string) {
 	}
 
 	log.Printf("run() Running task: %s", taskID)
-	r.sendLog(taskID, "", model.StageStart, false, model.UnixTime())
-	defer r.sendLog(taskID, "", model.StageEnd, false, model.UnixTime())
+	r.sendLog(taskID, "", model.StageStart, false, model.UnixTime(), debug)
+	defer r.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug)
 
 	// run in parallel and wait for them to finish
 	for i, command := range commands {
-		r.executors[i] = newExecutor(taskID, model.StageRun, r.logger)
+		r.executors[i] = newExecutor(taskID, model.StageRun, r.logger, debug)
 		r.wg.Add(1)
 		go func(c string, e *executor) {
 			defer r.wg.Done()
@@ -47,8 +47,8 @@ func (r *runner) run(commands []string, taskID string) {
 	log.Println("run() All processes are ended.")
 }
 
-func (r *runner) sendLog(task, command, output string, error bool, time model.UnixTimeType) {
-	r.logger <- model.Log{task, model.StageRun, command, output, error, time}
+func (r *runner) sendLog(task, command, output string, error bool, time model.UnixTimeType, debug bool) {
+	r.logger <- model.Log{task, model.StageRun, command, output, error, time, debug}
 }
 
 func (r *runner) stop() bool {

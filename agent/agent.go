@@ -32,6 +32,10 @@ type agent struct {
 	runner       runner
 }
 
+// TODO
+// 	make two objects to hold active and pending tasks along with their resources
+// 	active task should be persisted for recovery
+
 type logCollector interface {
 	sendResponse(*model.Response)
 }
@@ -50,7 +54,7 @@ func startAgent() *agent {
 
 	// autostart
 	if len(a.target.TaskRun) > 0 {
-		go a.runner.run(a.target.TaskRun, a.target.TaskID)
+		go a.runner.run(a.target.TaskRun, a.target.TaskID, a.target.Debug)
 	}
 
 	go a.startWorker()
@@ -118,6 +122,7 @@ func (a *agent) loadConf() {
 		a.saveState()
 	}
 }
+
 func (a *agent) startWorker() {
 	log.Printf("Subscribing to topics...")
 	topicMap := make(map[string]bool)
@@ -180,7 +185,7 @@ func (a *agent) handleAnnouncement(payload []byte) {
 	payload = nil // to release memory
 
 	log.Printf("handleAnnouncement: %s", taskA.ID)
-	a.sendTransferResponse(taskA.ID, model.StageStart, false)
+	a.sendTransferResponse(taskA.ID, model.StageStart, false, taskA.Debug)
 
 	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
 		if a.target.TaskHistory[i] == taskA.ID {
@@ -192,10 +197,10 @@ func (a *agent) handleAnnouncement(payload []byte) {
 
 	if a.installer.evaluate(taskA) {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.sendTransferResponse(taskA.ID, "subscribed to task", false)
+		a.sendTransferResponse(taskA.ID, "subscribed to task", false, taskA.Debug)
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
-		a.sendTransferResponse(taskA.ID, "not enough memory", true)
+		a.sendTransferResponse(taskA.ID, "not enough memory", true, taskA.Debug)
 	}
 }
 
@@ -211,23 +216,21 @@ func (a *agent) handleTask(id string, payload []byte) {
 	payload = nil // to release memory
 	//runtime.GC() ?
 
-	a.target.Debug = task.Debug
-
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendTransferResponse(task.ID, "received task", false)
+	a.sendTransferResponse(task.ID, "received task", false, task.Debug)
 	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
 	a.installer.store(task.Artifacts, task.ID)
-	a.sendTransferResponse(task.ID, model.StageEnd, false)
+	a.sendTransferResponse(task.ID, model.StageEnd, false, task.Debug)
 
-	success := a.installer.install(task.Install, task.ID)
+	success := a.installer.install(task.Install, task.ID, task.Debug)
 	if success {
 		a.runner.stop()            // stop runner for old task
 		a.installer.clean(task.ID) // remove old task files
 		a.target.TaskRun = task.Run
 		a.saveState()
 
-		go a.runner.run(task.Run, task.ID)
+		go a.runner.run(task.Run, task.ID, task.Debug)
 	}
 }
 
@@ -258,8 +261,8 @@ func (a *agent) saveState() {
 	log.Println("Saved state:", StateFile)
 }
 
-func (a *agent) sendTransferResponse(taskID, message string, error bool) {
-	a.logger.Writer() <- model.Log{taskID, model.StageTransfer, "", message, error, model.UnixTime()}
+func (a *agent) sendTransferResponse(taskID, message string, error, debug bool) {
+	a.logger.Writer() <- model.Log{taskID, model.StageTransfer, "", message, error, model.UnixTime(), debug}
 }
 
 func (a *agent) sendAdvertisement() {
