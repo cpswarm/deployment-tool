@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
@@ -24,6 +25,13 @@ type TaskDescription struct {
 	Debug  bool
 
 	DeploymentInfo DeploymentInfo
+}
+
+func (d TaskDescription) validate() error {
+	if len(d.Stages.Assemble) + len(d.Stages.Transfer) + len(d.Stages.Install) + len(d.Stages.Test) + len(d.Stages.Run) == 0 {
+		return fmt.Errorf("empty stages")
+	}
+	return nil
 }
 
 type Stages struct {

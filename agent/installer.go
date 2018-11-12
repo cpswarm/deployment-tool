@@ -35,11 +35,22 @@ func (i *installer) store(artifacts []byte, taskID string) {
 	taskDir := fmt.Sprintf("%s/%s", wd, taskID)
 	log.Println("installer: Task work directory:", taskDir)
 
+	err := os.Mkdir(taskDir, 0755)
+	if err != nil {
+		log.Printf("installer: Error creating task directory: %s", err)
+	}
+
+	// nothing to store
+	if len(artifacts) == 0 {
+		log.Printf("installer: Nothing to store.")
+		return
+	}
+
 	// decompress and store
 	log.Printf("installer: Deploying %d bytes of artifacts.", len(artifacts))
-	err := archiver.TarGz.Read(bytes.NewBuffer(artifacts), taskDir)
+	err = archiver.TarGz.Read(bytes.NewBuffer(artifacts), taskDir)
 	if err != nil {
-		log.Fatal(err) // TODO send client error
+		log.Printf("installer: Error reading archive: %s", err) // TODO send to manager
 	}
 	artifacts = nil // release memory
 }

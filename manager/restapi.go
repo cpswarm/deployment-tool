@@ -72,6 +72,12 @@ func (a *restAPI) AddTask(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Received task descr:", descr)
 
+	err = descr.validate()
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, "Invalid task description: ", err)
+		return
+	}
+
 	a.manager.RLock()
 	defer a.manager.RUnlock()
 
