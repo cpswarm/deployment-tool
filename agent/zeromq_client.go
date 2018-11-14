@@ -182,32 +182,46 @@ func (c *zmqClient) close() {
 }
 
 const (
-	EnvPrivateKey = "PRIVATE_KEY"
-	EnvPublicKey  = "PUBLIC_KEY"
-	EnvManagerKey = "MANAGER_KEY"
+	EnvPrivateKey         = "PRIVATE_KEY"
+	EnvPublicKey          = "PUBLIC_KEY"
+	EnvManagerKey         = "MANAGER_KEY"
+	DefaultPrivateKeyPath = "./agent.key"
+	DefaultPublicKeyPath  = "./agent.pub"
+	DefaultManagerKeyPath = "./manager.key"
 )
 
 func (c *zmqClient) loadKeys() (string, string, string, error) {
-	if os.Getenv(EnvPrivateKey) == "" || os.Getenv(EnvPublicKey) == "" || os.Getenv(EnvManagerKey) == "" {
-		log.Printf("%s=%s", EnvPrivateKey, os.Getenv(EnvPrivateKey))
-		log.Printf("%s=%s", EnvPublicKey, os.Getenv(EnvPublicKey))
-		log.Printf("%s=%s", EnvManagerKey, os.Getenv(EnvManagerKey))
-		return "", "", "", fmt.Errorf("one or more variables are not set")
+	privateKeyPath := os.Getenv(EnvPrivateKey)
+	publicKeyPath := os.Getenv(EnvPublicKey)
+	managerKeyPath := os.Getenv(EnvManagerKey)
+
+	if privateKeyPath == "" {
+		privateKeyPath = DefaultPrivateKeyPath
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvPrivateKey, DefaultPrivateKeyPath)
+	}
+	if publicKeyPath == "" {
+		publicKeyPath = DefaultPublicKeyPath
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvPublicKey, DefaultPublicKeyPath)
+	}
+	if managerKeyPath == "" {
+		managerKeyPath = DefaultManagerKeyPath
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvManagerKey, DefaultManagerKeyPath)
 	}
 
-	serverPublic, err := ioutil.ReadFile(os.Getenv(EnvManagerKey))
-	if err != nil {
-		return "", "", "", fmt.Errorf("error reading server public key: %s", err)
-	}
-
-	clientSecret, err := ioutil.ReadFile(os.Getenv(EnvPrivateKey))
+	clientSecret, err := ioutil.ReadFile(privateKeyPath)
 	if err != nil {
 		return "", "", "", fmt.Errorf("error reading client private key: %s", err)
 	}
 
-	clientPublic, err := ioutil.ReadFile(os.Getenv(EnvPublicKey))
+	clientPublic, err := ioutil.ReadFile(publicKeyPath)
 	if err != nil {
 		return "", "", "", fmt.Errorf("error reading client public key: %s", err)
+	}
+	log.Println("zeromq: Public key ->", string(clientPublic))
+
+	serverPublic, err := ioutil.ReadFile(managerKeyPath)
+	if err != nil {
+		return "", "", "", fmt.Errorf("error reading server public key: %s", err)
 	}
 
 	return string(serverPublic), string(clientSecret), string(clientPublic), nil

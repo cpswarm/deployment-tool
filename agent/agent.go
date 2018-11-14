@@ -134,7 +134,7 @@ func (a *agent) startWorker() {
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetAll)}
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetID + model.PrefixSeparator + a.target.ID)}
 
-	log.Println("Listening to requests...")
+	log.Println("Waiting for connection and requests...")
 	var latestMessageChecksum [16]byte
 	for request := range a.pipe.RequestCh {
 		switch {

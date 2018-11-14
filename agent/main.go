@@ -12,8 +12,14 @@ import (
 )
 
 const (
-	EnvFile   = ".env"
-	StateFile = "state.json"
+	EnvFile           = ".env"
+	StateFile         = "state.json"
+	EnvManager        = "MANAGER"
+	EnvManagerSub     = "MANAGER_SUB"
+	EnvManagerPub     = "MANAGER_PUB"
+	DefaultManager    = "localhost"
+	DefaultManagerSub = "5556"
+	DefaultManagerPub = "5557"
 )
 
 func main() {
@@ -41,17 +47,20 @@ func main() {
 
 func endpoints() (string, string) {
 	prot := "tcp"
-	addr := os.Getenv("MANAGER")
+	addr := os.Getenv(EnvManager)
 	if addr == "" {
-		addr = "localhost"
+		addr = DefaultManager
+		log.Printf("%s not set. Using default: %s", EnvManager, DefaultManager)
 	}
-	sub := os.Getenv("SUB")
+	sub := os.Getenv(EnvManagerSub)
 	if sub == "" {
-		sub = "5556"
+		sub = DefaultManagerSub
+		log.Printf("%s not set. Using default: %s", EnvManagerSub, DefaultManagerSub)
 	}
-	pub := os.Getenv("PUB")
+	pub := os.Getenv(EnvManagerPub)
 	if pub == "" {
-		pub = "5557"
+		pub = DefaultManagerPub
+		log.Printf("%s not set. Using default: %s", EnvManagerPub, DefaultManagerPub)
 	}
 	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, pub)
 }
