@@ -62,11 +62,11 @@ func startAgent() *agent {
 }
 
 func (a *agent) loadState() error {
-	if _, err := os.Stat(StateFile); os.IsNotExist(err) {
+	if _, err := os.Stat(DefaultStateFile); os.IsNotExist(err) {
 		return err
 	}
 
-	b, err := ioutil.ReadFile(StateFile)
+	b, err := ioutil.ReadFile(DefaultStateFile)
 	if err != nil {
 		return fmt.Errorf("error reading state file: %s", err)
 	}
@@ -76,14 +76,14 @@ func (a *agent) loadState() error {
 		return fmt.Errorf("error parsing state file: %s", err)
 	}
 
-	log.Println("Loaded state file:", StateFile)
+	log.Println("Loaded state file:", DefaultStateFile)
 	return nil
 }
 
 func (a *agent) loadConf() {
 	err := a.loadState()
 	if err != nil {
-		log.Printf("Error loading state file: %s. Starting fresh.", StateFile)
+		log.Printf("Error loading state file: %s. Starting fresh.", DefaultStateFile)
 	}
 
 	// LOAD AND REPLACE WITH ENV VARIABLES
@@ -251,12 +251,12 @@ func (a *agent) saveState() {
 	defer a.Unlock()
 
 	b, _ := json.MarshalIndent(&a.target, "", "\t")
-	err := ioutil.WriteFile(StateFile, b, 0600)
+	err := ioutil.WriteFile(DefaultStateFile, b, 0600)
 	if err != nil {
 		log.Printf("Error saving state: %s", err)
 		return
 	}
-	log.Println("Saved state:", StateFile)
+	log.Println("Saved state:", DefaultStateFile)
 }
 
 func (a *agent) sendTransferResponse(taskID, message string, error, debug bool) {

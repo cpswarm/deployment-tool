@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 WorkingDirectory=/var/local/linksmart-deployment-agent
 ExecStart=/usr/local/bin/linksmart-deployment-agent
+Environment="DISABLE_LOG_TIME=1"
 Restart=on-failure
 
 [Install]

@@ -73,7 +73,7 @@ func (l *logger) startTicker() {
 
 		select {
 		case logM := <-l.queue:
-			if EnvDebug {
+			if envDebug {
 				if logM.Error {
 					log.Println("logger: Err:", logM.Output)
 				} else {

@@ -12,11 +12,15 @@ import (
 )
 
 const (
-	EnvFile           = ".env"
-	StateFile         = "state.json"
 	EnvManager        = "MANAGER"
 	EnvManagerSub     = "MANAGER_SUB"
 	EnvManagerPub     = "MANAGER_PUB"
+	EnvDebug          = "DEBUG"
+	EnvVerbose        = "VERBOSE"
+	EnvDisableLogTime = "DISABLE_LOG_TIME"
+
+	DefaultEnvFile    = "./.env"
+	DefaultStateFile  = "./state.json"
 	DefaultManager    = "localhost"
 	DefaultManagerSub = "5556"
 	DefaultManagerPub = "5557"
@@ -65,38 +69,38 @@ func endpoints() (string, string) {
 	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, pub)
 }
 
-var EnvDebug = false
+var envDebug = false
 
 func init() {
-	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
 
 	// load env file
 	wd, _ := os.Getwd()
 	log.Println("Working directory:", wd)
-	err := godotenv.Load(EnvFile)
+	err := godotenv.Load(DefaultEnvFile)
 	if err == nil {
-		log.Println("Loaded environment file:", EnvFile)
+		log.Println("Loaded environment file:", DefaultEnvFile)
 	}
 
-	if os.Getenv("DEBUG") == "1" || os.Getenv("DEBUG") == "true" {
-		EnvDebug = true
+	logFlags := log.LstdFlags
+	if os.Getenv(EnvDisableLogTime) == "1" || os.Getenv(EnvDisableLogTime) == "true" {
+		logFlags = 0
 	}
-	if os.Getenv("VERBOSE") == "1" || os.Getenv("VERBOSE") == "true" {
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	if os.Getenv(EnvDebug) == "1" || os.Getenv(EnvDebug) == "true" {
+		envDebug = true
 	}
+	if os.Getenv(EnvVerbose) == "1" || os.Getenv(EnvVerbose) == "true" {
+		logFlags = logFlags | log.Lshortfile
+	}
+	log.SetFlags(logFlags)
 }
-
-const (
-	PrivateKey = "agent.key"
-	PublicKey  = "agent.pub"
-)
 
 func parseFlags() bool {
 	newKeys := flag.Bool("newkeypair", false, "Generate new Curve keypair")
 	flag.Parse()
 	if *newKeys {
-		err := zeromq.NewCurveKeypair(PrivateKey, PublicKey)
+		err := zeromq.NewCurveKeypair("agent.key", "agent.pub")
 		if err != nil {
 			fmt.Println("Error creating keypair:", err)
 			os.Exit(1)
