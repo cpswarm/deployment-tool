@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -80,13 +79,7 @@ TARGETS:
 }
 
 func newTaskID() string {
-	// inverse the UUIDv1 chunks to make them alphanumerically sortable
-	split := strings.Split(uuid.NewV1().String(), "-")
-	var reverse []string
-	for i := len(split) - 1; i >= 0; i-- {
-		reverse = append(reverse, split[i])
-	}
-	return strings.Join(reverse, "-")
+	return uuid.NewV4().String()
 }
 
 func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
