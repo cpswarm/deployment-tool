@@ -6,6 +6,9 @@ This repository consists of the following packages:
 * agent: The Deployment Agent responsible for performing tasks and reporting results
 * model: Data models used among other packages
 
+## Documentation
+* [docs/documentation.md](docs/documentation.md)
+
 ## Development Status
 | Feature                          | Functional |
 |----------------------------------|:----------:|
