@@ -1,0 +1,17 @@
+FROM ubuntu:bionic
+
+WORKDIR /home
+
+ADD https://pipelines.linksmart.eu/artifact/CPSW-DTB/shared/build-latest/linux-amd64-binary-distributions/deployment-manager-linux-amd64 .
+RUN chmod +x deployment-manager-linux-amd64
+
+ENV PRIVATE_KEY=/home/keys/manager.key
+ENV AUTHORIZED_KEYS=/home/keys/authorized_keys
+
+VOLUME /home/keys
+EXPOSE 8080
+
+CMD ["./deployment-manager-linux-amd64"]
+
+# Run:
+# docker run -p 8080:8080 -v $(pwd)/keys:/home/keys --name=deployment-manager --restart=unless-stopped -d farshidtz/deployment-manager
