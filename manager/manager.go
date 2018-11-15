@@ -167,7 +167,7 @@ func (m *manager) manageResponses() {
 }
 
 func (m *manager) processTarget(target *model.Target) {
-	log.Printf("processTarget %+v", target)
+	log.Printf("Discovered target: %s %v %s", target.ID, target.Tags, target.TaskID)
 
 	m.Lock()
 	defer m.Unlock()
@@ -179,7 +179,7 @@ func (m *manager) processTarget(target *model.Target) {
 }
 
 func (m *manager) processResponse(response *model.Response) {
-	log.Printf("processResponse %+v", response)
+	log.Printf("Response from target: %v", response)
 
 	m.Lock()
 	defer m.Unlock()
@@ -196,7 +196,7 @@ func (m *manager) processResponse(response *model.Response) {
 		task := m.Targets[response.TargetID].Tasks[l.Task]
 		stageLogs := task.GetStageLog(l.Stage)
 		// update task
-		task.Updated = time.Now().Format(time.RFC3339)
+		task.Updated = time.Now().Unix()
 		stageLogs.InsertLogs(l)
 	}
 

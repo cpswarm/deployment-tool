@@ -28,7 +28,7 @@ type TaskDescription struct {
 }
 
 func (d TaskDescription) validate() error {
-	if len(d.Stages.Assemble) + len(d.Stages.Transfer) + len(d.Stages.Install) + len(d.Stages.Test) + len(d.Stages.Run) == 0 {
+	if len(d.Stages.Assemble)+len(d.Stages.Transfer)+len(d.Stages.Install)+len(d.Stages.Test)+len(d.Stages.Run) == 0 {
 		return fmt.Errorf("empty stages")
 	}
 	return nil
@@ -75,7 +75,7 @@ func (t *Target) initTask(id string) {
 
 type Task struct {
 	Stages  StageLogs
-	Updated string
+	Updated int64
 }
 
 func (t *Task) GetStageLog(stage string) *StageLog {
