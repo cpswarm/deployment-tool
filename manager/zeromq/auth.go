@@ -12,10 +12,6 @@ import (
 
 const (
 	DomainAll = "*" // ZAP Domain for access control (https://rfc.zeromq.org/spec:27/ZAP)
-	// key files
-	PrivateKey     = "manager.key"
-	PublicKey      = "manager.pub"
-	AuthorizedKeys = "authorized_keys"
 )
 
 func NewCurveKeypair(privateFile, publicFile string) error {
@@ -51,8 +47,22 @@ func NewCurveKeypair(privateFile, publicFile string) error {
 	return nil
 }
 
+const (
+	EnvPrivateKey     = "PRIVATE_KEY"
+	EnvAuthorizedKeys = "AUTHORIZED_KEYS"
+
+	DefaultPrivateKeyPath     = "./manager.key"
+	DefaultAuthorizedKeysPath = "./authorized_keys"
+)
+
 func loadServerKey() (string, error) {
-	key, err := ioutil.ReadFile(PrivateKey)
+	privateKeyPath := os.Getenv(EnvPrivateKey)
+	if privateKeyPath == "" {
+		privateKeyPath = DefaultPrivateKeyPath
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvPrivateKey, DefaultPrivateKeyPath)
+	}
+
+	key, err := ioutil.ReadFile(privateKeyPath)
 	if err != nil {
 		return "", fmt.Errorf("error reading server private key: %s", err)
 	}
@@ -61,10 +71,16 @@ func loadServerKey() (string, error) {
 }
 
 func loadClientKeys() error {
-	file, err := ioutil.ReadFile(AuthorizedKeys)
+	authorizedKeysPath := os.Getenv(EnvAuthorizedKeys)
+	if authorizedKeysPath == "" {
+		authorizedKeysPath = DefaultAuthorizedKeysPath
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvAuthorizedKeys, DefaultAuthorizedKeysPath)
+	}
+
+	file, err := ioutil.ReadFile(authorizedKeysPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Printf("Client keys file %s not found.", AuthorizedKeys)
+			log.Printf("Client keys file %s not found.", authorizedKeysPath)
 			return nil
 		}
 		return fmt.Errorf("error reading client public key: %s", err)
@@ -91,8 +107,14 @@ func AddClientKey(id, key string) error {
 	log.Println("Adding client key for:", id)
 	zmq.AuthCurveAdd(DomainAll, key)
 
+	authorizedKeysPath := os.Getenv(EnvAuthorizedKeys)
+	if authorizedKeysPath == "" {
+		authorizedKeysPath = DefaultAuthorizedKeysPath
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvAuthorizedKeys, DefaultAuthorizedKeysPath)
+	}
+
 	// If the file doesn't exist, create it, or append to the file
-	f, err := os.OpenFile(AuthorizedKeys, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0444)
+	f, err := os.OpenFile(authorizedKeysPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0444)
 	if err != nil {
 		log.Println("Error opening client key file", err)
 		return err
