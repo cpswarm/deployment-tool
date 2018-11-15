@@ -13,6 +13,14 @@
         /*border-left: solid 1px gray;*/
         border-bottom: solid 1px gray;
     }
+    .consolas{
+        font-family: Consolas, monaco, monospace;
+        font-size: small;
+    }
+    .logerror{
+        background-color: #ff000024;
+
+    }
     </style>
 
     <script src="lib/axios.min.js"></script>
@@ -26,78 +34,46 @@
 <body>
 
     <table id="app" class="table table-sm borderless">
-        <thead>
-        <tr>
-            <th scope="col">ID</th>
-            <th scope="col">Tags</th>
-            <th scope="col">Task</th>
-            <!--<th scope="col">History</th>-->
-        </tr>
-        </thead>
         <tbody>
-        <tr v-for="(target, id) in targets">
-            <!-- ID -->
-            <th scope="row" v-bind:class="target.Task.Error ? 'table-danger' : 'table-success'">{{ id }}</th>
-            <!-- TAGS -->
-            <td>
-               <table>
-                   <tr v-for="tag in target.Tags"><td>{{ tag }}</td></tr>
-               </table>
-            </td>
-            <!-- TASK -->
-            <td>
-                <table v-if="target.Task.ID">
-                    <tr><td>Task ID</td><td>{{ target.Task.ID }}</td></tr>
-                    <tr><td>Current Stage</td><td>{{ target.Task.CurrentStage }}</td></tr>
-                    <!--<tr><td>Error</td><td>{{ target.Task.Error }}</td></tr>-->
-                    <tr><td>Stages</td><td>
-                        <table>
-                            <tr v-if="target.Task.StageLogs.Transfer.Status"><td>Transfer</td><td>
-                                <table class="w-100">
-                                    <tr><div class="badge badge-light">{{ target.Task.StageLogs.Transfer.Status }}</div></tr>
-                                    <tr><div style="padding: 5px;" v-for="log in target.Task.StageLogs.Transfer.Logs" v-bind:class="log.Error ? 'table-danger' : 'table-success'">{{ log.Output }}</div></tr>
-                                </table>
-                                <div class="badge badge-light">Updated at {{ target.Task.StageLogs.Transfer.Updated }}</div>
-                            </td></tr>
-                            <tr v-if="target.Task.StageLogs.Install.Status"><td>Install</td><td>
-                                <table class="w-100">
-                                    <tr><div class="badge badge-light">{{ target.Task.StageLogs.Install.Status }}</div></tr>
-                                    <tr v-for="(logs, command) in target.Task.StageLogs.Install.LogDict">
-                                        <td>{{ command }}</td>
-                                        <td style="padding: 0;">
-                                            <div style="padding: 5px;" v-for="log in logs" v-bind:class="log.Error ? 'table-danger' : 'table-success'">{{ log.Output }}</div>
-                                        </td>
-                                    </tr>
-                                </table>
-                                <div class="badge badge-light">Updated at {{ target.Task.StageLogs.Install.Updated }}</div>
-                            </td></tr>
-                            <tr v-if="target.Task.StageLogs.Run.Status"><td>Run</td><td>
-                                <table class="w-100">
-                                    <tr><div class="badge badge-light">{{ target.Task.StageLogs.Run.Status }}</div></tr>
-                                    <tr v-for="(logs, command) in target.Task.StageLogs.Run.LogDict">
-                                        <td >{{ command }}</td>
-                                        <td style="padding: 0;">
-                                            <div style="padding: 5px;" v-for="log in logs" v-bind:class="log.Error ? 'table-danger' : 'table-success'">{{ log.Output }}</div>
-                                        </td>
-                                    </tr>
-                                </table>
-                                <div class="badge badge-light">Updated at {{ target.Task.StageLogs.Run.Updated }}</div><br>
-                                <button type="button" v-on:click="fetchLogs(id)" class="btn btn-outline-dark btn-sm">Fetch</button>
-                            </td></tr>
+        <tr v-for="(target, targetID) in targets"><td>
+            <h5>{{targetID}} <span v-for="tag in target.Tags" class="badge badge-secondary">{{tag}}</span>
+                <button type="button" v-on:click="fetchLogs(targetID)" class="btn btn-outline-dark btn-sm float-right">Sync</button></h5>
 
-                        </table>
-                    </td></tr>
-                </table>
-            </td>
-            <!-- HISTORY -->
-            <!--
-            <td>
-                <table>
-                    <tr v-for="(value, key) in target.History"><td>{{ key }}</td><td>{{ value }}</td></tr>
-                </table>
-            </td>
-            -->
-        </tr>
+            <div v-for="task in sortTasks(target.Tasks)" class="accordion" id="accordionExample">
+                <div class="card">
+                    <div style="padding: 0px" class="card-header" v-bind:id="'heading-'+task.id">
+                        <h5 class="mb-0">
+                            <button class="w-100 btn btn-link collapsed" type="button" data-toggle="collapse" v-bind:data-target="'#collapse-'+task.id" aria-expanded="false" v-bind:aria-controls="'collapse-'+task.id">
+                                <span class="float-left">{{ task.id }}</span> <span class="badge badge-light float-right">{{formatTime(task.value.Updated)}}</span>
+                            </button>
+                        </h5>
+                    </div>
+
+                    <div v-bind:id="'collapse-'+task.id" class="collapse" v-bind:aria-labelledby="'heading-'+task.id" data-parent="#accordionExample">
+                        <div class="card-body">
+                            <div v-for="(stage, name) in task.value.Stages">
+                            <template v-if="stage.Logs">
+                                <span class="badge badge-primary">{{name}}</span>
+                                <div style="margin-left: 10px">
+                                    <div class="consolas" v-for="log in stage.Logs.SYS">{{formatTime(log.Time)}} &nbsp; {{log.Output}}</div>
+                                    <div v-for="(logs, type) in stage.Logs">
+                                        <template v-if="type !=='SYS'">
+                                        <span class="badge badge-secondary">{{type}}</span>
+                                        <div v-bind:class="{logerror:log.Error}" class="consolas" v-for="log in logs">
+                                            {{formatTime(log.Time)}} &nbsp; {{log.Output}}
+                                        </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+        </td></tr>
         </tbody>
     </table>
 
@@ -110,46 +86,37 @@
             },
             methods: {
                 fetchLogs: function (id) {
-                    axios.put('http://localhost:8080/targets/'+id+'/logs/RUN')
+                    axios.put('http://localhost:8080/targets/'+id+'/logs')
                         .then(function (response) {
-                            // alert(response.data.message);
-                            // console.log(response.data.message);
+                            console.log(response.data.message);
                         })
                         .catch(function (error) {
                             alert(error);
                         });
+                },
+                formatTime: function (unix) {
+                    return moment.unix(unix).format('YYYY-MM-DD H:mm:ss');
+                },
+                sortTasks: function (dict) {
+                    var sorted = [];
+                    for(var key in dict) {
+                        sorted[sorted.length] = {"id": key, "value": dict[key]};
+                    }
+
+                    function compare(a,b) {
+                        if (a.value.Updated < b.value.Updated)
+                            return -1;
+                        if (a.value.Updated > b.value.Updated)
+                            return 1;
+                        return 0;
+                    }
+
+                    return sorted.sort(compare);
                 }
             }
         })
 
         function view(targets){
-
-            for(var key in targets){
-                if(targets[key].Task.StageLogs.Run.Logs) {
-                    var logs = targets[key].Task.StageLogs.Run.Logs;
-                    var logdict = {};
-                    for (var i = 0; i < logs.length; i++) {
-                        (logdict[logs[i].Command] = logdict[logs[i].Command] || []).push(logs[i]);
-                    }
-                    targets[key].Task.StageLogs.Run.LogDict = logdict;
-                }
-                if(targets[key].Task.StageLogs.Install.Logs) {
-                    var logs = targets[key].Task.StageLogs.Install.Logs;
-                    var logdict = {};
-                    for (var i = 0; i < logs.length; i++) {
-                        (logdict[logs[i].Command] = logdict[logs[i].Command] || []).push(logs[i]);
-                    }
-                    targets[key].Task.StageLogs.Install.LogDict = logdict;
-                }
-
-                var t = targets[key].Task.StageLogs.Transfer.Updated;
-                targets[key].Task.StageLogs.Transfer.Updated = moment(t).format('h:mm:ss');
-                var t = targets[key].Task.StageLogs.Install.Updated;
-                targets[key].Task.StageLogs.Install.Updated = moment(t).format('h:mm:ss');
-                var t = targets[key].Task.StageLogs.Run.Updated;
-                targets[key].Task.StageLogs.Run.Updated = moment(t).format('h:mm:ss');
-            }
-
             app.targets = targets;
         }
 
