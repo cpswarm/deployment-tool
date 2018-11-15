@@ -41,6 +41,7 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 	if err != nil {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
+
 	c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	err = c.subscriber.Connect(subEndpoint)
 	if err != nil {
@@ -181,19 +182,10 @@ func (c *zmqClient) close() {
 
 }
 
-const (
-	EnvPrivateKey         = "PRIVATE_KEY"
-	EnvPublicKey          = "PUBLIC_KEY"
-	EnvManagerKey         = "MANAGER_KEY"
-	DefaultPrivateKeyPath = "./agent.key"
-	DefaultPublicKeyPath  = "./agent.pub"
-	DefaultManagerKeyPath = "./manager.key"
-)
-
 func (c *zmqClient) loadKeys() (string, string, string, error) {
 	privateKeyPath := os.Getenv(EnvPrivateKey)
 	publicKeyPath := os.Getenv(EnvPublicKey)
-	managerKeyPath := os.Getenv(EnvManagerKey)
+	managerKeyPath := os.Getenv(EnvManagerPublicKey)
 
 	if privateKeyPath == "" {
 		privateKeyPath = DefaultPrivateKeyPath
@@ -205,7 +197,7 @@ func (c *zmqClient) loadKeys() (string, string, string, error) {
 	}
 	if managerKeyPath == "" {
 		managerKeyPath = DefaultManagerKeyPath
-		log.Printf("zeromq: %s not set. Using default path: %s", EnvManagerKey, DefaultManagerKeyPath)
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvManagerPublicKey, DefaultManagerKeyPath)
 	}
 
 	clientSecret, err := ioutil.ReadFile(privateKeyPath)

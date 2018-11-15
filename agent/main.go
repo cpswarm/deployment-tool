@@ -12,18 +12,25 @@ import (
 )
 
 const (
-	EnvManager        = "MANAGER"
-	EnvManagerSub     = "MANAGER_SUB"
-	EnvManagerPub     = "MANAGER_PUB"
-	EnvDebug          = "DEBUG"
-	EnvVerbose        = "VERBOSE"
-	EnvDisableLogTime = "DISABLE_LOG_TIME"
-
-	DefaultEnvFile    = "./.env"
-	DefaultStateFile  = "./state.json"
-	DefaultManager    = "localhost"
-	DefaultManagerSub = "5556"
-	DefaultManagerPub = "5557"
+	// Environment keys
+	EnvDebug            = "DEBUG"              // print debug messages
+	EnvVerbose          = "VERBOSE"            // print extra information e.g. line number)
+	EnvDisableLogTime   = "DISABLE_LOG_TIME"   // disable timestamp in logs
+	EnvPrivateKey       = "PRIVATE_KEY"        // path to private key of agent
+	EnvPublicKey        = "PUBLIC_KEY"         // path to public key of agent
+	EnvManagerPublicKey = "MANAGER_PUBLIC_KEY" // path to public key of manager
+	EnvManagerHost      = "MANAGER_HOST"
+	EnvManagerSubPort   = "MANAGER_SUB_PORT"
+	EnvManagerPubPort   = "MANAGER_PUB_PORT"
+	// Default values
+	DefaultEnvFile        = "./.env"       // path to environment variables file
+	DefaultStateFile      = "./state.json" // path to agent state file
+	DefaultPrivateKeyPath = "./agent.key"
+	DefaultPublicKeyPath  = "./agent.pub"
+	DefaultManagerKeyPath = "./manager.pub"
+	DefaultManagerHost    = "localhost"
+	DefaultManagerSubPort = "5556"
+	DefaultManagerPubPort = "5557"
 )
 
 func main() {
@@ -51,20 +58,20 @@ func main() {
 
 func endpoints() (string, string) {
 	prot := "tcp"
-	addr := os.Getenv(EnvManager)
+	addr := os.Getenv(EnvManagerHost)
 	if addr == "" {
-		addr = DefaultManager
-		log.Printf("%s not set. Using default: %s", EnvManager, DefaultManager)
+		addr = DefaultManagerHost
+		log.Printf("%s not set. Using default: %s", EnvManagerHost, DefaultManagerHost)
 	}
-	sub := os.Getenv(EnvManagerSub)
+	sub := os.Getenv(EnvManagerSubPort)
 	if sub == "" {
-		sub = DefaultManagerSub
-		log.Printf("%s not set. Using default: %s", EnvManagerSub, DefaultManagerSub)
+		sub = DefaultManagerSubPort
+		log.Printf("%s not set. Using default: %s", EnvManagerSubPort, DefaultManagerSubPort)
 	}
-	pub := os.Getenv(EnvManagerPub)
+	pub := os.Getenv(EnvManagerPubPort)
 	if pub == "" {
-		pub = DefaultManagerPub
-		log.Printf("%s not set. Using default: %s", EnvManagerPub, DefaultManagerPub)
+		pub = DefaultManagerPubPort
+		log.Printf("%s not set. Using default: %s", EnvManagerPubPort, DefaultManagerPubPort)
 	}
 	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, pub)
 }
