@@ -29,20 +29,27 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 		pipe: pipe,
 	}
 
-	zmq.AuthSetVerbose(true)
+	var err error
 
 	// load keys
-	serverPublic, clientSecret, clientPublic, err := c.loadKeys()
-	if err != nil {
-		return nil, err
+	var serverPublic, clientSecret, clientPublic string
+	if evalEnv(EnvDisableAuth) {
+		log.Println("WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
+	} else {
+		zmq.AuthSetVerbose(true)
+		serverPublic, clientSecret, clientPublic, err = c.loadKeys()
+		if err != nil {
+			return nil, err
+		}
 	}
 	// socket to receive from server
 	c.subscriber, err = zmq.NewSocket(zmq.SUB)
 	if err != nil {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
-
-	c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+	if !evalEnv(EnvDisableAuth) {
+		c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+	}
 	err = c.subscriber.Connect(subEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
@@ -52,7 +59,9 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 	if err != nil {
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
-	c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+	if !evalEnv(EnvDisableAuth) {
+		c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+	}
 	err = c.publisher.Connect(pubEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)

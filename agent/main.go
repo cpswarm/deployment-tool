@@ -16,6 +16,7 @@ const (
 	EnvDebug            = "DEBUG"              // print debug messages
 	EnvVerbose          = "VERBOSE"            // print extra information e.g. line number)
 	EnvDisableLogTime   = "DISABLE_LOG_TIME"   // disable timestamp in logs
+	EnvDisableAuth      = "DISABLE_AUTH"       // disable authentication completely
 	EnvPrivateKey       = "PRIVATE_KEY"        // path to private key of agent
 	EnvPublicKey        = "PUBLIC_KEY"         // path to public key of agent
 	EnvManagerPublicKey = "MANAGER_PUBLIC_KEY" // path to public key of manager
@@ -38,7 +39,7 @@ func main() {
 		return
 	}
 
-	log.Println("started deployment agent")
+	log.Println("Started deployment agent")
 	defer log.Println("bye.")
 
 	agent := startAgent()
@@ -76,10 +77,9 @@ func endpoints() (string, string) {
 	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, pub)
 }
 
-var envDebug = false
-
 func init() {
 	log.SetOutput(os.Stdout)
+	log.SetFlags(0)
 
 	// load env file
 	wd, _ := os.Getwd()
@@ -90,17 +90,18 @@ func init() {
 	}
 
 	logFlags := log.LstdFlags
-	if os.Getenv(EnvDisableLogTime) == "1" || os.Getenv(EnvDisableLogTime) == "true" {
+	if evalEnv(EnvDisableLogTime) {
 		logFlags = 0
 	}
-
-	if os.Getenv(EnvDebug) == "1" || os.Getenv(EnvDebug) == "true" {
-		envDebug = true
-	}
-	if os.Getenv(EnvVerbose) == "1" || os.Getenv(EnvVerbose) == "true" {
+	if evalEnv(EnvVerbose) {
 		logFlags = logFlags | log.Lshortfile
 	}
 	log.SetFlags(logFlags)
+}
+
+// evalEnv returns the boolean value of the env variable with the given key
+func evalEnv(key string) bool {
+	return os.Getenv(key) == "1" || os.Getenv(key) == "true" || os.Getenv(key) == "TRUE"
 }
 
 func parseFlags() bool {

@@ -11,12 +11,19 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 )
 
+const (
+	// Environment keys
+	EnvDebug   = "DEBUG"   // print debug messages
+	EnvVerbose = "VERBOSE" // print extra information e.g. line number)
+	EnvWorkdir = "WORKDIR" // work directory of the manager
+)
+
 func main() {
 	if parseFlags() {
 		return
 	}
 
-	log.Println("started deployment manager")
+	log.Println("Started deployment manager")
 	defer log.Println("bye.")
 
 	zmqServer, err := zeromq.StartServer("tcp://*:5556", "tcp://*:5557")
@@ -38,22 +45,18 @@ func main() {
 }
 
 var (
-	EnvDebug bool
-	WorkDir  string
+	WorkDir string
 )
 
 func init() {
 	loggingFlags := log.LstdFlags
-	if os.Getenv("DEBUG") == "1" || os.Getenv("DEBUG") == "true" {
-		EnvDebug = true
-	}
-	if os.Getenv("VERBOSE") == "1" || os.Getenv("VERBOSE") == "true" {
+	if evalEnv(EnvVerbose) {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
 	log.SetFlags(loggingFlags)
 	log.SetOutput(os.Stdout)
 
-	WorkDir = os.Getenv("WORKDIR")
+	WorkDir = os.Getenv(EnvWorkdir)
 	if WorkDir == "" {
 		dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 		if err != nil {
@@ -61,6 +64,11 @@ func init() {
 		}
 		WorkDir = dir
 	}
+}
+
+// evalEnv returns the boolean value of the env variable with the given key
+func evalEnv(key string) bool {
+	return os.Getenv(key) == "1" || os.Getenv(key) == "true" || os.Getenv(key) == "TRUE"
 }
 
 func parseFlags() bool {

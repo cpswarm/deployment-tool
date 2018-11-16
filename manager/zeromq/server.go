@@ -3,10 +3,15 @@ package zeromq
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"code.linksmart.eu/dt/deployment-tool/model"
 	zmq "github.com/pebbe/zmq4"
+)
+
+const (
+	EnvDisableAuth = "DISABLE_AUTH" // disable authentication completely
 )
 
 type zmqClient struct {
@@ -23,18 +28,24 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 		Pipe: model.NewPipe(),
 	}
 
-	//  Start authentication engine
-	zmq.AuthSetVerbose(true)
-	zmq.AuthStart()
+	var err error
+	var serverSecret string
+	if evalEnv(EnvDisableAuth) {
+		log.Println("WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
+	} else {
+		//  Start authentication engine
+		zmq.AuthSetVerbose(true)
+		zmq.AuthStart()
 
-	// load keys
-	serverSecret, err := loadServerKey()
-	if err != nil {
-		return nil, err
-	}
-	err = loadClientKeys()
-	if err != nil {
-		return nil, err
+		// load keys
+		serverSecret, err = loadServerKey()
+		if err != nil {
+			return nil, err
+		}
+		err = loadClientKeys()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// socket to publish to clients
@@ -42,7 +53,9 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
-	c.publisher.ServerAuthCurve(DomainAll, serverSecret)
+	if !evalEnv(EnvDisableAuth) {
+		c.publisher.ServerAuthCurve(DomainAll, serverSecret)
+	}
 	err = c.publisher.Bind(pubEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error binding to PUB endpoint: %s", err)
@@ -53,7 +66,9 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
-	c.subscriber.ServerAuthCurve(DomainAll, serverSecret)
+	if !evalEnv(EnvDisableAuth) {
+		c.subscriber.ServerAuthCurve(DomainAll, serverSecret)
+	}
 	err = c.subscriber.Bind(subEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
@@ -112,4 +127,9 @@ func (c *zmqClient) Close() error {
 	zmq.AuthStop()
 
 	return nil
+}
+
+// evalEnv returns the boolean value of the env variable with the given key
+func evalEnv(key string) bool {
+	return os.Getenv(key) == "1" || os.Getenv(key) == "true" || os.Getenv(key) == "TRUE"
 }
