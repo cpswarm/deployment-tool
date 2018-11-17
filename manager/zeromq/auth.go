@@ -33,11 +33,11 @@ func NewCurveKeypair(privateFile, publicFile string) error {
 	defer f2.Close()
 
 	// write private key
-	if _, err := f.Write([]byte(private)); err != nil {
+	if _, err := f.Write([]byte(private + "\n")); err != nil {
 		return err
 	}
 	// write public key
-	if _, err := f2.Write([]byte(public)); err != nil {
+	if _, err := f2.Write([]byte(public + "\n")); err != nil {
 		return err
 	}
 	fmt.Println("Saved key pair:")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -225,5 +226,5 @@ func (c *zmqClient) loadKeys() (string, string, string, error) {
 		return "", "", "", fmt.Errorf("error reading server public key: %s", err)
 	}
 
-	return string(serverPublic), string(clientSecret), string(clientPublic), nil
+	return string(bytes.TrimSpace(serverPublic)), string(bytes.TrimSpace(clientSecret)), string(bytes.TrimSpace(clientPublic)), nil
 }
