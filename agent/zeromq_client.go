@@ -13,6 +13,10 @@ import (
 	zmq "github.com/pebbe/zmq4"
 )
 
+const (
+	MaxReconnectInterval = 30 * time.Second
+)
+
 type zmqClient struct {
 	subscriber *zmq.Socket
 	publisher  *zmq.Socket
@@ -51,6 +55,7 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 	if !evalEnv(EnvDisableAuth) {
 		c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	}
+	c.subscriber.SetReconnectIvlMax(MaxReconnectInterval)
 	err = c.subscriber.Connect(subEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
@@ -63,6 +68,7 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 	if !evalEnv(EnvDisableAuth) {
 		c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	}
+	c.publisher.SetReconnectIvlMax(MaxReconnectInterval)
 	err = c.publisher.Connect(pubEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)
@@ -128,7 +134,7 @@ func (c *zmqClient) startOperator() {
 func (c *zmqClient) monitor() {
 
 	pubMonitorAddr := "inproc://pub-monitor.rep"
-	err := c.publisher.Monitor(pubMonitorAddr, zmq.EVENT_CONNECTED|zmq.EVENT_DISCONNECTED)
+	err := c.publisher.Monitor(pubMonitorAddr, zmq.EVENT_CONNECTED|zmq.EVENT_DISCONNECTED|zmq.EVENT_ALL)
 	if err != nil {
 		log.Printf("zeromq: Error starting monitor: %s", err)
 		return
@@ -148,12 +154,21 @@ func (c *zmqClient) monitor() {
 
 	go func() {
 		for {
-			eventType, eventAddr, _, err := c.pubMonitor.RecvEvent(0)
+			eventType, eventAddr, eventValue, err := c.pubMonitor.RecvEvent(0)
 			if err != nil {
 				fmt.Printf("zeromq: Error receiving monitor event: %s", err)
 				continue
 			}
-			log.Printf("zeromq: Event %s %s", eventType, eventAddr)
+			log.Printf("zeromq: Event %s %s %d", eventType, eventAddr, eventValue)
+			go func() {
+				if eventValue == 400 {
+					time.Sleep(1 * time.Second)
+					log.Println("zeromq: Error 400 from server. Client not authenticated?")
+					log.Println("Will exit in 30s...")
+					time.Sleep(MaxReconnectInterval)
+					os.Exit(1)
+				}
+			}()
 			switch eventType {
 			case zmq.EVENT_CONNECTED:
 				// send to worker
@@ -219,7 +234,7 @@ func (c *zmqClient) loadKeys() (string, string, string, error) {
 	if err != nil {
 		return "", "", "", fmt.Errorf("error reading client public key: %s", err)
 	}
-	log.Println("zeromq: Public key ->", string(clientPublic))
+	log.Println("zeromq: Public key ->", string(bytes.TrimSpace(clientPublic)))
 
 	serverPublic, err := ioutil.ReadFile(managerKeyPath)
 	if err != nil {
