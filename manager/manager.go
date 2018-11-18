@@ -73,7 +73,10 @@ TARGETS:
 	descr.DeploymentInfo.TransferSize = len(compressedArchive)
 	m.taskDescriptions = append(m.taskDescriptions, descr)
 
-	go m.sendTask(&task, descr.Target.Tags)
+	log.Println("Matching targets:", len(descr.DeploymentInfo.MatchingTargets))
+	if len(descr.DeploymentInfo.MatchingTargets) > 0 {
+		go m.sendTask(&task, descr.Target.Tags)
+	}
 
 	return &descr, nil
 }
