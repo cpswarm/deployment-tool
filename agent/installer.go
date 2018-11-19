@@ -64,7 +64,7 @@ func (i *installer) install(commands []string, taskID string, debug bool) bool {
 
 	log.Printf("installer: Installing task: %s", taskID)
 	i.sendLog(taskID, "", model.StageStart, false, model.UnixTime(), debug)
-	defer i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug)
+	defer func(){i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug)}()
 
 	// execute sequentially, return if one fails
 	i.executor = newExecutor(taskID, model.StageInstall, i.logger, debug)

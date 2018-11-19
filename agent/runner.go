@@ -31,7 +31,7 @@ func (r *runner) run(commands []string, taskID string, debug bool) {
 
 	log.Printf("runner: Running task: %s", taskID)
 	r.sendLog(taskID, "", model.StageStart, false, model.UnixTime(), debug)
-	defer r.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug)
+	defer func() { r.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug) }()
 
 	// run in parallel and wait for them to finish
 	for i, command := range commands {
