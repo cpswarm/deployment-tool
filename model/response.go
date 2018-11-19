@@ -18,16 +18,17 @@ const (
 )
 
 type Response struct {
-	TargetID string
-	Logs     []Log
+	TargetID  string
+	Logs      []Log
+	OnRequest bool `json:",omitempty"'` // true when logs were requested explicitly
 }
 
-// UnixTimeType is the integer type used for logging timestamps. For the time being, we use uint32 i.e. good for 1970-2106
-type UnixTimeType uint32
+// UnixTimeType is the type used for log timestamps
+type UnixTimeType int64
 
 // UnixTime returns the current unix time
 func UnixTime() UnixTimeType {
-	return UnixTimeType(time.Now().Unix())
+	return UnixTimeType(time.Now().UnixNano())
 }
 
 type Log struct {

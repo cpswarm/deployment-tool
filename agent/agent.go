@@ -240,9 +240,9 @@ func (a *agent) sendLogs(payload []byte) {
 	var request model.LogRequest
 	err := json.Unmarshal(payload, &request)
 	if err != nil {
-		log.Println("Error parsing log request: %s", err) // TODO send to manager
+		log.Printf("Error parsing log request: %s", err) // TODO send to manager
 	}
-
+	log.Println("Received log request since", request.IfModifiedSince)
 	a.logger.Report(request)
 }
 

@@ -95,7 +95,7 @@
                         });
                 },
                 formatTime: function (unix) {
-                    return moment.unix(unix).format('YYYY-MM-DD H:mm:ss');
+                    return moment.unix(unix/1e9).format('YYYY-MM-DD H:mm:ss');
                 },
                 sortTasks: function (dict) {
                     var sorted = [];

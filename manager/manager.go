@@ -131,14 +131,12 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 }
 
 func (m *manager) requestLogs(targetID string) error {
-	// TODO send request for missing logs only
-	b, _ := json.Marshal(&model.LogRequest{model.UnixTimeType(time.Now().Unix())})
+	b, _ := json.Marshal(&model.LogRequest{m.Targets[targetID].LastLogRequest})
 	m.pipe.RequestCh <- model.Message{
 		Topic:   model.TargetTopic(targetID),
 		Payload: b,
 	}
 	return nil
-
 }
 
 func (m *manager) manageResponses() {
@@ -182,14 +180,21 @@ func (m *manager) processTarget(target *model.Target) {
 }
 
 func (m *manager) processResponse(response *model.Response) {
-	log.Printf("Response from target: %v", response)
+	log.Println("Processing response", response)
 
 	m.Lock()
 	defer m.Unlock()
+	start := time.Now()
 
 	if _, found := m.Targets[response.TargetID]; !found {
 		log.Println("Log from unknown target:", response.TargetID)
 		return
+	}
+
+	// response to log request
+	if response.OnRequest {
+		sync := response.Logs[len(response.Logs)-1].Time
+		m.Targets[response.TargetID].LastLogRequest = sync
 	}
 
 	for _, l := range response.Logs {
@@ -199,8 +204,8 @@ func (m *manager) processResponse(response *model.Response) {
 		task := m.Targets[response.TargetID].Tasks[l.Task]
 		stageLogs := task.GetStageLog(l.Stage)
 		// update task
-		task.Updated = time.Now().Unix()
+		task.Updated = model.UnixTime()
 		stageLogs.InsertLogs(l)
 	}
-
+	log.Println("Processing response took", time.Since(start))
 }

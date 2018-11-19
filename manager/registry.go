@@ -57,8 +57,9 @@ type DeploymentInfo struct {
 // TARGET
 //
 type Target struct {
-	Tags  []string
-	Tasks map[string]*Task
+	Tags           []string
+	Tasks          map[string]*Task
+	LastLogRequest model.UnixTimeType
 }
 
 func newTarget() *Target {
@@ -75,7 +76,7 @@ func (t *Target) initTask(id string) {
 
 type Task struct {
 	Stages  StageLogs
-	Updated int64
+	Updated model.UnixTimeType
 }
 
 func (t *Task) GetStageLog(stage string) *StageLog {
@@ -119,6 +120,13 @@ func (s *StageLog) InsertLogs(l model.Log) {
 	}
 	if s.Logs == nil {
 		s.Logs = make(map[string][]Log)
+	}
+	// TODO make this efficient
+	// discard if duplicate
+	for _, log := range s.Logs[l.Command] {
+		if log.Time == l.Time && log.Output == l.Output {
+			return
+		}
 	}
 	s.Logs[l.Command] = append(s.Logs[l.Command], Log{l.Output, l.Error, l.Time})
 }

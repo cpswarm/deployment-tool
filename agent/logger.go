@@ -49,9 +49,15 @@ func NewLogger(targetID string, debug bool, responseCh chan<- model.Message) Log
 }
 
 func (l *logger) Report(request model.LogRequest) {
-	// TODO sned logs after request.IfModifiedSince
-
-	l.send(l.buffer.Collect())
+	logs := l.buffer.Collect()
+	// send logs since request.IfModifiedSince
+	for i := range logs {
+		if logs[i].Time >= request.IfModifiedSince {
+			l.send(logs[i:], true)
+			return
+		}
+	}
+	log.Println("No logs since", request.IfModifiedSince)
 }
 
 func (l *logger) Writer() chan<- model.Log {
@@ -91,13 +97,13 @@ func (l *logger) startTicker() {
 		case <-l.ticker.C:
 			// send out and flush
 			if len(tickBuffer) > 0 {
-				l.send(tickBuffer)
+				l.send(tickBuffer, false)
 				tickBuffer = nil
 			}
 		case <-l.tickerQuit:
 			// send out and flush
 			if len(tickBuffer) > 0 {
-				l.send(tickBuffer)
+				l.send(tickBuffer, false)
 				tickBuffer = nil
 			}
 			log.Println("logger: Quit ticker")
@@ -106,11 +112,12 @@ func (l *logger) startTicker() {
 	}
 }
 
-func (l *logger) send(logs []model.Log) {
+func (l *logger) send(logs []model.Log, onRequest bool) {
 	log.Printf("logger: Sending %d entries.", len(logs))
 	b, _ := json.Marshal(model.Response{
-		TargetID: l.targetID,
-		Logs:     logs,
+		TargetID:  l.targetID,
+		Logs:      logs,
+		OnRequest: onRequest,
 	})
 	l.responseCh <- model.Message{string(model.ResponseLog), b}
 }
