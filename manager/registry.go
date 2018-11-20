@@ -121,28 +121,34 @@ func (s *StageLog) InsertLogs(l model.Log) {
 	if s.Logs == nil {
 		s.Logs = make(map[string][]Log)
 	}
+	// first insertion
+	if len(s.Logs[l.Command]) == 0 {
+		s.Logs[l.Command] = append(s.Logs[l.Command], Log{l.Output, l.Error, l.Time})
+		return
+	}
 
-	// TODO make this efficient
-	// discard if duplicate
-	for _, log := range s.Logs[l.Command] {
+	i := 0
+	for ; i < len(s.Logs[l.Command]); i++ {
+		log := s.Logs[l.Command][i]
+		// discard if duplicate
 		if log.Time == l.Time && log.Output == l.Output {
 			return
 		}
-	}
-	// insert into "ordered" logs
-	temp := make([]Log, len(s.Logs[l.Command])+1)
-	i := 0
-	for ti := range temp {
-		if len(s.Logs[l.Command]) > i && s.Logs[l.Command][i].Time < l.Time {
-			temp[ti] = s.Logs[l.Command][i] // assign the old log
+		// find the index where it should be inserted
+		if i == len(s.Logs[l.Command])-1 || (l.Time >= log.Time && l.Time < s.Logs[l.Command][i+1].Time) {
 			i++
-		} else {
-			temp[ti] = Log{l.Output, l.Error, l.Time} // assign the new log
-			copy(temp[ti+1:], s.Logs[l.Command][i:])  // copy the remaining logs to the end
-			s.Logs[l.Command] = temp
 			break
 		}
 	}
+	// append to the end
+	if i == len(s.Logs[l.Command]) {
+		s.Logs[l.Command] = append(s.Logs[l.Command], Log{l.Output, l.Error, l.Time})
+		return
+	}
+	// insert in the middle
+	s.Logs[l.Command] = append(s.Logs[l.Command], Log{})
+	copy(s.Logs[l.Command][i+1:], s.Logs[l.Command][i:])
+	s.Logs[l.Command][i] = Log{l.Output, l.Error, l.Time}
 }
 
 func (s *StageLog) Flush() {
