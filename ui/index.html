@@ -19,7 +19,9 @@
     }
     .logerror{
         background-color: #ff000024;
-
+    }
+    .tag + .tag{
+        margin-left: 5px;
     }
     </style>
 
@@ -36,20 +38,20 @@
     <table id="app" class="table table-sm borderless">
         <tbody>
         <tr v-for="(target, targetID) in targets"><td>
-            <h5>{{targetID}} <span v-for="tag in target.Tags" class="badge badge-secondary">{{tag}}</span>
-                <button type="button" v-on:click="fetchLogs(targetID)" class="btn btn-outline-dark btn-sm float-right">Sync</button></h5>
+            <h5>{{targetID}} <span v-for="tag in target.Tags" class="badge badge-secondary tag">{{tag}}</span>
+                <button type="button" v-on:click="fetchLogs(targetID)" class="btn btn-outline-dark btn-sm float-right">Request Logs</button></h5>
 
             <div v-for="task in sortTasks(target.Tasks)" class="accordion" id="accordionExample">
                 <div class="card">
-                    <div style="padding: 0px" class="card-header" v-bind:id="'heading-'+task.id">
+                    <div style="padding: 0px" class="card-header" v-bind:id="'heading-'+targetID+'-'+task.id">
                         <h5 class="mb-0">
-                            <button class="w-100 btn btn-link collapsed" type="button" data-toggle="collapse" v-bind:data-target="'#collapse-'+task.id" aria-expanded="false" v-bind:aria-controls="'collapse-'+task.id">
+                            <button class="w-100 btn btn-link collapsed" type="button" data-toggle="collapse" v-bind:data-target="'#collapse-'+targetID+'-'+task.id" aria-expanded="false" v-bind:aria-controls="'collapse-'+targetID+'-'+task.id">
                                 <span class="float-left">{{ task.id }}</span> <span class="badge badge-light float-right">{{formatTime(task.value.Updated)}}</span>
                             </button>
                         </h5>
                     </div>
 
-                    <div v-bind:id="'collapse-'+task.id" class="collapse" v-bind:aria-labelledby="'heading-'+task.id" data-parent="#accordionExample">
+                    <div v-bind:id="'collapse-'+targetID+'-'+task.id" class="collapse" v-bind:aria-labelledby="'heading-'+targetID+'-'+task.id" data-parent="#accordionExample">
                         <div class="card-body">
                             <div v-for="(stage, name) in task.value.Stages">
                             <template v-if="stage.Logs">
@@ -95,7 +97,7 @@
                         });
                 },
                 formatTime: function (unix) {
-                    return moment.unix(unix/1e9).format('YYYY-MM-DD H:mm:ss');
+                    return moment.unix(unix/1e9).format('YYYY-MM-DD H:mm:ss.SSS');
                 },
                 sortTasks: function (dict) {
                     var sorted = [];
