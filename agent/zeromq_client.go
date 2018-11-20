@@ -159,7 +159,9 @@ func (c *zmqClient) monitor() {
 				fmt.Printf("zeromq: Error receiving monitor event: %s", err)
 				continue
 			}
-			log.Printf("zeromq: Event %s %s %d", eventType, eventAddr, eventValue)
+			if evalEnv(EnvDebug) || eventType == zmq.EVENT_CONNECTED || eventType == zmq.EVENT_DISCONNECTED {
+				log.Printf("zeromq: Event %s %s %d", eventType, eventAddr, eventValue)
+			}
 			go func() {
 				if eventValue == 400 {
 					time.Sleep(1 * time.Second)
