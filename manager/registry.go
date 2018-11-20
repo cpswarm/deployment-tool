@@ -121,6 +121,7 @@ func (s *StageLog) InsertLogs(l model.Log) {
 	if s.Logs == nil {
 		s.Logs = make(map[string][]Log)
 	}
+
 	// TODO make this efficient
 	// discard if duplicate
 	for _, log := range s.Logs[l.Command] {
@@ -128,7 +129,20 @@ func (s *StageLog) InsertLogs(l model.Log) {
 			return
 		}
 	}
-	s.Logs[l.Command] = append(s.Logs[l.Command], Log{l.Output, l.Error, l.Time})
+	// insert into "ordered" logs
+	temp := make([]Log, len(s.Logs[l.Command])+1)
+	i := 0
+	for ti := range temp {
+		if len(s.Logs[l.Command]) > i && s.Logs[l.Command][i].Time < l.Time {
+			temp[ti] = s.Logs[l.Command][i] // assign the old log
+			i++
+		} else {
+			temp[ti] = Log{l.Output, l.Error, l.Time} // assign the new log
+			copy(temp[ti+1:], s.Logs[l.Command][i:])  // copy the remaining logs to the end
+			s.Logs[l.Command] = temp
+			break
+		}
+	}
 }
 
 func (s *StageLog) Flush() {
