@@ -75,7 +75,7 @@ TARGETS:
 
 	log.Println("Matching targets:", len(descr.DeploymentInfo.MatchingTargets))
 	if len(descr.DeploymentInfo.MatchingTargets) > 0 {
-		go m.sendTask(&task, descr.Target.Tags)
+		go m.sendTask(&task, descr.Target.Tags, descr.DeploymentInfo.MatchingTargets)
 	}
 
 	return &descr, nil
@@ -94,10 +94,9 @@ func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (m *manager) sendTask(task *model.Task, targetTags []string) {
-	pending := true
+func (m *manager) sendTask(task *model.Task, targetTags, matchingTargets []string) {
 
-	for pending {
+	for pending := true; pending; {
 		log.Printf("sendTask: %s", task.ID)
 		//log.Printf("sendTask: %+v", task)
 
@@ -121,8 +120,8 @@ func (m *manager) sendTask(task *model.Task, targetTags []string) {
 
 		// TODO which messages are received, what is pending?
 		pending = false
-		for _, target := range m.Targets {
-			if _, found := target.Tasks[task.ID]; !found {
+		for _, match := range matchingTargets {
+			if _, found := m.Targets[match].Tasks[task.ID]; !found {
 				pending = true
 			}
 		}
