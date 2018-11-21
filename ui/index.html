@@ -127,7 +127,7 @@
             },
             methods: {
                 fetchLogs: function (id) {
-                    axios.put('http://localhost:8080/targets/'+id+'/logs')
+                    axios.put(server.http+'/targets/'+id+'/logs')
                         .then(function (response) {
                             console.log(response.data.message);
                         })
@@ -175,7 +175,7 @@
                     console.log("Submitting task.");
                     console.log(this.taskDescr);
                     localStorage.setItem("taskDescr",this.taskDescr);
-                    axios.post('http://localhost:8080/tasks', this.taskDescr)
+                    axios.post(server.http+'/tasks', this.taskDescr)
                             .then(function (response) {
                                 console.log(response);
                                 submit.taskDescrResp = response.data.DeploymentInfo;
@@ -194,7 +194,7 @@
 
 
         function getTargets() {
-            axios.get('http://localhost:8080/targets')
+            axios.get(server.http+'/targets')
                     .then(function (response) {
                         view(response.data);
                     })
@@ -216,7 +216,7 @@
                 return;
             }
 
-            var ws = new WebSocket("ws://localhost:8080/ws");
+            var ws = new WebSocket(server.ws);
             ws.onopen = function () {
                 console.log("Socket connected.");
                 document.body.style.backgroundColor = "#fff";
@@ -237,6 +237,19 @@
 
         }
 
+        function getServerAddr() {
+            var loc = window.location, wsURI, httpURI;
+            if (loc.protocol === "https:") {
+                wsURI = "wss:";
+            } else {
+                wsURI = "ws:";
+            }
+            wsURI += "//" + loc.host + "/ws";
+            httpURI = loc.protocol + "//" + loc.host;
+            return {http: httpURI, ws: wsURI}
+        }
+
+        var server = getServerAddr();
         getTargets();
         listen();
 
