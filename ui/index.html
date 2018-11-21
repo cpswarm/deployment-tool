@@ -5,6 +5,9 @@
 
     <link rel="stylesheet" href="lib/bootstrap-4.0.0.min.css">
     <style>
+    body{
+        padding: 10px;
+    }
     .badge{
         margin: 5px 0 5px 0;
     }
@@ -23,6 +26,21 @@
     .tag + .tag{
         margin-left: 5px;
     }
+    .submit{
+        margin-bottom: 10px;
+    }
+    .taskArea {
+        padding: 5px;
+        background-color: aliceblue;
+        border: 0;
+        min-width: 100%;
+        height:10em;
+    }
+    .taskDescrResp {
+        margin-top: 10px;
+        margin-bottom: 0;
+    }
+
     </style>
 
     <script src="lib/axios.min.js"></script>
@@ -34,7 +52,28 @@
 </head>
 
 <body>
+    <div id="submit" class="submit">
 
+        <div id="accordion">
+            <div class="card">
+                <div style="padding: 0px" class="card-header" id="headingOne">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne" v-on:click="retrieveTaskLocal()">Submit Task</button>
+                    </h5>
+                </div>
+
+                <div id="collapseOne" class="collapse" aria-labelledby="headingOne" data-parent="#accordion">
+                    <div class="card-body">
+                        <p><textarea id="taskArea" class="card card-body consolas taskArea" v-model="taskDescr" oninput='this.style.height = "";this.style.height = this.scrollHeight + "px"' onclick='this.style.height = "";this.style.height = this.scrollHeight + "px"'>{{taskDescr}}</textarea></p>
+                        <button type="button" v-on:click="submitTask()" class="btn btn-outline-dark btn-sm">Submit</button>
+                        <div class="consolas taskDescrResp"><div v-for="(v, k) in taskDescrResp">{{k}}: {{v}}</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4>TARGETS</h4>
     <table id="app" class="table table-sm borderless">
         <tbody>
         <tr v-for="(target, targetID) in targets"><td>
@@ -46,7 +85,7 @@
                     <div style="padding: 0px" class="card-header" v-bind:id="'heading-'+targetID+'-'+task.id">
                         <h5 class="mb-0">
                             <button class="w-100 btn btn-link collapsed" type="button" data-toggle="collapse" v-bind:data-target="'#collapse-'+targetID+'-'+task.id" aria-expanded="false" v-bind:aria-controls="'collapse-'+targetID+'-'+task.id">
-                                <span class="float-left">{{ task.id }}</span> <span class="badge badge-light float-right">{{formatTime(task.value.Updated)}}</span>
+                                <span class="float-left">Task {{ task.id }}</span> <span class="badge badge-light float-right">{{formatTime(task.value.Updated)}}</span>
                             </button>
                         </h5>
                     </div>
@@ -56,9 +95,9 @@
                             <div v-for="(stage, name) in task.value.Stages">
                             <template v-if="stage.Logs">
                                 <span class="badge badge-primary">{{name}}</span>
-                                <div style="margin-left: 10px">
+                                <div>
                                     <div class="consolas" v-for="log in stage.Logs.SYS">{{formatTime(log.Time)}} &nbsp; {{log.Output}}</div>
-                                    <div v-for="(logs, type) in stage.Logs">
+                                    <div style="margin-left: 1em;" v-for="(logs, type) in stage.Logs">
                                         <template v-if="type !=='SYS'">
                                         <span class="badge badge-secondary">{{type}}</span>
                                         <div v-bind:class="{logerror:log.Error}" class="consolas" v-for="log in logs">
@@ -97,7 +136,7 @@
                         });
                 },
                 formatTime: function (unix) {
-                    return moment.unix(unix/1e9).format('YYYY-MM-DD H:mm:ss.SSS');
+                    return moment.unix(unix/1e9).format('YYYY-MM-DD H:mm:ss');
                 },
                 sortTasks: function (dict) {
                     var sorted = [];
@@ -116,7 +155,38 @@
                     return sorted.sort(compare);
                 }
             }
-        })
+        });
+
+        var submit = new Vue({
+            el: '#submit',
+            data: {
+                taskDescr: "task description in YAML or JSON",
+                taskDescrResp: {}
+            },
+            methods: {
+                saveTaskLocal: function () {
+
+                },
+                retrieveTaskLocal: function () {
+                    console.log("retrieveTaskLocal");
+                    this.taskDescr = localStorage.getItem("taskDescr");
+                },
+                submitTask: function(){
+                    console.log("Submitting task.");
+                    console.log(this.taskDescr);
+                    localStorage.setItem("taskDescr",this.taskDescr);
+                    axios.post('http://localhost:8080/tasks', this.taskDescr)
+                            .then(function (response) {
+                                console.log(response);
+                                submit.taskDescrResp = response.data.DeploymentInfo;
+                            })
+                            .catch(function (error) {
+                                console.log(error);
+                                alert(error.response.data.error);
+                            });
+                }
+            }
+        });
 
         function view(targets){
             app.targets = targets;
