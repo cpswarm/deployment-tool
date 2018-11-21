@@ -40,7 +40,9 @@
         margin-top: 10px;
         margin-bottom: 0;
     }
-
+    .active{
+        font-weight: 900;
+    }
     </style>
 
     <script src="lib/axios.min.js"></script>
@@ -84,7 +86,7 @@
                 <div class="card">
                     <div style="padding: 0px" class="card-header" v-bind:id="'heading-'+targetID+'-'+task.id">
                         <h5 class="mb-0">
-                            <button class="w-100 btn btn-link collapsed" type="button" data-toggle="collapse" v-bind:data-target="'#collapse-'+targetID+'-'+task.id" aria-expanded="false" v-bind:aria-controls="'collapse-'+targetID+'-'+task.id">
+                            <button class="w-100 btn btn-link collapsed" type="button" data-toggle="collapse" v-bind:data-target="'#collapse-'+targetID+'-'+task.id" aria-expanded="false" v-bind:aria-controls="'collapse-'+targetID+'-'+task.id" v-bind:class="{active:task.id==activeTask}">
                                 <span class="float-left">Task {{ task.id }}</span> <span class="badge badge-light float-right">{{formatTime(task.value.Updated)}}</span>
                             </button>
                         </h5>
@@ -123,7 +125,8 @@
         var app = new Vue({
             el: '#app',
             data: {
-                targets: {}
+                targets: {},
+                activeTask: ""
             },
             methods: {
                 fetchLogs: function (id) {
@@ -152,7 +155,8 @@
                         return 0;
                     }
 
-                    return sorted.sort(compare);
+                    var s = sorted.sort(compare);
+                    return s.slice(-5, s.length); // return the last 5 items only
                 }
             }
         });
@@ -160,16 +164,13 @@
         var submit = new Vue({
             el: '#submit',
             data: {
-                taskDescr: "task description in YAML or JSON",
+                taskDescr: "# task description in YAML or JSON",
                 taskDescrResp: {}
             },
             methods: {
-                saveTaskLocal: function () {
-
-                },
                 retrieveTaskLocal: function () {
                     console.log("retrieveTaskLocal");
-                    this.taskDescr = localStorage.getItem("taskDescr");
+                    this.taskDescr = localStorage.getItem("taskDescr") || this.taskDescr;
                 },
                 submitTask: function(){
                     console.log("Submitting task.");
@@ -179,6 +180,7 @@
                             .then(function (response) {
                                 console.log(response);
                                 submit.taskDescrResp = response.data.DeploymentInfo;
+                                app.activeTask = response.data.DeploymentInfo.TaskID;
                             })
                             .catch(function (error) {
                                 console.log(error);
@@ -250,6 +252,7 @@
         }
 
         var server = getServerAddr();
+        console.log("Server address:", server);
         getTargets();
         listen();
 
