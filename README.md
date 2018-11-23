@@ -7,7 +7,7 @@ This repository consists of the following packages:
 * model: Data models used among other packages
 
 ## Documentation
-* [docs/documentation.md](docs/documentation.md)
+* [Github Wiki](https://github.com/cpswarm/deployment-tool/wiki)
 
 ## Development Status
 | Feature                          | Functional |
