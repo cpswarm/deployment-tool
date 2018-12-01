@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 )
 
 type executor struct {

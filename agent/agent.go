@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"github.com/satori/go.uuid"
 )
 

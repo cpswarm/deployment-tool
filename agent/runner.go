@@ -4,7 +4,7 @@ import (
 	"log"
 	"sync"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 )
 
 type runner struct {

@@ -9,7 +9,7 @@ echo "Copying the code..."
 package=code.linksmart.eu/dt/deployment-tool
 mkdir -p temp/$package bin
 cp -rv ../../agent temp/$package
-cp -rv ../../model temp/$package
+cp -rv ../../manager temp/$package
 cp -rv ../../vendor temp/$package
 
 echo "Compiling... (IF HUNG, KILL THE CONTAINER!)"

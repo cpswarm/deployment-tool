@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 )
 
 const (

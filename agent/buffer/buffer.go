@@ -4,7 +4,7 @@ package buffer
 import (
 	"sync"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 )
 
 func NewBuffer(capacity uint8) Buffer {

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/agent/buffer"
-	"code.linksmart.eu/dt/deployment-tool/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 )
 
 const (

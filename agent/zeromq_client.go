@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	zmq "github.com/pebbe/zmq4"
 )
 

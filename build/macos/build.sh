@@ -10,7 +10,7 @@ set -e
 echo "Copying the code..."
 mkdir -p temp bin
 cp -R ../../agent temp
-cp -R ../../model temp
+cp -R ../../manager temp
 cp -R ../../vendor temp
 
 echo "Compiling..."

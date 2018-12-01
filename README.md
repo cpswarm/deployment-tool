@@ -1,10 +1,5 @@
-# Deployment Tool 
-a.k.a. CPSwarm Bulk Deployment Tool
-
-This repository consists of the following packages:
-* manager: The Deployment Manager responsible for propagating deployment tasks
-* agent: The Deployment Agent responsible for performing tasks and reporting results
-* model: Data models used among other packages
+# CPSwarm Deployment Tool 
+An over-the-air (OTA) software deployment tool for IoT applications. This project is currently under active development and not ready for production.
 
 ## Documentation
 * [Github Wiki](https://github.com/cpswarm/deployment-tool/wiki)

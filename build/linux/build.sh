@@ -10,7 +10,6 @@ package=code.linksmart.eu/dt/deployment-tool
 mkdir -p temp/$package bin
 cp -rv ../../manager temp/$package
 cp -rv ../../agent temp/$package
-cp -rv ../../model temp/$package
 cp -r ../../vendor temp/$package
 
 echo "Compiling... (IF HUNG, KILL THE CONTAINER!)"

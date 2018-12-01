@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"code.linksmart.eu/dt/deployment-tool/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"github.com/mholt/archiver"
 	"github.com/pbnjay/memory"
 )
