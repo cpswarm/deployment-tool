@@ -12,45 +12,28 @@ const (
 )
 
 type registry struct {
-	taskDescriptions []TaskDescription
-	Targets          map[string]*Target
+	orders  map[string]*Order
+	targets map[string]*Target
 }
 
 //
-// TASK DESCRIPTION
+// Order
 //
-type TaskDescription struct {
-	Stages Stages
-	Target DeploymentTarget
-	Debug  bool
-
-	DeploymentInfo DeploymentInfo
+type Order struct {
+	model.Header `yaml:",inline"`
+	Stages       model.Stages `json:"stages"`
+	Target       struct {
+		IDs  []string `json:"ids"`
+		Tags []string `json:"tags"`
+	} `json:"targets"`
+	Receivers []string `json:"receivers"`
 }
 
-func (d TaskDescription) validate() error {
-	if len(d.Stages.Assemble)+len(d.Stages.Transfer)+len(d.Stages.Install)+len(d.Stages.Test)+len(d.Stages.Run) == 0 {
+func (o Order) Validate() error {
+	if len(o.Stages.Transfer)+len(o.Stages.Install)+len(o.Stages.Run) == 0 {
 		return fmt.Errorf("empty stages")
 	}
 	return nil
-}
-
-type Stages struct {
-	Assemble []string
-	Transfer []string
-	Install  []string
-	Test     []string
-	Run      []string
-}
-
-type DeploymentTarget struct {
-	Tags []string
-}
-
-type DeploymentInfo struct {
-	TaskID          string
-	Created         string
-	TransferSize    int
-	MatchingTargets []string
 }
 
 //

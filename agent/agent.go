@@ -177,7 +177,7 @@ func (a *agent) advertiseTarget() {
 }
 
 func (a *agent) handleAnnouncement(payload []byte) {
-	var taskA model.TaskAnnouncement
+	var taskA model.Announcement
 	err := json.Unmarshal(payload, &taskA)
 	if err != nil {
 		log.Printf("Error parsing announcement: %s", err) // TODO send to manager
@@ -223,16 +223,16 @@ func (a *agent) handleTask(id string, payload []byte) {
 	a.installer.store(task.Artifacts, task.ID)
 	a.sendTransferResponse(task.ID, model.StageEnd, false, task.Debug)
 
-	success := a.installer.install(task.Install, task.ID, task.Debug)
+	success := a.installer.install(task.Stages.Install, task.ID, task.Debug)
 	if success {
 		a.runner.stop()            // stop runner for old task
 		a.installer.clean(task.ID) // remove old task files
-		a.target.TaskRun = task.Run
+		a.target.TaskRun = task.Stages.Run
 		a.target.TaskID = task.ID
 		a.target.TaskDebug = task.Debug
 		a.saveState()
 
-		go a.runner.run(task.Run, task.ID, task.Debug)
+		go a.runner.run(task.Stages.Run, task.ID, task.Debug)
 	}
 }
 

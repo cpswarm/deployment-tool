@@ -10,7 +10,6 @@ import (
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"github.com/mholt/archiver"
-	"github.com/satori/go.uuid"
 )
 
 type manager struct {
@@ -27,62 +26,64 @@ func startManager(pipe model.Pipe) (*manager, error) {
 		update: sync.NewCond(&sync.Mutex{}),
 	}
 
-	m.Targets = make(map[string]*Target)
-	m.taskDescriptions = []TaskDescription{}
+	m.targets = make(map[string]*Target)
+	m.orders = make(map[string]*Order)
 
 	go m.manageResponses()
 	return m, nil
 }
 
-func (m *manager) addTaskDescr(descr TaskDescription) (*TaskDescription, error) {
+func (m *manager) addOrder(order *Order) error {
+	m.Lock()
+	defer m.Unlock()
 
-	m.RLock()
 TARGETS:
-	for id, target := range m.Targets {
+	for id, target := range m.targets {
 		for _, t := range target.Tags {
-			for _, t2 := range descr.Target.Tags {
+			for _, t2 := range order.Target.Tags {
 				if t == t2 {
-					descr.DeploymentInfo.MatchingTargets = append(descr.DeploymentInfo.MatchingTargets, id)
+					order.Receivers = append(order.Receivers, id)
 					continue TARGETS
 				}
 			}
 		}
 	}
-	m.RUnlock()
+	log.Println("Order receivers:", len(order.Receivers))
 
 	var compressedArchive []byte
 	var err error
-	if len(descr.Stages.Transfer) > 0 {
-		compressedArchive, err = m.compressFiles(descr.Stages.Transfer)
+	if len(order.Stages.Transfer) > 0 {
+		compressedArchive, err = m.compressFiles(order.Stages.Transfer)
 		if err != nil {
-			return nil, fmt.Errorf("error compressing files: %s", err)
+			return fmt.Errorf("error compressing files: %s", err)
 		}
 	}
 
+	ann := model.Announcement{
+		Header: order.Header,
+		Size:   len(compressedArchive),
+	}
+
 	task := model.Task{
-		ID:        newTaskID(),
+		Header:    order.Header,
+		Stages:    order.Stages,
 		Artifacts: compressedArchive,
-		Install:   descr.Stages.Install,
-		Run:       descr.Stages.Run,
-		Debug:     descr.Debug,
 	}
 
-	//m.tasks = append(m.tasks, task)
-	descr.DeploymentInfo.TaskID = task.ID
-	descr.DeploymentInfo.Created = time.Now().Format(time.RFC3339)
-	descr.DeploymentInfo.TransferSize = len(compressedArchive)
-	m.taskDescriptions = append(m.taskDescriptions, descr)
+	m.orders[order.ID] = order
+	log.Println("Added order:", order.ID)
 
-	log.Println("Matching targets:", len(descr.DeploymentInfo.MatchingTargets))
-	if len(descr.DeploymentInfo.MatchingTargets) > 0 {
-		go m.sendTask(&task, descr.Target.Tags, descr.DeploymentInfo.MatchingTargets)
+	if len(order.Receivers) > 0 {
+		go m.sendTask(&ann, &task, order.Target.Tags, order.Receivers)
 	}
 
-	return &descr, nil
+	return nil
 }
 
-func newTaskID() string {
-	return uuid.NewV4().String()
+func (m *manager) getOrders() (map[string]*Order, error) {
+	m.RLock()
+	defer m.RUnlock()
+	return m.orders, nil
 }
 
 func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
@@ -94,15 +95,14 @@ func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (m *manager) sendTask(task *model.Task, targetTags, matchingTargets []string) {
+func (m *manager) sendTask(ann *model.Announcement, task *model.Task, targetTags, matchingTargets []string) {
 
 	for pending := true; pending; {
 		log.Printf("sendTask: %s", task.ID)
 		//log.Printf("sendTask: %+v", task)
 
 		// send announcement
-		taskA := model.TaskAnnouncement{ID: task.ID, Size: uint64(len(task.Artifacts)), Debug: task.Debug}
-		b, _ := json.Marshal(&taskA)
+		b, _ := json.Marshal(ann)
 		for _, tag := range targetTags {
 			m.pipe.RequestCh <- model.Message{model.TargetTag(tag), b}
 		}
@@ -121,7 +121,7 @@ func (m *manager) sendTask(task *model.Task, targetTags, matchingTargets []strin
 		// TODO which messages are received, what is pending?
 		pending = false
 		for _, match := range matchingTargets {
-			if _, found := m.Targets[match].Tasks[task.ID]; !found {
+			if _, found := m.targets[match].Tasks[task.ID]; !found {
 				pending = true
 			}
 		}
@@ -130,7 +130,7 @@ func (m *manager) sendTask(task *model.Task, targetTags, matchingTargets []strin
 }
 
 func (m *manager) requestLogs(targetID string) error {
-	b, _ := json.Marshal(&model.LogRequest{m.Targets[targetID].LastLogRequest})
+	b, _ := json.Marshal(&model.LogRequest{m.targets[targetID].LastLogRequest})
 	m.pipe.RequestCh <- model.Message{
 		Topic:   model.TargetTopic(targetID),
 		Payload: b,
@@ -172,10 +172,10 @@ func (m *manager) processTarget(target *model.Target) {
 	m.Lock()
 	defer m.Unlock()
 
-	if _, found := m.Targets[target.ID]; !found {
-		m.Targets[target.ID] = newTarget()
+	if _, found := m.targets[target.ID]; !found {
+		m.targets[target.ID] = newTarget()
 	}
-	m.Targets[target.ID].Tags = target.Tags
+	m.targets[target.ID].Tags = target.Tags
 }
 
 func (m *manager) processResponse(response *model.Response) {
@@ -185,7 +185,7 @@ func (m *manager) processResponse(response *model.Response) {
 	defer m.Unlock()
 	start := time.Now()
 
-	if _, found := m.Targets[response.TargetID]; !found {
+	if _, found := m.targets[response.TargetID]; !found {
 		log.Println("Log from unknown target:", response.TargetID)
 		return
 	}
@@ -193,14 +193,14 @@ func (m *manager) processResponse(response *model.Response) {
 	// response to log request
 	if response.OnRequest {
 		sync := response.Logs[len(response.Logs)-1].Time
-		m.Targets[response.TargetID].LastLogRequest = sync
+		m.targets[response.TargetID].LastLogRequest = sync
 	}
 
 	for _, l := range response.Logs {
-		m.Targets[response.TargetID].initTask(l.Task)
+		m.targets[response.TargetID].initTask(l.Task)
 
 		// create aliases
-		task := m.Targets[response.TargetID].Tasks[l.Task]
+		task := m.targets[response.TargetID].Tasks[l.Task]
 		stageLogs := task.GetStageLog(l.Stage)
 		// update task
 		task.Updated = model.UnixTime()

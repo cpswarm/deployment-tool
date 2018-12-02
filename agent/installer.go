@@ -23,9 +23,9 @@ func newInstaller(logger chan<- model.Log) installer {
 	}
 }
 
-func (i *installer) evaluate(ta model.TaskAnnouncement) bool {
+func (i *installer) evaluate(ann model.Announcement) bool {
 	sizeLimit := memory.TotalMemory() / 2 // TODO calculate this based on the available memory
-	return ta.Size <= sizeLimit
+	return uint64(ann.Size) <= sizeLimit
 }
 
 func (i *installer) store(artifacts []byte, taskID string) {
@@ -64,7 +64,7 @@ func (i *installer) install(commands []string, taskID string, debug bool) bool {
 
 	log.Printf("installer: Installing task: %s", taskID)
 	i.sendLog(taskID, "", model.StageStart, false, model.UnixTime(), debug)
-	defer func(){i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug)}()
+	defer func() { i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug) }()
 
 	// execute sequentially, return if one fails
 	i.executor = newExecutor(taskID, model.StageInstall, i.logger, debug)

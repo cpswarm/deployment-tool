@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/satori/go.uuid"
 	"gopkg.in/yaml.v2"
 )
 
@@ -38,8 +40,8 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/targets/{id}", a.GetTarget).Methods("GET")
 	r.HandleFunc("/targets", a.GetTargets).Methods("GET")
 	// tasks
-	r.HandleFunc("/tasks", a.ListTasks).Methods("GET")
-	r.HandleFunc("/tasks", a.AddTask).Methods("POST")
+	r.HandleFunc("/orders", a.GetOrders).Methods("GET")
+	r.HandleFunc("/orders", a.AddOrder).Methods("POST")
 	// static
 	ui := http.Dir(WorkDir + "/ui")
 	r.PathPrefix("/ui").Handler(http.StripPrefix("/ui", http.FileServer(ui)))
@@ -52,58 +54,69 @@ func (a *restAPI) setupRouter() {
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		log.Println(r.Method, r.RequestURI)
 		next.ServeHTTP(w, r)
-		log.Println(r.Method, r.URL, "responded.")
+		log.Println(r.Method, r.URL, "responded in", time.Since(start))
 	})
 }
 
-func (a *restAPI) AddTask(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) newTaskID() string {
+	return uuid.NewV4().String()
+}
+
+func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 
 	decoder := yaml.NewDecoder(r.Body)
 	defer r.Body.Close()
 
-	var descr TaskDescription
-	err := decoder.Decode(&descr)
+	var order Order
+	err := decoder.Decode(&order)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
-	log.Println("Received task descr:", descr)
+	log.Println("Received order:", order)
 
-	err = descr.validate()
+	err = order.Validate()
 	if err != nil {
-		HTTPResponseError(w, http.StatusBadRequest, "Invalid task description: ", err)
+		HTTPResponseError(w, http.StatusBadRequest, "Invalid order: ", err)
 		return
 	}
 
-	a.manager.RLock()
-	defer a.manager.RUnlock()
+	// add system generated meta values
+	order.ID = a.newTaskID()
+	order.Date = time.Now().UnixNano()
 
-	createdDescr, err := a.manager.addTaskDescr(descr)
+	err = a.manager.addOrder(&order)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	b, _ := json.Marshal(createdDescr)
-
-	// task is only accepted, but may not succeed
+	// order is accepted
+	b, err := json.Marshal(order) // marshal updated order
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
 	HTTPResponse(w, http.StatusAccepted, b)
 	return
 }
 
-func (a *restAPI) ListTasks(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) GetOrders(w http.ResponseWriter, r *http.Request) {
 
-	a.manager.RLock()
-	defer a.manager.RUnlock()
-
-	b, err := json.Marshal(a.manager.taskDescriptions)
+	orders, err := a.manager.getOrders()
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
 
+	b, err := json.Marshal(orders)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
 	HTTPResponse(w, http.StatusOK, b)
 	return
 }
@@ -119,7 +132,7 @@ func (a *restAPI) GetTargets(w http.ResponseWriter, r *http.Request) {
 	a.manager.RLock()
 	defer a.manager.RUnlock()
 
-	b, err := json.Marshal(a.manager.Targets)
+	b, err := json.Marshal(a.manager.targets)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -136,7 +149,7 @@ func (a *restAPI) GetTarget(w http.ResponseWriter, r *http.Request) {
 	a.manager.RLock()
 	defer a.manager.RUnlock()
 
-	target, found := a.manager.Targets[id]
+	target, found := a.manager.targets[id]
 	if !found {
 		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
 		return
@@ -159,7 +172,7 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 	a.manager.RLock()
 	defer a.manager.RUnlock()
 
-	if _, found := a.manager.Targets[id]; !found {
+	if _, found := a.manager.targets[id]; !found {
 		HTTPResponseError(w, http.StatusNotFound, id, " is not found!")
 		return
 	}
@@ -185,7 +198,7 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 		a.manager.update.L.Lock()
 		a.manager.update.Wait()
 		log.Println("websocket: sending update!")
-		b, _ := json.Marshal(a.manager.Targets)
+		b, _ := json.Marshal(a.manager.targets)
 		err = c.WriteMessage(websocket.TextMessage, b)
 		if err != nil {
 			log.Println("websocket: write error:", err)
