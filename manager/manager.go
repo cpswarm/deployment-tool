@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 	"time"
 
@@ -205,6 +206,23 @@ func (m *manager) processResponse(response *model.Response) {
 		// update task
 		task.Updated = model.UnixTime()
 		stageLogs.InsertLogs(l)
+	}
+	// remove old tasks
+	const max = 2
+	if len(m.targets[response.TargetID].Tasks) > max {
+		var times []int64
+		for k := range m.targets[response.TargetID].Tasks {
+			times = append(times, m.orders[k].Created)
+		}
+		sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
+		// delete the oldest item(s)
+		pivot := times[len(times)-max]
+		for k := range m.targets[response.TargetID].Tasks {
+			if m.orders[k].Created < pivot {
+				log.Println("Removing logs for", k)
+				delete(m.targets[response.TargetID].Tasks, k)
+			}
+		}
 	}
 	log.Println("Processing response took", time.Since(start))
 }

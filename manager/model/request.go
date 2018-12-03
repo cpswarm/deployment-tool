@@ -27,7 +27,7 @@ type Stages struct {
 type Header struct {
 	ID    string `json:"id"`
 	Debug bool   `json:"debug"`
-	Date  int64  `json:"date"`
+	Created  int64  `json:"created"`
 }
 
 // Announcement carries information about a task
@@ -42,21 +42,6 @@ type Task struct {
 	Stages    Stages `json:"stages"`
 	Artifacts []byte `json:"artifacts"`
 }
-
-//// Task is a struct with all the information for deployment on a target
-//type Task struct {
-//	ID        string
-//	Artifacts []byte
-//	Install   []string
-//	Run       []string
-//	Debug     bool
-//}
-//
-//type TaskAnnouncement struct {
-//	ID    string
-//	Size  uint64
-//	Debug bool
-//}
 
 type LogRequest struct {
 	IfModifiedSince UnixTimeType

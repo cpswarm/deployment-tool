@@ -86,7 +86,7 @@ func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 
 	// add system generated meta values
 	order.ID = a.newTaskID()
-	order.Date = time.Now().UnixNano()
+	order.Created = time.Now().UnixNano()
 
 	err = a.manager.addOrder(&order)
 	if err != nil {

@@ -40,9 +40,9 @@ func (o Order) Validate() error {
 // TARGET
 //
 type Target struct {
-	Tags           []string
-	Tasks          map[string]*Task
-	LastLogRequest model.UnixTimeType
+	Tags           []string           `json:"tags"`
+	Tasks          map[string]*Task   `json:"tasks"`
+	LastLogRequest model.UnixTimeType `json:"lastLogRequest"`
 }
 
 func newTarget() *Target {
@@ -58,8 +58,8 @@ func (t *Target) initTask(id string) {
 }
 
 type Task struct {
-	Stages  StageLogs
-	Updated model.UnixTimeType
+	Stages  StageLogs          `json:"stages"`
+	Updated model.UnixTimeType `json:"updated"`
 }
 
 func (t *Task) GetStageLog(stage string) *StageLog {
@@ -80,21 +80,21 @@ func (t *Task) GetStageLog(stage string) *StageLog {
 }
 
 type StageLogs struct {
-	Assemble StageLog
-	Transfer StageLog
-	Install  StageLog
-	Test     StageLog
-	Run      StageLog
+	Assemble StageLog `json:"assemble"`
+	Transfer StageLog `json:"transfer"`
+	Install  StageLog `json:"install"`
+	Test     StageLog `json:"test"`
+	Run      StageLog `json:"run"`
 }
 
 type StageLog struct {
-	Logs map[string][]Log `json:",omitempty"'`
+	Logs map[string][]Log `json:"logs,omitempty"`
 }
 
 type Log struct {
-	Output string
-	Error  bool `json:",omitempty"'`
-	Time   model.UnixTimeType
+	Output string             `json:"output"`
+	Error  bool               `json:"error,omitempty"`
+	Time   model.UnixTimeType `json:"time"`
 }
 
 func (s *StageLog) InsertLogs(l model.Log) {
