@@ -41,54 +41,44 @@ func (o Order) Validate() error {
 //
 type Target struct {
 	Tags           []string           `json:"tags"`
-	Tasks          map[string]*Task   `json:"tasks"`
+	Logs           map[string]*Logs   `json:"logs"`
 	LastLogRequest model.UnixTimeType `json:"lastLogRequest"`
 }
 
 func newTarget() *Target {
 	return &Target{
-		Tasks: make(map[string]*Task),
+		Logs: make(map[string]*Logs),
 	}
 }
 
 func (t *Target) initTask(id string) {
-	if _, found := t.Tasks[id]; !found {
-		t.Tasks[id] = new(Task)
+	if _, found := t.Logs[id]; !found {
+		t.Logs[id] = new(Logs)
 	}
 }
 
-type Task struct {
-	Stages  StageLogs          `json:"stages"`
+type Logs struct {
+	Stages
 	Updated model.UnixTimeType `json:"updated"`
 }
 
-func (t *Task) GetStageLog(stage string) *StageLog {
+func (logs *Logs) GetStageLog(stage string) map[string][]Log {
 	switch stage {
-	case model.StageAssemble:
-		return &t.Stages.Assemble
 	case model.StageTransfer:
-		return &t.Stages.Transfer
+		return logs.Stages.Transfer
 	case model.StageInstall:
-		return &t.Stages.Install
-	case model.StageTest:
-		return &t.Stages.Test
+		return logs.Stages.Install
 	case model.StageRun:
-		return &t.Stages.Run
+		return logs.Stages.Run
 	}
 	log.Println("ERROR: Unknown/unsupported stage:", stage)
-	return &StageLog{}
+	return nil
 }
 
-type StageLogs struct {
-	Assemble StageLog `json:"assemble"`
-	Transfer StageLog `json:"transfer"`
-	Install  StageLog `json:"install"`
-	Test     StageLog `json:"test"`
-	Run      StageLog `json:"run"`
-}
-
-type StageLog struct {
-	Logs map[string][]Log `json:"logs,omitempty"`
+type Stages struct {
+	Transfer map[string][]Log `json:"transfer"`
+	Install  map[string][]Log `json:"install"`
+	Run      map[string][]Log `json:"run"`
 }
 
 type Log struct {
@@ -97,43 +87,57 @@ type Log struct {
 	Time   model.UnixTimeType `json:"time"`
 }
 
-func (s *StageLog) InsertLogs(l model.Log) {
+func (logs *Logs) InsertLogs(l model.Log) {
 	if l.Command == "" {
 		l.Command = SystemLogsKey
 	}
-	if s.Logs == nil {
-		s.Logs = make(map[string][]Log)
+
+	// TODO this is as ugly as code can get
+	s := logs.GetStageLog(l.Stage)
+	if s == nil {
+		s = make(map[string][]Log)
 	}
+	commit := func() {
+		switch l.Stage {
+		case model.StageTransfer:
+			logs.Stages.Transfer = s
+		case model.StageInstall:
+			logs.Stages.Install = s
+		case model.StageRun:
+			logs.Stages.Run = s
+		}
+		logs.Updated = model.UnixTime()
+	}
+
 	// first insertion
-	if len(s.Logs[l.Command]) == 0 {
-		s.Logs[l.Command] = append(s.Logs[l.Command], Log{l.Output, l.Error, l.Time})
+	if len(s[l.Command]) == 0 {
+		s[l.Command] = append(s[l.Command], Log{l.Output, l.Error, l.Time})
+		commit()
 		return
 	}
 
 	i := 0
-	for ; i < len(s.Logs[l.Command]); i++ {
-		log := s.Logs[l.Command][i]
+	for ; i < len(s[l.Command]); i++ {
+		log := s[l.Command][i]
 		// discard if duplicate
 		if log.Time == l.Time && log.Output == l.Output {
 			return
 		}
 		// find the index where it should be inserted
-		if i == len(s.Logs[l.Command])-1 || (l.Time >= log.Time && l.Time < s.Logs[l.Command][i+1].Time) {
+		if i == len(s[l.Command])-1 || (l.Time >= log.Time && l.Time < s[l.Command][i+1].Time) {
 			i++
 			break
 		}
 	}
 	// append to the end
-	if i == len(s.Logs[l.Command]) {
-		s.Logs[l.Command] = append(s.Logs[l.Command], Log{l.Output, l.Error, l.Time})
+	if i == len(s[l.Command]) {
+		s[l.Command] = append(s[l.Command], Log{l.Output, l.Error, l.Time})
+		commit()
 		return
 	}
-	// insert in the middle
-	s.Logs[l.Command] = append(s.Logs[l.Command], Log{})
-	copy(s.Logs[l.Command][i+1:], s.Logs[l.Command][i:])
-	s.Logs[l.Command][i] = Log{l.Output, l.Error, l.Time}
-}
-
-func (s *StageLog) Flush() {
-	*s = StageLog{}
+	// InsertLogs in the middle
+	s[l.Command] = append(s[l.Command], Log{})
+	copy(s[l.Command][i+1:], s[l.Command][i:])
+	s[l.Command][i] = Log{l.Output, l.Error, l.Time}
+	commit()
 }

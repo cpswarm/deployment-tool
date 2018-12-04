@@ -122,7 +122,7 @@ func (m *manager) sendTask(ann *model.Announcement, task *model.Task, targetTags
 		// TODO which messages are received, what is pending?
 		pending = false
 		for _, match := range matchingTargets {
-			if _, found := m.targets[match].Tasks[task.ID]; !found {
+			if _, found := m.targets[match].Logs[task.ID]; !found {
 				pending = true
 			}
 		}
@@ -200,27 +200,22 @@ func (m *manager) processResponse(response *model.Response) {
 	for _, l := range response.Logs {
 		m.targets[response.TargetID].initTask(l.Task)
 
-		// create aliases
-		task := m.targets[response.TargetID].Tasks[l.Task]
-		stageLogs := task.GetStageLog(l.Stage)
-		// update task
-		task.Updated = model.UnixTime()
-		stageLogs.InsertLogs(l)
+		m.targets[response.TargetID].Logs[l.Task].InsertLogs(l)
 	}
 	// remove old tasks
 	const max = 2
-	if len(m.targets[response.TargetID].Tasks) > max {
+	if len(m.targets[response.TargetID].Logs) > max {
 		var times []int64
-		for k := range m.targets[response.TargetID].Tasks {
+		for k := range m.targets[response.TargetID].Logs {
 			times = append(times, m.orders[k].Created)
 		}
 		sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
 		// delete the oldest item(s)
 		pivot := times[len(times)-max]
-		for k := range m.targets[response.TargetID].Tasks {
+		for k := range m.targets[response.TargetID].Logs {
 			if m.orders[k].Created < pivot {
 				log.Println("Removing logs for", k)
-				delete(m.targets[response.TargetID].Tasks, k)
+				delete(m.targets[response.TargetID].Logs, k)
 			}
 		}
 	}
