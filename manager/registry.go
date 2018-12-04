@@ -8,18 +8,18 @@ import (
 )
 
 const (
-	SystemLogsKey = "SYS"
+	systemLogsKey = "SYS"
 )
 
 type registry struct {
-	orders  map[string]*Order
-	targets map[string]*Target
+	orders  map[string]*order
+	targets map[string]*target
 }
 
 //
-// Order
+// ORDER
 //
-type Order struct {
+type order struct {
 	model.Header `yaml:",inline"`
 	Stages       model.Stages `json:"stages"`
 	Target       struct {
@@ -29,7 +29,7 @@ type Order struct {
 	Receivers []string `json:"receivers"`
 }
 
-func (o Order) Validate() error {
+func (o order) validate() error {
 	if len(o.Stages.Transfer)+len(o.Stages.Install)+len(o.Stages.Run) == 0 {
 		return fmt.Errorf("empty stages")
 	}
@@ -39,79 +39,79 @@ func (o Order) Validate() error {
 //
 // TARGET
 //
-type Target struct {
+type target struct {
 	Tags           []string           `json:"tags"`
-	Logs           map[string]*Logs   `json:"logs"`
+	Logs           map[string]*logs   `json:"logs"`
 	LastLogRequest model.UnixTimeType `json:"lastLogRequest"`
 }
 
-func newTarget() *Target {
-	return &Target{
-		Logs: make(map[string]*Logs),
-	}
-}
-
-func (t *Target) initTask(id string) {
-	if _, found := t.Logs[id]; !found {
-		t.Logs[id] = new(Logs)
-	}
-}
-
-type Logs struct {
-	Stages
+type logs struct {
+	stages
 	Updated model.UnixTimeType `json:"updated"`
 }
 
-func (logs *Logs) GetStageLog(stage string) map[string][]Log {
-	switch stage {
-	case model.StageTransfer:
-		return logs.Stages.Transfer
-	case model.StageInstall:
-		return logs.Stages.Install
-	case model.StageRun:
-		return logs.Stages.Run
-	}
-	log.Println("ERROR: Unknown/unsupported stage:", stage)
-	return nil
+type stages struct {
+	Transfer map[string][]stageLog `json:"transfer"`
+	Install  map[string][]stageLog `json:"install"`
+	Run      map[string][]stageLog `json:"run"`
 }
 
-type Stages struct {
-	Transfer map[string][]Log `json:"transfer"`
-	Install  map[string][]Log `json:"install"`
-	Run      map[string][]Log `json:"run"`
-}
-
-type Log struct {
+type stageLog struct {
 	Output string             `json:"output"`
 	Error  bool               `json:"error,omitempty"`
 	Time   model.UnixTimeType `json:"time"`
 }
 
-func (logs *Logs) InsertLogs(l model.Log) {
+func newTarget() *target {
+	return &target{
+		Logs: make(map[string]*logs),
+	}
+}
+
+func (t *target) initTask(id string) {
+	if _, found := t.Logs[id]; !found {
+		t.Logs[id] = new(logs)
+	}
+}
+
+func (logs *logs) getStage(stage string) map[string][]stageLog {
+	switch stage {
+	case model.StageTransfer:
+		return logs.stages.Transfer
+	case model.StageInstall:
+		return logs.stages.Install
+	case model.StageRun:
+		return logs.stages.Run
+	}
+	log.Println("ERROR: Unknown/unsupported stage:", stage)
+	return nil
+}
+
+func (logs *logs) insert(l model.Log) {
 	if l.Command == "" {
-		l.Command = SystemLogsKey
+		l.Command = systemLogsKey
 	}
 
 	// TODO this is as ugly as code can get
-	s := logs.GetStageLog(l.Stage)
+	s := logs.getStage(l.Stage)
 	if s == nil {
-		s = make(map[string][]Log)
+		s = make(map[string][]stageLog)
 	}
 	commit := func() {
 		switch l.Stage {
 		case model.StageTransfer:
-			logs.Stages.Transfer = s
+			logs.stages.Transfer = s
 		case model.StageInstall:
-			logs.Stages.Install = s
+			logs.stages.Install = s
 		case model.StageRun:
-			logs.Stages.Run = s
+			logs.stages.Run = s
 		}
 		logs.Updated = model.UnixTime()
 	}
 
 	// first insertion
 	if len(s[l.Command]) == 0 {
-		s[l.Command] = append(s[l.Command], Log{l.Output, l.Error, l.Time})
+		s[l.Command] = append(s[l.Command], stageLog{l.Output, l.Error, l.Time})
 		commit()
 		return
 	}
@@ -131,13 +131,13 @@ func (logs *Logs) InsertLogs(l model.Log) {
 	}
 	// append to the end
 	if i == len(s[l.Command]) {
-		s[l.Command] = append(s[l.Command], Log{l.Output, l.Error, l.Time})
+		s[l.Command] = append(s[l.Command], stageLog{l.Output, l.Error, l.Time})
 		commit()
 		return
 	}
-	// InsertLogs in the middle
-	s[l.Command] = append(s[l.Command], Log{})
+	// insert in the middle
+	s[l.Command] = append(s[l.Command], stageLog{})
 	copy(s[l.Command][i+1:], s[l.Command][i:])
-	s[l.Command][i] = Log{l.Output, l.Error, l.Time}
+	s[l.Command][i] = stageLog{l.Output, l.Error, l.Time}
 	commit()
 }

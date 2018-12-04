@@ -13,6 +13,10 @@ import (
 	"github.com/mholt/archiver"
 )
 
+const (
+	maxTasksInMemory = 2
+)
+
 type manager struct {
 	sync.RWMutex
 	registry
@@ -27,14 +31,14 @@ func startManager(pipe model.Pipe) (*manager, error) {
 		update: sync.NewCond(&sync.Mutex{}),
 	}
 
-	m.targets = make(map[string]*Target)
-	m.orders = make(map[string]*Order)
+	m.targets = make(map[string]*target)
+	m.orders = make(map[string]*order)
 
 	go m.manageResponses()
 	return m, nil
 }
 
-func (m *manager) addOrder(order *Order) error {
+func (m *manager) addOrder(order *order) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -81,7 +85,7 @@ TARGETS:
 	return nil
 }
 
-func (m *manager) getOrders() (map[string]*Order, error) {
+func (m *manager) getOrders() (map[string]*order, error) {
 	m.RLock()
 	defer m.RUnlock()
 	return m.orders, nil
@@ -200,18 +204,17 @@ func (m *manager) processResponse(response *model.Response) {
 	for _, l := range response.Logs {
 		m.targets[response.TargetID].initTask(l.Task)
 
-		m.targets[response.TargetID].Logs[l.Task].InsertLogs(l)
+		m.targets[response.TargetID].Logs[l.Task].insert(l)
 	}
 	// remove old tasks
-	const max = 2
-	if len(m.targets[response.TargetID].Logs) > max {
+	if len(m.targets[response.TargetID].Logs) > maxTasksInMemory {
 		var times []int64
 		for k := range m.targets[response.TargetID].Logs {
 			times = append(times, m.orders[k].Created)
 		}
 		sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
 		// delete the oldest item(s)
-		pivot := times[len(times)-max]
+		pivot := times[len(times)-maxTasksInMemory]
 		for k := range m.targets[response.TargetID].Logs {
 			if m.orders[k].Created < pivot {
 				log.Println("Removing logs for", k)

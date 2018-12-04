@@ -70,7 +70,7 @@ func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 	decoder := yaml.NewDecoder(r.Body)
 	defer r.Body.Close()
 
-	var order Order
+	var order order
 	err := decoder.Decode(&order)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
@@ -78,7 +78,7 @@ func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Received order:", order)
 
-	err = order.Validate()
+	err = order.validate()
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, "Invalid order: ", err)
 		return
@@ -123,7 +123,7 @@ func (a *restAPI) GetOrders(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) GetTargets(w http.ResponseWriter, r *http.Request) {
 
-	//var targets []*model.Target
+	//var targets []*model.target
 	//for _, t := range a.manager.targets {
 	//	targets = append(targets, t)
 	//}
