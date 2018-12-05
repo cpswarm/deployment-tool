@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -232,12 +233,20 @@ func (c *zmqClient) loadKeys() (string, string, string, error) {
 	if err != nil {
 		return "", "", "", fmt.Errorf("error reading client private key: %s", err)
 	}
+	clientSecret, err = base64.StdEncoding.DecodeString(string(clientSecret))
+	if err != nil {
+		return "", "", "", fmt.Errorf("error decoding client private key: %s", err)
+	}
 
 	clientPublic, err := ioutil.ReadFile(publicKeyPath)
 	if err != nil {
 		return "", "", "", fmt.Errorf("error reading client public key: %s", err)
 	}
 	log.Println("zeromq: Public key ->", string(bytes.TrimSpace(clientPublic)))
+	clientPublic, err = base64.StdEncoding.DecodeString(string(clientPublic))
+	if err != nil {
+		return "", "", "", fmt.Errorf("error decoding client public key: %s", err)
+	}
 
 	var serverPublic []byte
 	if managerKeyStr == "" {
@@ -247,8 +256,13 @@ func (c *zmqClient) loadKeys() (string, string, string, error) {
 		}
 	} else {
 		// take key directly from variable
-		log.Printf("zeromq: Using manager public key from env: %s", managerKeyStr)
+		log.Printf("zeromq: Read manager public key from env variable.")
 		serverPublic = []byte(managerKeyStr)
+	}
+	log.Printf("zeromq: manager public key: %s", string(serverPublic))
+	serverPublic, err = base64.StdEncoding.DecodeString(string(serverPublic))
+	if err != nil {
+		return "", "", "", fmt.Errorf("error decoding manager public key: %s", err)
 	}
 
 	return string(bytes.TrimSpace(serverPublic)), string(bytes.TrimSpace(clientSecret)), string(bytes.TrimSpace(clientPublic)), nil

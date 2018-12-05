@@ -1,6 +1,7 @@
 package zeromq
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -33,16 +34,18 @@ func NewCurveKeypair(privateFile, publicFile string) error {
 	defer f2.Close()
 
 	// write private key
-	if _, err := f.Write([]byte(private + "\n")); err != nil {
+	encoded := base64.StdEncoding.EncodeToString([]byte(private))
+	if _, err := f.Write([]byte(encoded)); err != nil {
 		return err
 	}
 	// write public key
-	if _, err := f2.Write([]byte(public + "\n")); err != nil {
+	encoded = base64.StdEncoding.EncodeToString([]byte(public))
+	if _, err := f2.Write([]byte(encoded)); err != nil {
 		return err
 	}
 	fmt.Println("Saved key pair:")
 	fmt.Printf("\t%s (private key)\n", privateFile)
-	fmt.Printf("\t%s (public key) -> %s\n", publicFile, public)
+	fmt.Printf("\t%s (public key) -> %s\n", publicFile, encoded)
 
 	return nil
 }
@@ -65,6 +68,10 @@ func loadServerKey() (string, error) {
 	key, err := ioutil.ReadFile(privateKeyPath)
 	if err != nil {
 		return "", fmt.Errorf("error reading server private key: %s", err)
+	}
+	key, err = base64.StdEncoding.DecodeString(string(key))
+	if err != nil {
+		return "", fmt.Errorf("error decoding server private key: %s", err)
 	}
 	fmt.Println("Loaded server key.")
 	return string(key), nil
@@ -95,7 +102,12 @@ func loadClientKeys() error {
 			log.Println("Invalid format in client key file line", i+1)
 			continue
 		}
-		zmq.AuthCurveAdd(DomainAll, parts[1])
+		decoded, err := base64.StdEncoding.DecodeString(parts[1])
+		if err != nil {
+			log.Println("Unable to decode client key file line", i+1)
+			continue
+		}
+		zmq.AuthCurveAdd(DomainAll, string(decoded))
 		log.Println("Added client key for:", parts[0])
 	}
 
