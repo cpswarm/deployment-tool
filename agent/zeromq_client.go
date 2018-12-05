@@ -213,6 +213,7 @@ func (c *zmqClient) loadKeys() (string, string, string, error) {
 	privateKeyPath := os.Getenv(EnvPrivateKey)
 	publicKeyPath := os.Getenv(EnvPublicKey)
 	managerKeyPath := os.Getenv(EnvManagerPublicKey)
+	managerKeyStr := os.Getenv(EnvManagerPublicKeyStr)
 
 	if privateKeyPath == "" {
 		privateKeyPath = DefaultPrivateKeyPath
@@ -238,9 +239,16 @@ func (c *zmqClient) loadKeys() (string, string, string, error) {
 	}
 	log.Println("zeromq: Public key ->", string(bytes.TrimSpace(clientPublic)))
 
-	serverPublic, err := ioutil.ReadFile(managerKeyPath)
-	if err != nil {
-		return "", "", "", fmt.Errorf("error reading server public key: %s", err)
+	var serverPublic []byte
+	if managerKeyStr == "" {
+		serverPublic, err = ioutil.ReadFile(managerKeyPath)
+		if err != nil {
+			return "", "", "", fmt.Errorf("error reading server public key: %s", err)
+		}
+	} else {
+		// take key directly from variable
+		log.Printf("zeromq: Using manager public key from env: %s", managerKeyStr)
+		serverPublic = []byte(managerKeyStr)
 	}
 
 	return string(bytes.TrimSpace(serverPublic)), string(bytes.TrimSpace(clientSecret)), string(bytes.TrimSpace(clientPublic)), nil

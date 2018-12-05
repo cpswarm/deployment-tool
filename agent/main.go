@@ -13,16 +13,17 @@ import (
 
 const (
 	// Environment keys
-	EnvDebug            = "DEBUG"              // print debug messages
-	EnvVerbose          = "VERBOSE"            // print extra information e.g. line number)
-	EnvDisableLogTime   = "DISABLE_LOG_TIME"   // disable timestamp in logs
-	EnvDisableAuth      = "DISABLE_AUTH"       // disable authentication completely
-	EnvPrivateKey       = "PRIVATE_KEY"        // path to private key of agent
-	EnvPublicKey        = "PUBLIC_KEY"         // path to public key of agent
-	EnvManagerPublicKey = "MANAGER_PUBLIC_KEY" // path to public key of manager
-	EnvManagerHost      = "MANAGER_HOST"
-	EnvManagerSubPort   = "MANAGER_SUB_PORT"
-	EnvManagerPubPort   = "MANAGER_PUB_PORT"
+	EnvDebug               = "DEBUG"                  // print debug messages
+	EnvVerbose             = "VERBOSE"                // print extra information e.g. line number)
+	EnvDisableLogTime      = "DISABLE_LOG_TIME"       // disable timestamp in logs
+	EnvDisableAuth         = "DISABLE_AUTH"           // disable authentication completely
+	EnvPrivateKey          = "PRIVATE_KEY"            // path to private key of agent
+	EnvPublicKey           = "PUBLIC_KEY"             // path to public key of agent
+	EnvManagerPublicKey    = "MANAGER_PUBLIC_KEY"     // path to public key of manager
+	EnvManagerPublicKeyStr = "MANAGER_PUBLIC_KEY_STR" // public key of manager (overrides file)
+	EnvManagerHost         = "MANAGER_HOST"
+	EnvManagerSubPort      = "MANAGER_SUB_PORT"
+	EnvManagerPubPort      = "MANAGER_PUB_PORT"
 	// Default values
 	DefaultEnvFile        = "./.env"       // path to environment variables file
 	DefaultStateFile      = "./state.json" // path to agent state file
@@ -105,10 +106,10 @@ func evalEnv(key string) bool {
 }
 
 func parseFlags() bool {
-	newKeys := flag.Bool("newkeypair", false, "Generate new Curve keypair")
+	name := flag.String("newkeypair", "", "Generate new Curve keypair with the given name")
 	flag.Parse()
-	if *newKeys {
-		err := zeromq.NewCurveKeypair("agent.key", "agent.pub")
+	if *name != "" {
+		err := zeromq.NewCurveKeypair(*name+".key", *name+".pub")
 		if err != nil {
 			fmt.Println("Error creating keypair:", err)
 			os.Exit(1)
