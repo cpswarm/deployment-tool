@@ -210,13 +210,20 @@ func (m *manager) processResponse(response *model.Response) {
 	if len(m.targets[response.TargetID].Logs) > maxTasksInMemory {
 		var times []int64
 		for k := range m.targets[response.TargetID].Logs {
+			// TODO this should not be needed if registry is persisted
+			if _, found := m.orders[k]; !found {
+				log.Println("Adding missing order to registry (Created=0):", k)
+				m.orders[k] = &order{}
+				m.orders[k].ID = k
+				m.orders[k].Created = 0
+			}
 			times = append(times, m.orders[k].Created)
 		}
 		sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
 		// delete the oldest item(s)
 		pivot := times[len(times)-maxTasksInMemory]
 		for k := range m.targets[response.TargetID].Logs {
-			if m.orders[k].Created < pivot {
+			if m.orders[k].Created == 0 || m.orders[k].Created < pivot {
 				log.Println("Removing logs for", k)
 				delete(m.targets[response.TargetID].Logs, k)
 			}
