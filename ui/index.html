@@ -82,7 +82,7 @@
     <table id="app" class="table table-sm borderless">
         <tbody>
         <tr v-for="(target, targetID) in targets"><td>
-            <h5>{{targetID}} <span v-for="tag in target.Tags" class="badge badge-secondary tag">{{tag}}</span>
+            <h5>{{targetID}} <span v-for="tag in target.tags" class="badge badge-secondary tag">{{tag}}</span>
                 <button type="button" v-on:click="fetchLogs(targetID)" class="btn btn-outline-dark btn-sm float-right">Request Logs</button></h5>
 
             <div id="tasksAccordion">
