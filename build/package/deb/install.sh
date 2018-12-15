@@ -1,6 +1,5 @@
 #!/bin/sh
-set -e
-echo "INSTALLING DEPLOYMENT AGENT AS A SERVICE"
+echo "DEPLOYMENT AGENT INSTALLER"
 
 # check arguments
 if [ -z "$1" ]
@@ -9,12 +8,20 @@ then
 	exit 1
 fi
 
+wd=/var/local/linksmart-deployment-agent
+echo "\nRemoving old files..."
+echo "==============================================="
+ls deployment-agent-linux-arm.deb*
+rm deployment-agent-linux-arm.deb*
+ls $wd/.env
+rm $wd/.env
+
+set -e
+
 echo "\nDownloading and installing the debian package:"
 echo "==============================================="
-rm deployment-agent-linux-arm.deb*
 wget https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/linux-arm-debian-package/deployment-agent-linux-arm.deb
 apt install ./deployment-agent-linux-arm.deb
-wd=/var/local/linksmart-deployment-agent
 
 echo "\nWriting variables to $wd/.env:"
 echo "==============================================="
