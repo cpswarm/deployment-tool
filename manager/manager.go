@@ -42,11 +42,23 @@ func (m *manager) addOrder(order *order) error {
 	m.Lock()
 	defer m.Unlock()
 
+	var topics []string
+
 TARGETS:
 	for id, target := range m.targets {
+		// target by id
+		for _, id2 := range order.Target.IDs {
+			if id == id2 {
+				topics = append(topics, model.FormatTopicID(id))
+				order.Receivers = append(order.Receivers, id)
+				continue TARGETS
+			}
+		}
+		// target by tag
 		for _, t := range target.Tags {
 			for _, t2 := range order.Target.Tags {
 				if t == t2 {
+					topics = append(topics, model.FormatTopicTag(t))
 					order.Receivers = append(order.Receivers, id)
 					continue TARGETS
 				}
@@ -79,7 +91,7 @@ TARGETS:
 	log.Println("Added order:", order.ID)
 
 	if len(order.Receivers) > 0 {
-		go m.sendTask(&ann, &task, order.Target.Tags, order.Receivers)
+		go m.sendTask(&ann, &task, topics, order.Receivers)
 	}
 
 	return nil
@@ -100,16 +112,17 @@ func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (m *manager) sendTask(ann *model.Announcement, task *model.Task, targetTags, matchingTargets []string) {
+func (m *manager) sendTask(ann *model.Announcement, task *model.Task, topics, matchingTargets []string) {
 
 	for pending := true; pending; {
-		log.Printf("sendTask: %s", task.ID)
+		log.Printf("Sending task %s to %s", task.ID, topics)
 		//log.Printf("sendTask: %+v", task)
 
 		// send announcement
-		b, _ := json.Marshal(ann)
-		for _, tag := range targetTags {
-			m.pipe.RequestCh <- model.Message{model.TargetTag(tag), b}
+		w := model.RequestWrapper{Announcement: ann}
+		b, _ := json.Marshal(w)
+		for _, topic := range topics {
+			m.pipe.RequestCh <- model.Message{topic, b}
 		}
 
 		time.Sleep(time.Second)
@@ -135,9 +148,12 @@ func (m *manager) sendTask(ann *model.Announcement, task *model.Task, targetTags
 }
 
 func (m *manager) requestLogs(targetID string) error {
-	b, _ := json.Marshal(&model.LogRequest{m.targets[targetID].LastLogRequest})
+	w := model.RequestWrapper{LogRequest: &model.LogRequest{
+		IfModifiedSince: m.targets[targetID].LastLogRequest,
+	}}
+	b, _ := json.Marshal(&w)
 	m.pipe.RequestCh <- model.Message{
-		Topic:   model.TargetTopic(targetID),
+		Topic:   model.FormatTopicID(targetID),
 		Payload: b,
 	}
 	return nil

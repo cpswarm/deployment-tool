@@ -124,39 +124,45 @@ func (a *agent) loadConf() {
 }
 
 func (a *agent) startWorker() {
-	log.Printf("Subscribing to topics...")
-	topicMap := make(map[string]bool)
-	for _, tag := range a.target.Tags {
-		tag = model.TargetTag(tag)
-		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(tag)}
-		topicMap[tag] = true
-	}
-	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetAll)}
-	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(model.RequestTargetID + model.PrefixSeparator + a.target.ID)}
+	topics := a.subscribe()
 
 	log.Println("Waiting for connection and requests...")
 	var latestMessageChecksum [16]byte
 	for request := range a.pipe.RequestCh {
+		log.Println("Request:", request.Topic)
 		switch {
 		case request.Topic == model.PipeConnected:
 			go a.advertiseTarget()
 		case request.Topic == model.PipeDisconnected:
 			a.disconnected <- true
-		case request.Topic == model.RequestTargetAll:
-			// do nothing for now
-		case request.Topic == model.TargetTopic(a.target.ID):
-			a.sendLogs(request.Payload)
-		case topicMap[request.Topic]:
-			// an announcement is received as many matching tags but needs to be processed only once
+		case topics[request.Topic]:
+			// a request may be received on few topics but needs to be processed only once
 			sum := md5.Sum(request.Payload)
 			if latestMessageChecksum != sum {
-				go a.handleAnnouncement(request.Payload)
+				go a.handleRequest(request.Payload)
 				latestMessageChecksum = sum
 			}
 		default:
-			go a.handleTask(request.Topic, request.Payload)
+			// topic is the task id
+			go a.handleTask(request.Payload)
 		}
 	}
+}
+
+func (a *agent) subscribe() map[string]bool {
+	log.Printf("Subscribing to topics...")
+
+	topics := make(map[string]bool)
+	topics[model.RequestTargetAll] = true
+	topics[model.FormatTopicID(a.target.ID)] = true
+	for _, tag := range a.target.Tags {
+		topics[model.FormatTopicTag(tag)] = true
+	}
+
+	for topic := range topics {
+		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(topic)}
+	}
+	return topics
 }
 
 func (a *agent) advertiseTarget() {
@@ -176,14 +182,29 @@ func (a *agent) advertiseTarget() {
 	}
 }
 
-func (a *agent) handleAnnouncement(payload []byte) {
-	var taskA model.Announcement
-	err := json.Unmarshal(payload, &taskA)
+func (a *agent) handleRequest(payload []byte) {
+	var w model.RequestWrapper
+	err := json.Unmarshal(payload, &w)
 	if err != nil {
-		log.Printf("Error parsing announcement: %s", err) // TODO send to manager
+		log.Printf("Error parsing request: %s", err) // TODO send to manager
+		return
 	}
 	payload = nil // to release memory
 
+	// Request is one of these types:
+	switch {
+	case w.Announcement != nil:
+		a.handleAnnouncement(w.Announcement)
+	case w.LogRequest != nil:
+		a.sendLogs(w.LogRequest)
+	case w.Command != nil:
+		// TODO execute a single command and send the logs
+	default:
+		log.Printf("Invalid request: %s->%v", string(payload), w) // TODO send to manager
+	}
+}
+
+func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 	log.Printf("Received announcement: %s", taskA.ID)
 	a.sendTransferResponse(taskA.ID, model.StageStart, false, taskA.Debug)
 
@@ -205,9 +226,7 @@ func (a *agent) handleAnnouncement(payload []byte) {
 }
 
 // TODO make this sequenctial
-func (a *agent) handleTask(id string, payload []byte) {
-	log.Printf("Received task: %s", id)
-
+func (a *agent) handleTask(payload []byte) {
 	var task model.Task
 	err := json.Unmarshal(payload, &task)
 	if err != nil {
@@ -215,6 +234,8 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}
 	payload = nil // to release memory
 	//runtime.GC() ?
+
+	log.Printf("Received task: %s", task.ID)
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
 	a.sendTransferResponse(task.ID, "received task", false, task.Debug)
@@ -236,12 +257,7 @@ func (a *agent) handleTask(id string, payload []byte) {
 	}
 }
 
-func (a *agent) sendLogs(payload []byte) {
-	var request model.LogRequest
-	err := json.Unmarshal(payload, &request)
-	if err != nil {
-		log.Printf("Error parsing log request: %s", err) // TODO send to manager
-	}
+func (a *agent) sendLogs(request *model.LogRequest) {
 	log.Println("Received log request since", request.IfModifiedSince)
 	a.logger.Report(request)
 }

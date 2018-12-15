@@ -15,7 +15,7 @@ const (
 )
 
 type Logger interface {
-	Report(model.LogRequest)
+	Report(*model.LogRequest)
 	Writer() chan<- model.Log
 }
 
@@ -48,7 +48,7 @@ func NewLogger(targetID string, debug bool, responseCh chan<- model.Message) Log
 	return l
 }
 
-func (l *logger) Report(request model.LogRequest) {
+func (l *logger) Report(request *model.LogRequest) {
 	logs := l.buffer.Collect()
 	// send logs since request.IfModifiedSince
 	for i := range logs {

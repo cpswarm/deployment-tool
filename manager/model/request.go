@@ -1,7 +1,7 @@
 package model
 
 const (
-	// Request types
+	// Request types (should not contain PrefixSeparator or TopicSeperator chars)
 	RequestTargetAll = "ALL"
 	RequestTargetID  = "ID"
 	RequestTargetTag = "TAG"
@@ -25,9 +25,9 @@ type Stages struct {
 
 // Header contains information that is common among task related structs
 type Header struct {
-	ID    string `json:"id"`
-	Debug bool   `json:"debug"`
-	Created  int64  `json:"created"`
+	ID      string `json:"id"`
+	Debug   bool   `json:"debug"`
+	Created int64  `json:"created"`
 }
 
 // Announcement carries information about a task
@@ -47,10 +47,17 @@ type LogRequest struct {
 	IfModifiedSince UnixTimeType
 }
 
-func TargetTopic(id string) string {
+// RequestWrapper is the struct of messages sent to request topics
+type RequestWrapper struct {
+	Announcement *Announcement `json:"a,omitempty"`
+	LogRequest   *LogRequest   `json:"l,omitempty"`
+	Command      *string       `json:"c,omitempty"`
+}
+
+func FormatTopicID(id string) string {
 	return RequestTargetID + PrefixSeparator + id
 }
 
-func TargetTag(tag string) string {
+func FormatTopicTag(tag string) string {
 	return RequestTargetTag + PrefixSeparator + tag
 }

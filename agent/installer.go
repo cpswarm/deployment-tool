@@ -23,7 +23,7 @@ func newInstaller(logger chan<- model.Log) installer {
 	}
 }
 
-func (i *installer) evaluate(ann model.Announcement) bool {
+func (i *installer) evaluate(ann *model.Announcement) bool {
 	sizeLimit := memory.TotalMemory() / 2 // TODO calculate this based on the available memory
 	return uint64(ann.Size) <= sizeLimit
 }
