@@ -20,7 +20,7 @@ const (
 type Response struct {
 	TargetID  string
 	Logs      []Log
-	OnRequest bool `json:",omitempty"'` // true when logs were requested explicitly
+	OnRequest bool `json:",omitempty"` // true when logs were requested explicitly
 }
 
 // UnixTimeType is the type used for log timestamps
@@ -34,22 +34,22 @@ func UnixTime() UnixTimeType {
 type Log struct {
 	Task    string
 	Stage   string
-	Command string `json:",omitempty"'` // TODO is command unique within a stage?
+	Command string `json:",omitempty"` // TODO is command unique within a stage?
 	Output  string
-	Error   bool         `json:",omitempty"'`
-	Time    UnixTimeType `json:",omitempty"'`
+	Error   bool         `json:",omitempty"`
+	Time    UnixTimeType `json:",omitempty"`
 	Debug   bool         `json:"-"`
 }
 
 type Target struct {
 	// identification attributes
 	ID        string   // TODO change this to alias and always generate UUID ? alias==tag ? //
-	AutoGenID string   `json:",omitempty"'`
-	Tags      []string `json:",omitempty"'`
+	AutoGenID string   `json:",omitempty"`
+	Tags      []string `json:",omitempty"`
 
 	// active task
-	TaskID      string   `json:",omitempty"'`
-	TaskDebug   bool     `json:",omitempty"'`
-	TaskRun     []string `json:",omitempty"'`
-	TaskHistory []string `json:",omitempty"'`
+	TaskID      string   `json:",omitempty"`
+	TaskDebug   bool     `json:",omitempty"`
+	TaskRun     []string `json:",omitempty"`
+	TaskHistory []string `json:",omitempty"`
 }
