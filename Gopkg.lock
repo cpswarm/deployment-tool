@@ -82,6 +82,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:15057fc7395024283a7d2639b8afc61c5b6df3fe260ce06ff5834c8464f16b5c"
+  name = "github.com/otiai10/copy"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "7e9a647135a142c2669943d4a4d29be015ce9392"
+
+[[projects]]
+  branch = "master"
   digest = "1:4db5962a88cd63de6187a876406664f565c244ae9d6226a7420b5278940c8d97"
   name = "github.com/pbnjay/memory"
   packages = ["."]
@@ -167,6 +175,7 @@
     "github.com/gorilla/websocket",
     "github.com/joho/godotenv",
     "github.com/mholt/archiver",
+    "github.com/otiai10/copy",
     "github.com/pbnjay/memory",
     "github.com/pborman/uuid",
     "github.com/pebbe/zmq4",

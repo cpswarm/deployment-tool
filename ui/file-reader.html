@@ -1,0 +1,66 @@
+<html>
+<head>
+    <script src="lib/jszip-3.1.5.min.js"></script>
+</head>
+<body>
+
+<input type="file" id="files" name="files[]" webkitdirectory multiple />
+<output id="list"></output>
+
+<script>
+    function handleFileSelect(evt) {
+        var files = evt.target.files; // FileList object
+
+        var output = [];
+
+        new Promise(function(resolve, reject) {
+            // too many files may cause problems
+            console.log("Selected files:", files.length);
+
+            var archive = (new JSZip()).folder("archive");
+            var pending = files.length;
+
+            for (var i = 0, f; f = files[i]; i++) {
+                output.push('<li><strong>', escape(f.name), '</strong> (', f.type || 'n/a', ') - ',
+                    f.size, ' bytes, last modified: ',
+                    f.lastModifiedDate ? f.lastModifiedDate.toLocaleDateString() : 'n/a',
+                    '</li>');
+
+                // console.log(f);
+
+                var reader = new FileReader();
+
+                // Closure to capture the file information.
+                reader.onload = (function (file) {
+                    return function (e) {
+                        // console.log("e:", e.target.result);
+                        console.log("loaded:", file.webkitRelativePath);
+                        // parent directory name is in the path
+                        archive.file(file.webkitRelativePath, e.target.result)
+
+                        // count down and resolve promise
+                        pending--;
+                        if(pending == 0){
+                            resolve(archive);
+                        }
+                    };
+                })(f);
+
+                // Read in the image file as a data URL.
+                reader.readAsArrayBuffer(f); // bytes array
+                // reader.readAsDataURL(f); // header + base64_encoded
+            }
+            document.getElementById('list').innerHTML = '<ul>' + output.join('') + '</ul>';
+        }).then(function(archive) {
+            return archive.generateAsync({type: "base64"});
+        }).then(function (z) {
+            console.log("zip", z);
+        });
+
+
+    }
+
+    document.getElementById('files').addEventListener('change', handleFileSelect, false);
+</script>
+</body>
+</html>
