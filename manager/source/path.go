@@ -16,7 +16,7 @@ func (paths Paths) Copy(workDir, orderID string) error {
 	for _, path := range paths {
 		parts := strings.Split(strings.TrimSuffix(path, "/"), "/")
 		name := parts[len(parts)-1]
-		err := copier.Copy(path, fmt.Sprintf("%s/orders/%s/%s", workDir, orderID, name))
+		err := copier.Copy(path, fmt.Sprintf("%s/%s/%s", OrdersDir, orderID, name))
 		if err != nil {
 			return err
 		}

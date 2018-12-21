@@ -101,7 +101,9 @@
                                 <template v-if="name !== 'updated' && stage">
                                     <span class="badge badge-primary">{{name}}</span>
                                     <div>
-                                        <div class="consolas" v-for="log in stage.SYS">{{formatTime(log.time)}} &nbsp; {{log.output}}</div>
+                                        <div :class="{logerror:log.error}" class="consolas" v-for="log in stage.SYS">
+                                            {{formatTime(log.time)}} &nbsp; {{log.output}}
+                                        </div>
                                         <div class="stageLogs" v-for="(logs, type) in stage">
                                             <template v-if="type !=='SYS'">
                                                 <span class="badge badge-secondary">{{type}}</span>

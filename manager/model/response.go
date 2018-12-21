@@ -20,7 +20,8 @@ const (
 type Response struct {
 	TargetID  string
 	Logs      []Log
-	OnRequest bool `json:",omitempty"` // true when logs were requested explicitly
+	OnRequest bool   `json:",omitempty"` // true when logs were requested explicitly
+	Artifacts []byte `json:",omitempty"`
 }
 
 // UnixTimeType is the type used for log timestamps

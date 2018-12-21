@@ -16,7 +16,7 @@ const (
 )
 
 type Stages struct {
-	//Assemble []string
+	Assemble []string `json:"assemble"`
 	Transfer []string `json:"transfer"`
 	Install  []string `json:"install"`
 	//Test     []string
@@ -52,6 +52,7 @@ type RequestWrapper struct {
 	Announcement *Announcement `json:"a,omitempty"`
 	LogRequest   *LogRequest   `json:"l,omitempty"`
 	Command      *string       `json:"c,omitempty"`
+	Assembly     *[]string     `json:"s,omitempty"`
 }
 
 func FormatTopicID(id string) string {

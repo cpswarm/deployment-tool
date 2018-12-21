@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/source"
 	"github.com/mholt/archiver"
 )
 
@@ -42,14 +43,12 @@ func (m *manager) addOrder(order *order) error {
 	m.Lock()
 	defer m.Unlock()
 
-	var topics []string
-
 TARGETS:
 	for id, target := range m.targets {
 		// target by id
 		for _, id2 := range order.Target.IDs {
 			if id == id2 {
-				topics = append(topics, model.FormatTopicID(id))
+				order.receiverTopics = append(order.receiverTopics, model.FormatTopicID(id))
 				order.Receivers = append(order.Receivers, id)
 				continue TARGETS
 			}
@@ -58,7 +57,7 @@ TARGETS:
 		for _, t := range target.Tags {
 			for _, t2 := range order.Target.Tags {
 				if t == t2 {
-					topics = append(topics, model.FormatTopicTag(t))
+					order.receiverTopics = append(order.receiverTopics, model.FormatTopicTag(t))
 					order.Receivers = append(order.Receivers, id)
 					continue TARGETS
 				}
@@ -66,13 +65,126 @@ TARGETS:
 		}
 	}
 	log.Println("Order receivers:", len(order.Receivers))
+	if len(order.Receivers) == 0 {
+		return fmt.Errorf("could not match any device")
+	}
 
-	var compressedArchive []byte
+	// place into work directory
+	err := m.fetchSource(order.ID, order.Source)
+	if err != nil {
+		return fmt.Errorf("error fetching source files: %s", err)
+	}
+
+	m.orders[order.ID] = order
+	log.Println("Added order:", order.ID)
+
+	go m.processOrder(order)
+	return nil
+}
+
+func (m *manager) getOrders() (map[string]*order, error) {
+	m.RLock()
+	defer m.RUnlock()
+	return m.orders, nil
+}
+
+func (m *manager) processOrder(order *order) {
+
+	if len(order.Stages.Assemble) > 0 {
+		m.assemble(order)
+	} else {
+		m.sendTask(order)
+	}
+}
+
+func (m *manager) initLogger(orderID string, targetIDs ...string) {
+	for _, targetID := range targetIDs {
+		m.targets[targetID].initTask(orderID)
+	}
+}
+
+func (m *manager) compressFiles(orderID string, filePaths []string) ([]byte, error) {
+	// make it relative to order directory
+	for i, path := range filePaths {
+		filePaths[i] = fmt.Sprintf("%s/%s/%s", source.OrdersDir, orderID, path)
+	}
+	var b bytes.Buffer
+	err := archiver.TarGz.Write(&b, filePaths)
+	if err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
+func (m *manager) fetchSource(orderID string, src source.Source) error {
+	switch {
+	case src.Paths != nil:
+		return src.Paths.Copy(WorkDir, orderID)
+	case src.Zip != nil:
+		return src.Zip.Store(WorkDir, orderID)
+	case src.Git != nil:
+		return src.Git.Clone(WorkDir, orderID)
+	}
+	return nil
+}
+
+func (m *manager) assemble(order *order) {
+	/* TODO
+	- send it to the assembler device
+	- get back logs as usuall
+	- get the final result as tar.gz
+	- send acknowledgement and remove it on assembler
+	- continue with the order
+	*/
+	log.Printf("assemble")
+	m.Lock()
+	m.initLogger(order.ID, order.Target.Assembler)
+	m.Unlock()
+
+}
+
+func (m *manager) insertLog(order, stage, message string, targets ...string) {
+	for _, target := range targets {
+		m.targets[target].Logs[order].insert(model.Log{
+			Output: message,
+			Task:   order,
+			Stage:  stage,
+			Time:   model.UnixTime(),
+		})
+	}
+	// sent update notification
+	m.update.Broadcast()
+}
+
+func (m *manager) insertLogError(order, stage, message string, targets ...string) {
+	for _, target := range targets {
+		m.targets[target].Logs[order].insert(model.Log{
+			Output: message,
+			Task:   order,
+			Stage:  stage,
+			Time:   model.UnixTime(),
+			Error:  true,
+		})
+	}
+	// sent update notification
+	m.update.Broadcast()
+}
+
+func (m *manager) sendTask(order *order) {
+	m.Lock()
+	m.initLogger(order.ID, order.Receivers...)
+	m.Unlock()
+
 	var err error
+	var compressedArchive []byte
 	if len(order.Stages.Transfer) > 0 {
-		compressedArchive, err = m.compressFiles(order.Stages.Transfer)
+		m.insertLog(order.ID, model.StageTransfer, model.StageStart, order.Receivers...)
+		compressedArchive, err = m.compressFiles(order.ID, order.Stages.Transfer)
 		if err != nil {
-			return fmt.Errorf("error compressing files: %s", err)
+			log.Printf("error compressing files: %s", err)
+			m.insertLogError(order.ID, model.StageTransfer, fmt.Sprintf("error compressing files: %s", err), order.Receivers...)
+			m.insertLogError(order.ID, model.StageTransfer, model.StageEnd, order.Receivers...)
+			return
 		}
 	}
 
@@ -87,41 +199,14 @@ TARGETS:
 		Artifacts: compressedArchive,
 	}
 
-	m.orders[order.ID] = order
-	log.Println("Added order:", order.ID)
-
-	if len(order.Receivers) > 0 {
-		go m.sendTask(&ann, &task, topics, order.Receivers)
-	}
-
-	return nil
-}
-
-func (m *manager) getOrders() (map[string]*order, error) {
-	m.RLock()
-	defer m.RUnlock()
-	return m.orders, nil
-}
-
-func (m *manager) compressFiles(filePaths []string) ([]byte, error) {
-	var b bytes.Buffer
-	err := archiver.TarGz.Write(&b, filePaths)
-	if err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
-}
-
-func (m *manager) sendTask(ann *model.Announcement, task *model.Task, topics, matchingTargets []string) {
-
 	for pending := true; pending; {
-		log.Printf("Sending task %s to %s", task.ID, topics)
+		log.Printf("Sending task %s to %s", task.ID, order.receiverTopics)
 		//log.Printf("sendTask: %+v", task)
 
 		// send announcement
-		w := model.RequestWrapper{Announcement: ann}
+		w := model.RequestWrapper{Announcement: &ann}
 		b, _ := json.Marshal(w)
-		for _, topic := range topics {
+		for _, topic := range order.receiverTopics {
 			m.pipe.RequestCh <- model.Message{topic, b}
 		}
 
@@ -138,7 +223,7 @@ func (m *manager) sendTask(ann *model.Announcement, task *model.Task, topics, ma
 
 		// TODO which messages are received, what is pending?
 		pending = false
-		for _, match := range matchingTargets {
+		for _, match := range order.Receivers {
 			if _, found := m.targets[match].Logs[task.ID]; !found {
 				pending = true
 			}
@@ -195,6 +280,7 @@ func (m *manager) processTarget(target *model.Target) {
 
 	if _, found := m.targets[target.ID]; !found {
 		m.targets[target.ID] = newTarget()
+		m.initLogger(target.TaskID, target.ID)
 	}
 	m.targets[target.ID].Tags = target.Tags
 }
@@ -213,13 +299,11 @@ func (m *manager) processResponse(response *model.Response) {
 
 	// response to log request
 	if response.OnRequest {
-		sync := response.Logs[len(response.Logs)-1].Time
-		m.targets[response.TargetID].LastLogRequest = sync
+		m.targets[response.TargetID].LastLogRequest = response.Logs[len(response.Logs)-1].Time
 	}
 
 	for _, l := range response.Logs {
-		m.targets[response.TargetID].initTask(l.Task)
-
+		m.initLogger(l.Task, response.TargetID) // TODO let the device send all task ids in advertisement and init during discovery?
 		m.targets[response.TargetID].Logs[l.Task].insert(l)
 	}
 	// remove old tasks

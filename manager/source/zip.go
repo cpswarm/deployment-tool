@@ -19,7 +19,7 @@ func (zip Zip) Store(workDir, orderID string) error {
 		return err
 	}
 	log.Printf("Size of data: %d bytes", len(data))
-	err = archiver.Zip.Read(bytes.NewBuffer(data), fmt.Sprintf("%s/orders/%s", workDir, orderID))
+	err = archiver.Zip.Read(bytes.NewBuffer(data), fmt.Sprintf("%s/%s", OrdersDir, orderID))
 	if err != nil {
 		return err
 	}

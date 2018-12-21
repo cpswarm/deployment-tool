@@ -206,7 +206,7 @@ func (a *agent) handleRequest(payload []byte) {
 
 func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 	log.Printf("Received announcement: %s", taskA.ID)
-	a.sendTransferResponse(taskA.ID, model.StageStart, false, taskA.Debug)
+	//a.sendTransferResponse(taskA.ID, model.StageStart, false, taskA.Debug)
 
 	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
 		if a.target.TaskHistory[i] == taskA.ID {

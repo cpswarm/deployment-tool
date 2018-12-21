@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/source"
 )
 
 const (
@@ -21,17 +23,26 @@ type registry struct {
 //
 type order struct {
 	model.Header `yaml:",inline"`
+	Source       source.Source
 	Stages       model.Stages `json:"stages"`
 	Target       struct {
-		IDs  []string `json:"ids"`
-		Tags []string `json:"tags"`
+		Assembler string   `json:"assembler"`
+		IDs       []string `json:"ids"`
+		Tags      []string `json:"tags"`
 	} `json:"targets"`
 	Receivers []string `json:"receivers"`
+	// internal
+	receiverTopics []string
 }
 
 func (o order) validate() error {
 	if len(o.Stages.Transfer)+len(o.Stages.Install)+len(o.Stages.Run) == 0 {
 		return fmt.Errorf("empty stages")
+	}
+	for _, path := range o.Stages.Transfer {
+		if strings.HasPrefix(path, "/") {
+			return fmt.Errorf("transfer path should be relative to source. This path is absolute: %s", path)
+		}
 	}
 	return nil
 }
@@ -51,6 +62,7 @@ type logs struct {
 }
 
 type stages struct {
+	//Assemble map[string][]stageLog `json:"assemble"`
 	Transfer map[string][]stageLog `json:"transfer"`
 	Install  map[string][]stageLog `json:"install"`
 	Run      map[string][]stageLog `json:"run"`
