@@ -35,6 +35,8 @@ const (
 	DefaultManagerPubPort = "5557"
 )
 
+var WorkDir = "."
+
 func main() {
 	if parseFlags() {
 		return
@@ -42,6 +44,9 @@ func main() {
 
 	log.Println("Started deployment agent")
 	defer log.Println("bye.")
+
+	WorkDir, _ = os.Getwd()
+	log.Printf("Workdir: %s", WorkDir)
 
 	agent := startAgent()
 	defer agent.close()

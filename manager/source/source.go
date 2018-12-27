@@ -1,6 +1,11 @@
 package source
 
-const OrdersDir = "orders" // w/o trailing slash
+const (
+	OrdersDir     = "orders" // w/o trailing slash
+	SourceDir     = "src"
+	SourceArchive = "src.tgz"
+	PackageDir    = "pkg"
+)
 
 type Source struct {
 	Paths *Paths `json:"paths"`

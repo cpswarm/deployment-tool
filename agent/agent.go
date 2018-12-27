@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/source"
 	"github.com/satori/go.uuid"
 )
 
@@ -244,6 +245,11 @@ func (a *agent) handleTask(payload []byte) {
 	a.installer.store(task.Artifacts, task.ID)
 	a.sendTransferResponse(task.ID, model.StageEnd, false, task.Debug)
 
+	if len(task.Stages.Assemble) > 0 {
+		a.assemble(task.Stages, task.ID, task.Debug)
+		return
+	}
+
 	success := a.installer.install(task.Stages.Install, task.ID, task.Debug)
 	if success {
 		a.runner.stop()            // stop runner for old task
@@ -254,6 +260,30 @@ func (a *agent) handleTask(payload []byte) {
 		a.saveState()
 
 		go a.runner.run(task.Stages.Run, task.ID, task.Debug)
+	}
+}
+
+func (a *agent) assemble(stages model.Stages, taskID string, debug bool) {
+
+	success := a.installer.install(stages.Assemble, taskID, debug)
+	if success {
+		a.installer.clean(taskID) // remove old task files
+
+		wd := fmt.Sprintf("%s/tasks/%s/%s", WorkDir, taskID, source.SourceDir)
+		compressed, err := model.CompressFiles(wd, stages.Transfer...)
+		if err != nil {
+			// TODO send error to manager
+			log.Printf("error compressing package: %s", err)
+			return
+		}
+
+		b, err := json.Marshal(model.Package{a.target.ID, taskID, compressed})
+		if err != nil {
+			// TODO send error to manager
+			log.Printf("error serializing package: %s", err)
+			return
+		}
+		a.pipe.ResponseCh <- model.Message{model.ResponsePackage, b}
 	}
 }
 
@@ -286,7 +316,7 @@ func (a *agent) sendAdvertisement() {
 		TaskID: a.target.TaskID,
 	}
 	b, _ := json.Marshal(t)
-	a.pipe.ResponseCh <- model.Message{string(model.ResponseAdvertisement), b}
+	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 }
 
 func (a *agent) close() {

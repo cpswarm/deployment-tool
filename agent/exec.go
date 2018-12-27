@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"syscall"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/source"
 )
 
 type executor struct {
@@ -18,19 +18,16 @@ type executor struct {
 	stage   string
 	out     chan<- model.Log
 	cmd     *exec.Cmd
-	debug bool
+	debug   bool
 }
 
 func newExecutor(task, stage string, out chan<- model.Log, debug bool) *executor {
-	wd, _ := os.Getwd()
-	wd = fmt.Sprintf("%s/tasks/%s", wd, task)
-
 	return &executor{
-		workDir: wd,
+		workDir: fmt.Sprintf("%s/tasks/%s/%s", WorkDir, task, source.SourceDir),
 		task:    task,
 		stage:   stage,
 		out:     out,
-		debug : debug,
+		debug:   debug,
 	}
 }
 

@@ -40,7 +40,7 @@ type Announcement struct {
 type Task struct {
 	Header
 	Stages    Stages `json:"stages"`
-	Artifacts []byte `json:"artifacts"`
+	Artifacts []byte `json:"artifacts,omitempty"`
 }
 
 type LogRequest struct {
@@ -52,7 +52,6 @@ type RequestWrapper struct {
 	Announcement *Announcement `json:"a,omitempty"`
 	LogRequest   *LogRequest   `json:"l,omitempty"`
 	Command      *string       `json:"c,omitempty"`
-	Assembly     *[]string     `json:"s,omitempty"`
 }
 
 func FormatTopicID(id string) string {

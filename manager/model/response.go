@@ -6,6 +6,7 @@ const (
 	// Response types (topics)
 	ResponseLog           = "LOG" // logs
 	ResponseAdvertisement = "ADV" // device advertisement
+	ResponsePackage       = "PKG" // assembled artifacts
 	//ResponseSuccess = "SUCCESS" // stage ended without errors
 	//ResponseError   = "ERROR"   // stage ended with errors
 	//ResponseClientError   = "CLIENT_ERROR" // client errors
@@ -20,8 +21,7 @@ const (
 type Response struct {
 	TargetID  string
 	Logs      []Log
-	OnRequest bool   `json:",omitempty"` // true when logs were requested explicitly
-	Artifacts []byte `json:",omitempty"`
+	OnRequest bool `json:",omitempty"` // true when logs were requested explicitly
 }
 
 // UnixTimeType is the type used for log timestamps
@@ -53,4 +53,10 @@ type Target struct {
 	TaskDebug   bool     `json:",omitempty"`
 	TaskRun     []string `json:",omitempty"`
 	TaskHistory []string `json:",omitempty"`
+}
+
+type Package struct {
+	Assembler string `json:"a"`
+	Task      string `json:"t"`
+	Payload   []byte `json:"p"`
 }

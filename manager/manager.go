@@ -78,7 +78,7 @@ TARGETS:
 	m.orders[order.ID] = order
 	log.Println("Added order:", order.ID)
 
-	go m.processOrder(order)
+	go m.sendTask(order)
 	return nil
 }
 
@@ -88,22 +88,13 @@ func (m *manager) getOrders() (map[string]*order, error) {
 	return m.orders, nil
 }
 
-func (m *manager) processOrder(order *order) {
-
-	if len(order.Stages.Assemble) > 0 {
-		m.assemble(order)
-	} else {
-		m.sendTask(order)
-	}
-}
-
 func (m *manager) initLogger(orderID string, targetIDs ...string) {
 	for _, targetID := range targetIDs {
 		m.targets[targetID].initTask(orderID)
 	}
 }
 
-func (m *manager) compressFiles(orderID string, filePaths []string) ([]byte, error) {
+func (m *manager) compressFiles(orderID string, filePaths ...string) ([]byte, error) {
 	// make it relative to order directory
 	for i, path := range filePaths {
 		filePaths[i] = fmt.Sprintf("%s/%s/%s", source.OrdersDir, orderID, path)
@@ -128,7 +119,7 @@ func (m *manager) fetchSource(orderID string, src source.Source) error {
 	return nil
 }
 
-func (m *manager) assemble(order *order) {
+func (m *manager) processAssembly(p *model.Package) {
 	/* TODO
 	- send it to the assembler device
 	- get back logs as usuall
@@ -136,11 +127,12 @@ func (m *manager) assemble(order *order) {
 	- send acknowledgement and remove it on assembler
 	- continue with the order
 	*/
-	log.Printf("assemble")
-	m.Lock()
-	m.initLogger(order.ID, order.Target.Assembler)
-	m.Unlock()
+	log.Println("assemble", p.Task, p.Assembler, len(p.Payload))
 
+	err := model.DecompressFiles(p.Payload, fmt.Sprintf("%s/%s/%s", source.OrdersDir, p.Task, source.PackageDir))
+	if err != nil {
+		log.Printf("installer: Error reading archive: %s", err) // TODO send to manager
+	}
 }
 
 func (m *manager) insertLog(order, stage, message string, targets ...string) {
@@ -171,19 +163,42 @@ func (m *manager) insertLogError(order, stage, message string, targets ...string
 }
 
 func (m *manager) sendTask(order *order) {
-	m.Lock()
-	m.initLogger(order.ID, order.Receivers...)
-	m.Unlock()
 
-	var err error
+	var (
+		// instantiated based on the task type
+		stages           model.Stages
+		paths, receivers []string
+	)
+	if len(order.Stages.Assemble) > 0 {
+		stages.Assemble = order.Stages.Assemble
+		stages.Transfer = order.Stages.Transfer
+		paths = append(paths, source.SourceDir)               // one directory
+		receivers = append(receivers, order.Target.Assembler) // one target
+
+		m.Lock()
+		m.initLogger(order.ID, order.Target.Assembler)
+		m.Unlock()
+	} else {
+		stages.Install = order.Stages.Install
+		stages.Run = order.Stages.Run
+		paths = order.Stages.Transfer
+		receivers = order.Receivers
+
+		m.Lock()
+		m.initLogger(order.ID, order.Receivers...)
+		m.Unlock()
+	}
+
 	var compressedArchive []byte
-	if len(order.Stages.Transfer) > 0 {
-		m.insertLog(order.ID, model.StageTransfer, model.StageStart, order.Receivers...)
-		compressedArchive, err = m.compressFiles(order.ID, order.Stages.Transfer)
+	m.insertLog(order.ID, model.StageTransfer, model.StageStart, receivers...)
+	if len(paths) > 0 {
+		var err error
+		compressedArchive, err = model.CompressFiles(fmt.Sprintf("%s/%s", source.OrdersDir, order.ID), paths...)
 		if err != nil {
+			m.insertLogError(order.ID, model.StageTransfer, fmt.Sprintf("error compressing files: %s", err), receivers...)
+			m.insertLogError(order.ID, model.StageTransfer, model.StageEnd, receivers...)
+
 			log.Printf("error compressing files: %s", err)
-			m.insertLogError(order.ID, model.StageTransfer, fmt.Sprintf("error compressing files: %s", err), order.Receivers...)
-			m.insertLogError(order.ID, model.StageTransfer, model.StageEnd, order.Receivers...)
 			return
 		}
 	}
@@ -195,7 +210,7 @@ func (m *manager) sendTask(order *order) {
 
 	task := model.Task{
 		Header:    order.Header,
-		Stages:    order.Stages,
+		Stages:    stages,
 		Artifacts: compressedArchive,
 	}
 
@@ -216,6 +231,8 @@ func (m *manager) sendTask(order *order) {
 		b, err := json.Marshal(&task)
 		if err != nil {
 			log.Printf("Error serializing task: %s", err)
+			// TODO add logs and abort?
+			return
 		}
 		m.pipe.RequestCh <- model.Message{task.ID, b}
 
@@ -223,13 +240,15 @@ func (m *manager) sendTask(order *order) {
 
 		// TODO which messages are received, what is pending?
 		pending = false
-		for _, match := range order.Receivers {
+		for _, match := range receivers {
 			if _, found := m.targets[match].Logs[task.ID]; !found {
 				pending = true
 			}
 		}
 	}
 	log.Println("Task received by all targets.")
+	// TODO
+	// remove the directory
 }
 
 func (m *manager) requestLogs(targetID string) error {
@@ -247,16 +266,24 @@ func (m *manager) requestLogs(targetID string) error {
 func (m *manager) manageResponses() {
 	for resp := range m.pipe.ResponseCh {
 		switch resp.Topic {
-		case string(model.ResponseAdvertisement):
+		case model.ResponseAdvertisement:
 			var target model.Target
 			err := json.Unmarshal(resp.Payload, &target)
 			if err != nil {
-				log.Printf("error parsing response: %s", err)
+				log.Printf("error parsing advert response: %s", err)
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
 			m.processTarget(&target)
-
+		case model.ResponsePackage:
+			var pkg model.Package
+			err := json.Unmarshal(resp.Payload, &pkg)
+			if err != nil {
+				log.Printf("error parsing package response: %s", err)
+				log.Printf("payload was: %s", string(resp.Payload))
+				continue
+			}
+			m.processAssembly(&pkg)
 		default:
 			var response model.Response
 			err := json.Unmarshal(resp.Payload, &response)

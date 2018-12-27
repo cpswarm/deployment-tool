@@ -1,12 +1,11 @@
 package source
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"log"
 
-	"github.com/mholt/archiver"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 )
 
 type Zip string
@@ -19,7 +18,7 @@ func (zip Zip) Store(workDir, orderID string) error {
 		return err
 	}
 	log.Printf("Size of data: %d bytes", len(data))
-	err = archiver.Zip.Read(bytes.NewBuffer(data), fmt.Sprintf("%s/%s", OrdersDir, orderID))
+	err = model.DecompressFiles(data, fmt.Sprintf("%s/%s/%s", OrdersDir, orderID, SourceDir))
 	if err != nil {
 		return err
 	}

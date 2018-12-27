@@ -1,14 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
-	"github.com/mholt/archiver"
 	"github.com/pbnjay/memory"
 )
 
@@ -28,11 +26,9 @@ func (i *installer) evaluate(ann *model.Announcement) bool {
 	return uint64(ann.Size) <= sizeLimit
 }
 
-func (i *installer) store(artifacts []byte, taskID string) {
-	// set work directory
-	wd, _ := os.Getwd()
-	wd = fmt.Sprintf("%s/tasks", wd)
-	taskDir := fmt.Sprintf("%s/%s", wd, taskID)
+func (i *installer) store(artifacts []byte, dir string) {
+
+	taskDir := fmt.Sprintf("%s/tasks/%s", WorkDir, dir)
 	log.Println("installer: Task work directory:", taskDir)
 
 	err := os.Mkdir(taskDir, 0755)
@@ -48,7 +44,7 @@ func (i *installer) store(artifacts []byte, taskID string) {
 
 	// decompress and store
 	log.Printf("installer: Deploying %d bytes of artifacts.", len(artifacts))
-	err = archiver.TarGz.Read(bytes.NewBuffer(artifacts), taskDir)
+	err = model.DecompressFiles(artifacts, taskDir)
 	if err != nil {
 		log.Printf("installer: Error reading archive: %s", err) // TODO send to manager
 	}
@@ -87,8 +83,8 @@ func (i *installer) sendLog(task, command, output string, error bool, time model
 // clean removed old task directory
 func (i *installer) clean(taskID string) {
 	log.Println("installer: Removing files for task:", taskID)
-	wd, _ := os.Getwd()
-	wd = fmt.Sprintf("%s/tasks", wd)
+
+	wd := fmt.Sprintf("%s/tasks", WorkDir)
 
 	_, err := os.Stat(wd)
 	if err != nil && os.IsNotExist(err) {
