@@ -65,12 +65,12 @@
   version = "v1.2.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:9ac1cfbfb6caf6155531fdbed9e4c84e77f3ab7574e1e03baf340b62208b0ca6"
+  digest = "1:dabee2967e519f1675008ee9ab9f0df69b51489570d7155fe1912d8af5baf60b"
   name = "github.com/mholt/archiver"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "e4ef56d48eb029648b0e895bb0b6a393ef0829c3"
+  revision = "de0d89e255e17c8d75a40122055763e743ab0593"
+  version = "v2.1.0"
 
 [[projects]]
   branch = "master"
@@ -123,20 +123,15 @@
   revision = "5b443b6471cea4b4f9f85025530c04c93233f76a"
 
 [[projects]]
-  digest = "1:e39e722511703c69078a9455ce2c132db079547fd37861b42045d26a9dcd9c27"
+  digest = "1:1d920dce8e11bfff65b5709e883a8ece131b63a5bc4b2cd404f9ef7eb445f73f"
   name = "github.com/pierrec/lz4"
-  packages = ["."]
+  packages = [
+    ".",
+    "internal/xxh32",
+  ]
   pruneopts = "NUT"
-  revision = "2fcda4cb7018ce05a25959d2fe08c83e3329f169"
-  version = "v1.1"
-
-[[projects]]
-  digest = "1:186e021e0c2fa61e181151d8b2fef4d2b6b217a55794bd591de73773b934a32a"
-  name = "github.com/pierrec/xxHash"
-  packages = ["xxHash32"]
-  pruneopts = "NUT"
-  revision = "f051bb7f1d1aaf1b5a665d74fb6b0217712c69f7"
-  version = "v0.1.1"
+  revision = "635575b42742856941dbc767b44905bb9ba083f6"
+  version = "v2.0.7"
 
 [[projects]]
   digest = "1:6bc0652ea6e39e22ccd522458b8bdd8665bf23bdc5a20eec90056e4dc7e273ca"
@@ -147,7 +142,7 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:07e8742c479bab0066149ad02a710024154e76874fd0a2dba002d87702725825"
+  digest = "1:5f252b001e9573efb54ffae53b96bb5bfa4963afec4f35d607121ebb4a4dff81"
   name = "github.com/ulikunitz/xz"
   packages = [
     ".",
@@ -156,8 +151,8 @@
     "lzma",
   ]
   pruneopts = "NUT"
-  revision = "0c6b41e72360850ca4f98dc341fd999726ea007f"
-  version = "v0.5.4"
+  revision = "590df8077fbcb06ad62d7714da06c00e5dd2316d"
+  version = "v0.5.5"
 
 [[projects]]
   digest = "1:7c95b35057a0ff2e19f707173cc1a947fa43a6eb5c4d300d196ece0334046082"
