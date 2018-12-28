@@ -33,6 +33,7 @@ type order struct {
 	Receivers []string `json:"receivers"`
 	// internal
 	receiverTopics []string
+	stage          string
 }
 
 func (o order) validate() error {

@@ -11,7 +11,7 @@ import (
 type Zip string
 
 // Decode base64 encoded zip archive and write it to order directory
-func (zip Zip) Store(workDir, orderID string) error {
+func (zip Zip) Store(orderID string) error {
 	log.Println("Storing the base64 encoded archive...")
 	data, err := base64.StdEncoding.DecodeString(string(zip))
 	if err != nil {

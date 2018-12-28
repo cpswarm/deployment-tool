@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/source"
 	"github.com/pbnjay/memory"
 )
 
@@ -31,15 +32,20 @@ func (i *installer) store(artifacts []byte, dir string) {
 	taskDir := fmt.Sprintf("%s/tasks/%s", WorkDir, dir)
 	log.Println("installer: Task work directory:", taskDir)
 
-	err := os.Mkdir(taskDir, 0755)
-	if err != nil {
-		log.Printf("installer: Error creating task directory: %s", err)
-	}
-
 	// nothing to store
 	if len(artifacts) == 0 {
 		log.Printf("installer: Nothing to store.")
+		// create task with source directory
+		err := os.MkdirAll(fmt.Sprintf("%s/%s", taskDir, source.SourceDir), 0755)
+		if err != nil {
+			log.Printf("installer: Error creating source directory: %s", err)
+		}
 		return
+	}
+
+	err := os.Mkdir(taskDir, 0755)
+	if err != nil {
+		log.Printf("installer: Error creating task directory: %s", err)
 	}
 
 	// decompress and store

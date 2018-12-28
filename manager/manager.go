@@ -1,17 +1,16 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"sync"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
-	"github.com/mholt/archiver"
 )
 
 const (
@@ -75,6 +74,10 @@ TARGETS:
 		return fmt.Errorf("error fetching source files: %s", err)
 	}
 
+	if len(order.Stages.Assemble) != 0 {
+		order.stage = model.StageAssemble
+	}
+
 	m.orders[order.ID] = order
 	log.Println("Added order:", order.ID)
 
@@ -94,32 +97,19 @@ func (m *manager) initLogger(orderID string, targetIDs ...string) {
 	}
 }
 
-func (m *manager) compressFiles(orderID string, filePaths ...string) ([]byte, error) {
-	// make it relative to order directory
-	for i, path := range filePaths {
-		filePaths[i] = fmt.Sprintf("%s/%s/%s", source.OrdersDir, orderID, path)
-	}
-	var b bytes.Buffer
-	err := archiver.TarGz.Write(&b, filePaths)
-	if err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
-}
-
 func (m *manager) fetchSource(orderID string, src source.Source) error {
 	switch {
 	case src.Paths != nil:
-		return src.Paths.Copy(WorkDir, orderID)
+		return src.Paths.Copy(orderID)
 	case src.Zip != nil:
-		return src.Zip.Store(WorkDir, orderID)
+		return src.Zip.Store(orderID)
 	case src.Git != nil:
-		return src.Git.Clone(WorkDir, orderID)
+		return src.Git.Clone(orderID)
 	}
 	return nil
 }
 
-func (m *manager) processAssembly(p *model.Package) {
+func (m *manager) processPackage(p *model.Package) {
 	/* TODO
 	- send it to the assembler device
 	- get back logs as usuall
@@ -131,8 +121,17 @@ func (m *manager) processAssembly(p *model.Package) {
 
 	err := model.DecompressFiles(p.Payload, fmt.Sprintf("%s/%s/%s", source.OrdersDir, p.Task, source.PackageDir))
 	if err != nil {
-		log.Printf("installer: Error reading archive: %s", err) // TODO send to manager
+		log.Printf("Error decompressing archive: %s", err) // TODO send to manager
+		return
 	}
+
+	order, found := m.orders[p.Task]
+	if !found {
+		log.Printf("Package for unknown order: %s", p.Task)
+		return
+	}
+	order.stage = model.StageTransfer
+	go m.sendTask(order)
 }
 
 func (m *manager) insertLog(order, stage, message string, targets ...string) {
@@ -166,14 +165,13 @@ func (m *manager) sendTask(order *order) {
 
 	var (
 		// instantiated based on the task type
-		stages           model.Stages
-		paths, receivers []string
+		stages    model.Stages
+		receivers []string
 	)
-	if len(order.Stages.Assemble) > 0 {
+	if order.stage == model.StageAssemble {
 		stages.Assemble = order.Stages.Assemble
 		stages.Transfer = order.Stages.Transfer
-		paths = append(paths, source.SourceDir)               // one directory
-		receivers = append(receivers, order.Target.Assembler) // one target
+		receivers = []string{order.Target.Assembler}
 
 		m.Lock()
 		m.initLogger(order.ID, order.Target.Assembler)
@@ -181,7 +179,6 @@ func (m *manager) sendTask(order *order) {
 	} else {
 		stages.Install = order.Stages.Install
 		stages.Run = order.Stages.Run
-		paths = order.Stages.Transfer
 		receivers = order.Receivers
 
 		m.Lock()
@@ -191,9 +188,9 @@ func (m *manager) sendTask(order *order) {
 
 	var compressedArchive []byte
 	m.insertLog(order.ID, model.StageTransfer, model.StageStart, receivers...)
-	if len(paths) > 0 {
+	if path := m.sourcePath(order.ID); path != "" {
 		var err error
-		compressedArchive, err = model.CompressFiles(fmt.Sprintf("%s/%s", source.OrdersDir, order.ID), paths...)
+		compressedArchive, err = model.CompressFiles(fmt.Sprintf("%s/%s", source.OrdersDir, order.ID), path)
 		if err != nil {
 			m.insertLogError(order.ID, model.StageTransfer, fmt.Sprintf("error compressing files: %s", err), receivers...)
 			m.insertLogError(order.ID, model.StageTransfer, model.StageEnd, receivers...)
@@ -251,6 +248,16 @@ func (m *manager) sendTask(order *order) {
 	// remove the directory
 }
 
+func (m *manager) sourcePath(orderID string) string {
+	wd := fmt.Sprintf("%s/%s", source.OrdersDir, orderID)
+	path := source.ExecDir(wd)
+
+	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
+		return ""
+	}
+	return path
+}
+
 func (m *manager) requestLogs(targetID string) error {
 	w := model.RequestWrapper{LogRequest: &model.LogRequest{
 		IfModifiedSince: m.targets[targetID].LastLogRequest,
@@ -283,7 +290,7 @@ func (m *manager) manageResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			m.processAssembly(&pkg)
+			m.processPackage(&pkg)
 		default:
 			var response model.Response
 			err := json.Unmarshal(resp.Payload, &response)

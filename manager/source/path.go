@@ -11,7 +11,7 @@ import (
 type Paths []string
 
 // copies files or directories into workdir/id/<name>
-func (paths Paths) Copy(workDir, orderID string) error {
+func (paths Paths) Copy(orderID string) error {
 	log.Println("Copying from path...")
 	for _, path := range paths {
 		parts := strings.Split(strings.TrimSuffix(path, "/"), "/")

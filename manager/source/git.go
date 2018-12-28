@@ -6,6 +6,6 @@ type Git struct {
 	// TODO
 }
 
-func (git Git) Clone(workDir, orderID string) error {
+func (git Git) Clone(orderID string) error {
 	return fmt.Errorf("git source loading is not implemented")
 }

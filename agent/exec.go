@@ -22,8 +22,9 @@ type executor struct {
 }
 
 func newExecutor(task, stage string, out chan<- model.Log, debug bool) *executor {
+	wd := fmt.Sprintf("%s/tasks/%s", WorkDir, task)
 	return &executor{
-		workDir: fmt.Sprintf("%s/tasks/%s/%s", WorkDir, task, source.SourceDir),
+		workDir: fmt.Sprintf("%s/%s", wd, source.ExecDir(wd)),
 		task:    task,
 		stage:   stage,
 		out:     out,
