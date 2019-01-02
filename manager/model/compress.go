@@ -2,16 +2,15 @@ package model
 
 import (
 	"bytes"
-	"fmt"
+	"log"
 
 	"github.com/mholt/archiver"
 )
 
 // CompressFiles reads from given path and compresses in memory
-func CompressFiles(workDir string, paths ...string) ([]byte, error) {
-	// make it relative to work directory
-	for i, path := range paths {
-		paths[i] = fmt.Sprintf("%s/%s", workDir, path)
+func CompressFiles(paths ...string) ([]byte, error) {
+	if len(paths) == 0 {
+		log.Panicf("no path provided")
 	}
 	var b bytes.Buffer
 	err := archiver.TarGz.Write(&b, paths)

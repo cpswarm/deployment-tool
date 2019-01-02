@@ -270,7 +270,12 @@ func (a *agent) assemble(stages model.Stages, taskID string, debug bool) {
 		a.installer.clean(taskID) // remove old task files
 
 		wd := fmt.Sprintf("%s/tasks/%s/%s", WorkDir, taskID, source.SourceDir)
-		compressed, err := model.CompressFiles(wd, stages.Transfer...)
+		// make it relative to work directory
+		paths := make([]string, len(stages.Transfer))
+		for i := range stages.Transfer {
+			paths[i] = fmt.Sprintf("%s/%s", wd, stages.Transfer[i])
+		}
+		compressed, err := model.CompressFiles(paths...)
 		if err != nil {
 			// TODO send error to manager
 			log.Printf("error compressing package: %s", err)
