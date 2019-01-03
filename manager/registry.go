@@ -23,8 +23,8 @@ type registry struct {
 //
 type order struct {
 	model.Header `yaml:",inline"`
-	Source       source.Source
-	Stages       model.Stages `json:"stages"`
+	Source       source.Source `json:"source"`
+	Stages       model.Stages  `json:"stages"`
 	Target       struct {
 		Assembler string   `json:"assembler"`
 		IDs       []string `json:"ids"`
@@ -33,7 +33,6 @@ type order struct {
 	Receivers []string `json:"receivers"`
 	// internal
 	receiverTopics []string
-	stage          string
 }
 
 func (o order) validate() error {
@@ -46,6 +45,18 @@ func (o order) validate() error {
 		}
 	}
 	return nil
+}
+
+func (o order) getChild() *order {
+	var child order
+	child.Stages.Install = o.Stages.Install
+	child.Stages.Run = o.Stages.Run
+	source := source.Order(o.ID)
+	child.Source.Order = &source
+	child.Debug = o.Debug
+	child.Target.IDs = o.Target.IDs
+	child.Target.Tags = o.Target.Tags
+	return &child
 }
 
 //

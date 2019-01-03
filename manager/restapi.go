@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/satori/go.uuid"
 	"gopkg.in/yaml.v2"
 )
 
@@ -61,10 +60,6 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (a *restAPI) newTaskID() string {
-	return uuid.NewV4().String()
-}
-
 func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 
 	decoder := yaml.NewDecoder(r.Body)
@@ -83,10 +78,6 @@ func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 		HTTPResponseError(w, http.StatusBadRequest, "Invalid order: ", err)
 		return
 	}
-
-	// add system generated meta values
-	order.ID = a.newTaskID()
-	order.Created = time.Now().UnixNano()
 
 	err = a.manager.addOrder(&order)
 	if err != nil {

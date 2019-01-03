@@ -11,6 +11,7 @@ import (
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
+	"github.com/satori/go.uuid"
 )
 
 const (
@@ -39,6 +40,10 @@ func startManager(pipe model.Pipe) (*manager, error) {
 }
 
 func (m *manager) addOrder(order *order) error {
+	// add system generated meta values
+	order.ID = m.newTaskID()
+	order.Created = time.Now().UnixNano()
+
 	m.Lock()
 	defer m.Unlock()
 
@@ -63,6 +68,13 @@ TARGETS:
 			}
 		}
 	}
+
+	if order.Target.Assembler != "" {
+		if _, found := m.targets[order.Target.Assembler]; !found {
+			return fmt.Errorf("target for assember is not found: %s", order.Target.Assembler)
+		}
+	}
+
 	log.Println("Order receivers:", len(order.Receivers))
 	if len(order.Receivers) == 0 {
 		return fmt.Errorf("could not match any device")
@@ -74,15 +86,15 @@ TARGETS:
 		return fmt.Errorf("error fetching source files: %s", err)
 	}
 
-	if len(order.Stages.Assemble) != 0 {
-		order.stage = model.StageAssemble
-	}
-
 	m.orders[order.ID] = order
 	log.Println("Added order:", order.ID)
 
 	go m.sendTask(order)
 	return nil
+}
+
+func (m *manager) newTaskID() string {
+	return uuid.NewV4().String()
 }
 
 func (m *manager) getOrders() (map[string]*order, error) {
@@ -105,6 +117,8 @@ func (m *manager) fetchSource(orderID string, src source.Source) error {
 		return src.Zip.Store(orderID)
 	case src.Git != nil:
 		return src.Git.Clone(orderID)
+	case src.Order != nil:
+		return src.Order.Fetch(orderID)
 	}
 	return nil
 }
@@ -117,7 +131,7 @@ func (m *manager) processPackage(p *model.Package) {
 	- send acknowledgement and remove it on assembler
 	- continue with the order
 	*/
-	log.Println("assemble", p.Task, p.Assembler, len(p.Payload))
+	log.Println("processPackage", p.Task, p.Assembler, len(p.Payload))
 
 	err := model.DecompressFiles(p.Payload, fmt.Sprintf("%s/%s/%s", source.OrdersDir, p.Task, source.PackageDir))
 	if err != nil {
@@ -125,13 +139,15 @@ func (m *manager) processPackage(p *model.Package) {
 		return
 	}
 
+	m.RLock()
+	defer m.RUnlock()
 	order, found := m.orders[p.Task]
 	if !found {
 		log.Printf("Package for unknown order: %s", p.Task)
 		return
 	}
-	order.stage = model.StageTransfer
-	go m.sendTask(order)
+	// assemble is done, make a new order for install and run
+	go m.addOrder(order.getChild())
 }
 
 func (m *manager) insertLog(order, stage, message string, targets ...string) {
@@ -165,13 +181,15 @@ func (m *manager) sendTask(order *order) {
 
 	var (
 		// instantiated based on the task type
-		stages    model.Stages
-		receivers []string
+		stages         model.Stages
+		receivers      []string
+		receiverTopics []string
 	)
-	if order.stage == model.StageAssemble {
+	if len(order.Stages.Assemble) != 0 {
 		stages.Assemble = order.Stages.Assemble
 		stages.Transfer = order.Stages.Transfer
 		receivers = []string{order.Target.Assembler}
+		receiverTopics = []string{model.FormatTopicID(order.Target.Assembler)}
 
 		m.Lock()
 		m.initLogger(order.ID, order.Target.Assembler)
@@ -180,6 +198,7 @@ func (m *manager) sendTask(order *order) {
 		stages.Install = order.Stages.Install
 		stages.Run = order.Stages.Run
 		receivers = order.Receivers
+		receiverTopics = order.receiverTopics
 
 		m.Lock()
 		m.initLogger(order.ID, order.Receivers...)
@@ -190,7 +209,7 @@ func (m *manager) sendTask(order *order) {
 	m.insertLog(order.ID, model.StageTransfer, model.StageStart, receivers...)
 	if path := m.sourcePath(order.ID); path != "" {
 		var err error
-		compressedArchive, err = model.CompressFiles(fmt.Sprintf("%s/%s", source.OrdersDir, order.ID), path)
+		compressedArchive, err = model.CompressFiles(path)
 		if err != nil {
 			m.insertLogError(order.ID, model.StageTransfer, fmt.Sprintf("error compressing files: %s", err), receivers...)
 			m.insertLogError(order.ID, model.StageTransfer, model.StageEnd, receivers...)
@@ -198,6 +217,9 @@ func (m *manager) sendTask(order *order) {
 			log.Printf("error compressing files: %s", err)
 			return
 		}
+		m.insertLog(order.ID, model.StageTransfer, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), receivers...)
+	} else {
+		m.insertLog(order.ID, model.StageTransfer, "no source files to transfer", receivers...)
 	}
 
 	ann := model.Announcement{
@@ -212,15 +234,16 @@ func (m *manager) sendTask(order *order) {
 	}
 
 	for pending := true; pending; {
-		log.Printf("Sending task %s to %s", task.ID, order.receiverTopics)
+		log.Printf("Sending task %s to %s", task.ID, receiverTopics)
 		//log.Printf("sendTask: %+v", task)
 
 		// send announcement
 		w := model.RequestWrapper{Announcement: &ann}
 		b, _ := json.Marshal(w)
-		for _, topic := range order.receiverTopics {
+		for _, topic := range receiverTopics {
 			m.pipe.RequestCh <- model.Message{topic, b}
 		}
+		m.insertLog(order.ID, model.StageTransfer, "sent announcement", receivers...)
 
 		time.Sleep(time.Second)
 
@@ -232,14 +255,19 @@ func (m *manager) sendTask(order *order) {
 			return
 		}
 		m.pipe.RequestCh <- model.Message{task.ID, b}
+		m.insertLog(order.ID, model.StageTransfer, "sent task", receivers...)
 
 		time.Sleep(10 * time.Second)
 
 		// TODO which messages are received, what is pending?
 		pending = false
 		for _, match := range receivers {
-			if _, found := m.targets[match].Logs[task.ID]; !found {
-				pending = true
+			if log, found := m.targets[match].Logs[task.ID]; found {
+				if len(log.Install)+len(log.Run) == 0 {
+					pending = true
+				} else {
+					m.insertLog(order.ID, model.StageTransfer, model.StageEnd, match) // TODO add this as soon as an ack arrives
+				}
 			}
 		}
 	}
@@ -250,7 +278,7 @@ func (m *manager) sendTask(order *order) {
 
 func (m *manager) sourcePath(orderID string) string {
 	wd := fmt.Sprintf("%s/%s", source.OrdersDir, orderID)
-	path := source.ExecDir(wd)
+	path := fmt.Sprintf("%s/%s/%s", source.OrdersDir, orderID, source.ExecDir(wd))
 
 	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
 		return ""

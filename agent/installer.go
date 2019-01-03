@@ -27,9 +27,12 @@ func (i *installer) evaluate(ann *model.Announcement) bool {
 	return uint64(ann.Size) <= sizeLimit
 }
 
-func (i *installer) store(artifacts []byte, dir string) {
+func (i *installer) store(artifacts []byte, taskID string, debug bool) {
+	defer func() {
+		artifacts = nil // release memory
+	}()
 
-	taskDir := fmt.Sprintf("%s/tasks/%s", WorkDir, dir)
+	taskDir := fmt.Sprintf("%s/tasks/%s", WorkDir, taskID)
 	log.Println("installer: Task work directory:", taskDir)
 
 	// nothing to store
@@ -38,52 +41,66 @@ func (i *installer) store(artifacts []byte, dir string) {
 		// create task with source directory
 		err := os.MkdirAll(fmt.Sprintf("%s/%s", taskDir, source.SourceDir), 0755)
 		if err != nil {
-			log.Printf("installer: Error creating source directory: %s", err)
+			i.sendLogFatal(taskID, fmt.Sprintf("error creating source directory: %s", err))
+			return
 		}
 		return
 	}
 
-	err := os.Mkdir(taskDir, 0755)
+	// create task directory
+	err := os.MkdirAll(taskDir, 0755)
 	if err != nil {
-		log.Printf("installer: Error creating task directory: %s", err)
+		i.sendLogFatal(taskID, fmt.Sprintf("error creating task directory: %s", err))
+		return
 	}
 
 	// decompress and store
 	log.Printf("installer: Deploying %d bytes of artifacts.", len(artifacts))
 	err = model.DecompressFiles(artifacts, taskDir)
 	if err != nil {
-		log.Printf("installer: Error reading archive: %s", err) // TODO send to manager
+		i.sendLogFatal(taskID, fmt.Sprintf("error reading archive: %s", err))
+		return
 	}
-	artifacts = nil // release memory
+	i.sendLog(taskID, fmt.Sprintf("decompressed archive of %d bytes", len(artifacts)), false, debug)
+	//i.sendLog(taskID, stage, model.StageEnd, false, debug)
 }
 
 func (i *installer) install(commands []string, taskID string, debug bool) bool {
 	// nothing to execute
 	if len(commands) == 0 {
 		log.Printf("installer: Nothing to execute.")
+		i.sendLog(taskID, model.StageEnd, false, debug)
 		return true
 	}
 
 	log.Printf("installer: Installing task: %s", taskID)
-	i.sendLog(taskID, "", model.StageStart, false, model.UnixTime(), debug)
-	defer func() { i.sendLog(taskID, "", model.StageEnd, false, model.UnixTime(), debug) }()
+	//i.sendLog(taskID, stage, model.StageStart, false, debug)
 
 	// execute sequentially, return if one fails
 	i.executor = newExecutor(taskID, model.StageInstall, i.logger, debug)
 	for _, command := range commands {
 		success := i.executor.execute(command)
 		if !success {
-			log.Printf("installer: Ended due to error.")
+			i.sendLogFatal(taskID, "ended with errors")
 			return false
 		}
 	}
 
 	log.Printf("installer: Install ended.")
+	i.sendLog(taskID, model.StageEnd, false, debug)
 	return true
 }
 
-func (i *installer) sendLog(task, command, output string, error bool, time model.UnixTimeType, debug bool) {
-	i.logger <- model.Log{task, model.StageInstall, command, output, error, time, debug}
+func (i *installer) sendLog(task, output string, error bool, debug bool) {
+	i.logger <- model.Log{task, model.StageInstall, "", output, error, model.UnixTime(), debug}
+}
+
+func (i *installer) sendLogFatal(task, output string) {
+	log.Printf("installer: %s", output)
+	if output != "" {
+		i.sendLog(task, output, true, true)
+	}
+	i.sendLog(task, model.StageEnd, true, true)
 }
 
 // clean removed old task directory

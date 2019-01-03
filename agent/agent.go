@@ -197,7 +197,7 @@ func (a *agent) handleRequest(payload []byte) {
 	case w.Announcement != nil:
 		a.handleAnnouncement(w.Announcement)
 	case w.LogRequest != nil:
-		a.sendLogs(w.LogRequest)
+		a.reportLogs(w.LogRequest)
 	case w.Command != nil:
 		// TODO execute a single command and send the logs
 	default:
@@ -207,7 +207,7 @@ func (a *agent) handleRequest(payload []byte) {
 
 func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 	log.Printf("Received announcement: %s", taskA.ID)
-	//a.sendTransferResponse(taskA.ID, model.StageStart, false, taskA.Debug)
+	a.sendTransferResponse(taskA.ID, model.StageStart, false, taskA.Debug)
 
 	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
 		if a.target.TaskHistory[i] == taskA.ID {
@@ -216,6 +216,7 @@ func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 		}
 	}
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
+	a.sendTransferResponse(taskA.ID, "received announcement", false, taskA.Debug)
 
 	if a.installer.evaluate(taskA) {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
@@ -239,11 +240,12 @@ func (a *agent) handleTask(payload []byte) {
 	log.Printf("Received task: %s", task.ID)
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendTransferResponse(task.ID, "received task", false, task.Debug)
+	a.sendTransferResponse(task.ID, "received task and unsubscribed", false, task.Debug)
+	//a.sendTransferResponse(task.ID, model.StageEnd, false, task.Debug)
 	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
-	a.installer.store(task.Artifacts, task.ID)
-	a.sendTransferResponse(task.ID, model.StageEnd, false, task.Debug)
+	a.installer.store(task.Artifacts, task.ID, task.Debug)
+	// TODO check storage errors?
 
 	if len(task.Stages.Assemble) > 0 {
 		a.assemble(task.Stages, task.ID, task.Debug)
@@ -292,7 +294,7 @@ func (a *agent) assemble(stages model.Stages, taskID string, debug bool) {
 	}
 }
 
-func (a *agent) sendLogs(request *model.LogRequest) {
+func (a *agent) reportLogs(request *model.LogRequest) {
 	log.Println("Received log request since", request.IfModifiedSince)
 	a.logger.Report(request)
 }
@@ -311,7 +313,7 @@ func (a *agent) saveState() {
 }
 
 func (a *agent) sendTransferResponse(taskID, message string, error, debug bool) {
-	a.logger.Writer() <- model.Log{taskID, model.StageTransfer, "", message, error, model.UnixTime(), debug}
+	a.logger.Writer() <- model.Log{taskID, model.StageInstall, "", message, error, model.UnixTime(), debug}
 }
 
 func (a *agent) sendAdvertisement() {
