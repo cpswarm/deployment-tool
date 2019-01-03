@@ -132,30 +132,43 @@ func (m *manager) processPackage(p *model.Package) {
 	- continue with the order
 	*/
 	log.Println("processPackage", p.Task, p.Assembler, len(p.Payload))
+	m.logTransfer(p.Task, fmt.Sprintf("received package sized %d bytes", len(p.Payload)), p.Assembler)
 
 	err := model.DecompressFiles(p.Payload, fmt.Sprintf("%s/%s/%s", source.OrdersDir, p.Task, source.PackageDir))
 	if err != nil {
-		log.Printf("Error decompressing archive: %s", err) // TODO send to manager
+		m.logTransferError(p.Task, "error decompressing assembled package", p.Assembler)
 		return
 	}
 
 	m.RLock()
-	defer m.RUnlock()
 	order, found := m.orders[p.Task]
 	if !found {
 		log.Printf("Package for unknown order: %s", p.Task)
+		m.RUnlock()
 		return
 	}
+	m.RUnlock()
+
 	// assemble is done, make a new order for install and run
-	go m.addOrder(order.getChild())
+	child := order.getChild()
+	err = m.addOrder(child)
+	if err != nil {
+		m.logTransferError(p.Task, fmt.Sprintf("error creating child order: %s", err), p.Assembler)
+		return
+	}
+	m.logTransfer(p.Task, fmt.Sprintf("created child order: %s", child.ID), p.Assembler)
+
+	m.Lock()
+	order.ChildOrder = child.ID
+	m.Unlock()
 }
 
-func (m *manager) insertLog(order, stage, message string, targets ...string) {
+func (m *manager) logTransfer(order, message string, targets ...string) {
 	for _, target := range targets {
 		m.targets[target].Logs[order].insert(model.Log{
 			Output: message,
 			Task:   order,
-			Stage:  stage,
+			Stage:  model.StageTransfer,
 			Time:   model.UnixTime(),
 		})
 	}
@@ -163,12 +176,13 @@ func (m *manager) insertLog(order, stage, message string, targets ...string) {
 	m.update.Broadcast()
 }
 
-func (m *manager) insertLogError(order, stage, message string, targets ...string) {
+func (m *manager) logTransferError(order, message string, targets ...string) {
 	for _, target := range targets {
+		log.Println(message)
 		m.targets[target].Logs[order].insert(model.Log{
 			Output: message,
 			Task:   order,
-			Stage:  stage,
+			Stage:  model.StageTransfer,
 			Time:   model.UnixTime(),
 			Error:  true,
 		})
@@ -206,20 +220,20 @@ func (m *manager) sendTask(order *order) {
 	}
 
 	var compressedArchive []byte
-	m.insertLog(order.ID, model.StageTransfer, model.StageStart, receivers...)
+	m.logTransfer(order.ID, model.StageStart, receivers...)
 	if path := m.sourcePath(order.ID); path != "" {
 		var err error
 		compressedArchive, err = model.CompressFiles(path)
 		if err != nil {
-			m.insertLogError(order.ID, model.StageTransfer, fmt.Sprintf("error compressing files: %s", err), receivers...)
-			m.insertLogError(order.ID, model.StageTransfer, model.StageEnd, receivers...)
+			m.logTransferError(order.ID, fmt.Sprintf("error compressing files: %s", err), receivers...)
+			m.logTransferError(order.ID, model.StageEnd, receivers...)
 
 			log.Printf("error compressing files: %s", err)
 			return
 		}
-		m.insertLog(order.ID, model.StageTransfer, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), receivers...)
+		m.logTransfer(order.ID, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), receivers...)
 	} else {
-		m.insertLog(order.ID, model.StageTransfer, "no source files to transfer", receivers...)
+		m.logTransfer(order.ID, "no source files to transfer", receivers...)
 	}
 
 	ann := model.Announcement{
@@ -243,7 +257,7 @@ func (m *manager) sendTask(order *order) {
 		for _, topic := range receiverTopics {
 			m.pipe.RequestCh <- model.Message{topic, b}
 		}
-		m.insertLog(order.ID, model.StageTransfer, "sent announcement", receivers...)
+		m.logTransfer(order.ID, "sent announcement", receivers...)
 
 		time.Sleep(time.Second)
 
@@ -255,7 +269,7 @@ func (m *manager) sendTask(order *order) {
 			return
 		}
 		m.pipe.RequestCh <- model.Message{task.ID, b}
-		m.insertLog(order.ID, model.StageTransfer, "sent task", receivers...)
+		m.logTransfer(order.ID, "sent task", receivers...)
 
 		time.Sleep(10 * time.Second)
 
@@ -266,7 +280,7 @@ func (m *manager) sendTask(order *order) {
 				if len(log.Install)+len(log.Run) == 0 {
 					pending = true
 				} else {
-					m.insertLog(order.ID, model.StageTransfer, model.StageEnd, match) // TODO add this as soon as an ack arrives
+					m.logTransfer(order.ID, model.StageEnd, match) // TODO add this as soon as an ack arrives
 				}
 			}
 		}

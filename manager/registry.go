@@ -26,11 +26,12 @@ type order struct {
 	Source       source.Source `json:"source"`
 	Stages       model.Stages  `json:"stages"`
 	Target       struct {
-		Assembler string   `json:"assembler"`
+		Assembler string   `json:"assembler,omitempty"`
 		IDs       []string `json:"ids"`
 		Tags      []string `json:"tags"`
 	} `json:"targets"`
-	Receivers []string `json:"receivers"`
+	Receivers  []string `json:"receivers"`
+	ChildOrder string   `json:"childOrder,omitempty"`
 	// internal
 	receiverTopics []string
 }
