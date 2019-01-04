@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	AdvInterval = 30 * time.Second
+	AdvInterval = 60 * time.Second
 )
 
 type agent struct {
@@ -133,7 +133,7 @@ func (a *agent) startWorker() {
 		log.Println("Request topic:", request.Topic)
 		switch {
 		case request.Topic == model.PipeConnected:
-			go a.advertiseTarget()
+			go a.connected()
 		case request.Topic == model.PipeDisconnected:
 			a.disconnected <- true
 		case topics[request.Topic]:
@@ -166,11 +166,12 @@ func (a *agent) subscribe() map[string]bool {
 	return topics
 }
 
-func (a *agent) advertiseTarget() {
-	log.Printf("Will advertise target every %s", AdvInterval)
-	defer log.Println("Stopped advertisement routine.")
+func (a *agent) connected() {
+	log.Printf("Connected.")
+	defer log.Println("Disconnected!")
 
-	a.sendAdvertisement()
+	// send first adv after a second. Cancel if disconnected
+	first := time.AfterFunc(time.Second, a.sendAdvertisement)
 
 	t := time.NewTicker(AdvInterval)
 	for {
@@ -178,9 +179,22 @@ func (a *agent) advertiseTarget() {
 		case <-t.C:
 			a.sendAdvertisement()
 		case <-a.disconnected:
+			t.Stop()
+			first.Stop()
 			return
 		}
 	}
+}
+
+func (a *agent) sendAdvertisement() {
+	t := model.Target{
+		ID:     a.target.ID,
+		Tags:   a.target.Tags,
+		TaskID: a.target.TaskID,
+	}
+	log.Println("Sent adv:", t.ID, t.Tags)
+	b, _ := json.Marshal(t)
+	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 }
 
 func (a *agent) handleRequest(payload []byte) {
@@ -311,16 +325,6 @@ func (a *agent) saveState() {
 		return
 	}
 	log.Println("Saved state:", DefaultStateFile)
-}
-
-func (a *agent) sendAdvertisement() {
-	t := model.Target{
-		ID:     a.target.ID,
-		Tags:   a.target.Tags,
-		TaskID: a.target.TaskID,
-	}
-	b, _ := json.Marshal(t)
-	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 }
 
 func (a *agent) close() {

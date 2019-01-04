@@ -75,7 +75,12 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)
 	}
 
-	c.monitor()
+	startMonitor, err := c.setupMonitor()
+	if err != nil {
+		return nil, fmt.Errorf("error starting monitor: %s", err)
+	}
+	go startMonitor()
+
 	go c.startListener()
 	go c.startResponder()
 	go c.startOperator()
@@ -132,28 +137,25 @@ func (c *zmqClient) startOperator() {
 	}
 }
 
-func (c *zmqClient) monitor() {
+func (c *zmqClient) setupMonitor() (func(), error) {
 
 	pubMonitorAddr := "inproc://pub-monitor.rep"
 	err := c.publisher.Monitor(pubMonitorAddr, zmq.EVENT_CONNECTED|zmq.EVENT_DISCONNECTED|zmq.EVENT_ALL)
 	if err != nil {
-		log.Printf("zeromq: Error starting monitor: %s", err)
-		return
+		return nil, fmt.Errorf("error registering monitor: %s", err)
 	}
 
 	c.pubMonitor, err = zmq.NewSocket(zmq.PAIR)
 	if err != nil {
-		log.Printf("zeromq: Error creating monitor socket: %s", err)
-		return
+		return nil, fmt.Errorf("error creating monitor socket: %s", err)
 	}
 
 	err = c.pubMonitor.Connect(pubMonitorAddr)
 	if err != nil {
-		log.Printf("zeromq: Error connecting minitor socket: %s", err)
-		return
+		return nil, fmt.Errorf("error connecting minitor socket: %s", err)
 	}
 
-	go func() {
+	return func() {
 		for {
 			eventType, eventAddr, eventValue, err := c.pubMonitor.RecvEvent(0)
 			if err != nil {
@@ -175,15 +177,13 @@ func (c *zmqClient) monitor() {
 			switch eventType {
 			case zmq.EVENT_CONNECTED:
 				// send to worker
-				//time.Sleep(time.Second) // solves missing pub on slow connections but overloads the queue
 				c.pipe.RequestCh <- model.Message{Topic: model.PipeConnected}
 			case zmq.EVENT_DISCONNECTED:
 				// send to worker
 				c.pipe.RequestCh <- model.Message{Topic: model.PipeDisconnected}
 			}
 		}
-	}()
-
+	}, nil
 }
 
 func (c *zmqClient) close() {
