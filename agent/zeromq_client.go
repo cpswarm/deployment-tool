@@ -175,7 +175,7 @@ func (c *zmqClient) monitor() {
 			switch eventType {
 			case zmq.EVENT_CONNECTED:
 				// send to worker
-				time.Sleep(time.Second) // solves missing pub on slow connections
+				//time.Sleep(time.Second) // solves missing pub on slow connections but overloads the queue
 				c.pipe.RequestCh <- model.Message{Topic: model.PipeConnected}
 			case zmq.EVENT_DISCONNECTED:
 				// send to worker
