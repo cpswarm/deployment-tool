@@ -8,13 +8,13 @@ import (
 )
 
 type runner struct {
-	logger    chan<- model.Log
+	logger    Logger
 	executors []*executor
 	wg        sync.WaitGroup
 	//shutdown  chan bool
 }
 
-func newRunner(logger chan<- model.Log) runner {
+func newRunner(logger Logger) runner {
 	return runner{
 		logger: logger,
 		//shutdown: make(chan bool, 1),
@@ -48,7 +48,7 @@ func (r *runner) run(commands []string, taskID string, debug bool) {
 }
 
 func (r *runner) sendLog(task, command, output string, error bool, time model.UnixTimeType, debug bool) {
-	r.logger <- model.Log{task, model.StageRun, command, output, error, time, debug}
+	r.logger.Send(&model.Log{task, model.StageRun, command, output, error, time, debug})
 }
 
 func (r *runner) stop() bool {

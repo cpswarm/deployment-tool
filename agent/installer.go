@@ -12,11 +12,11 @@ import (
 )
 
 type installer struct {
-	logger   chan<- model.Log
+	logger   Logger
 	executor *executor
 }
 
-func newInstaller(logger chan<- model.Log) installer {
+func newInstaller(logger Logger) installer {
 	return installer{
 		logger: logger,
 	}
@@ -92,7 +92,7 @@ func (i *installer) install(commands []string, taskID string, debug bool) bool {
 }
 
 func (i *installer) sendLog(task, output string, error bool, debug bool) {
-	i.logger <- model.Log{task, model.StageInstall, "", output, error, model.UnixTime(), debug}
+	i.logger.Send(&model.Log{task, model.StageInstall, "", output, error, model.UnixTime(), debug})
 }
 
 func (i *installer) sendLogFatal(task, output string) {

@@ -50,8 +50,8 @@ func startAgent() *agent {
 	a.loadConf()
 
 	a.logger = NewLogger(a.target.ID, a.target.TaskDebug, a.pipe.ResponseCh)
-	a.runner = newRunner(a.logger.Writer())
-	a.installer = newInstaller(a.logger.Writer())
+	a.runner = newRunner(a.logger)
+	a.installer = newInstaller(a.logger)
 
 	// autostart
 	if len(a.target.TaskRun) > 0 {

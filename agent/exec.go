@@ -16,25 +16,25 @@ type executor struct {
 	workDir string
 	task    string
 	stage   string
-	out     chan<- model.Log
+	logger  Logger
 	cmd     *exec.Cmd
 	debug   bool
 }
 
-func newExecutor(task, stage string, out chan<- model.Log, debug bool) *executor {
+func newExecutor(task, stage string, logger Logger, debug bool) *executor {
 	wd := fmt.Sprintf("%s/tasks/%s", WorkDir, task)
 	return &executor{
 		workDir: fmt.Sprintf("%s/%s", wd, source.ExecDir(wd)),
 		task:    task,
 		stage:   stage,
-		out:     out,
+		logger:  logger,
 		debug:   debug,
 	}
 }
 
 // execute executes a command
 func (e *executor) execute(command string) bool {
-	e.sendLog(command, model.ExecStart, false, model.UnixTime())
+	e.sendLog(command, model.ExecStart, false)
 
 	bashCommand := []string{"/bin/sh", "-c", command}
 	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
@@ -45,17 +45,13 @@ func (e *executor) execute(command string) bool {
 
 	outStream, err := e.cmd.StdoutPipe()
 	if err != nil {
-		log.Println("executor: Error:", err)
-		e.sendLog(command, err.Error(), true, model.UnixTime())
-		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
+		e.sendLogFatal(command, err.Error())
 		return false
 	}
 
 	errStream, err := e.cmd.StderrPipe()
 	if err != nil {
-		log.Println("executor: Error:", err)
-		e.sendLog(command, err.Error(), true, model.UnixTime())
-		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
+		e.sendLogFatal(command, err.Error())
 		return false
 	}
 
@@ -64,10 +60,10 @@ func (e *executor) execute(command string) bool {
 		scanner := bufio.NewScanner(stream)
 
 		for scanner.Scan() {
-			e.sendLog(command, scanner.Text(), false, model.UnixTime())
+			e.sendLog(command, scanner.Text(), false)
 		}
 		if err = scanner.Err(); err != nil {
-			e.sendLog(command, err.Error(), true, model.UnixTime())
+			e.sendLog(command, err.Error(), true)
 			log.Println("executor: Error:", err)
 		}
 		stream.Close()
@@ -78,10 +74,10 @@ func (e *executor) execute(command string) bool {
 		scanner := bufio.NewScanner(stream)
 
 		for scanner.Scan() {
-			e.sendLog(command, scanner.Text(), true, model.UnixTime())
+			e.sendLog(command, scanner.Text(), true)
 		}
 		if err = scanner.Err(); err != nil {
-			e.sendLog(command, err.Error(), true, model.UnixTime())
+			e.sendLog(command, err.Error(), true)
 			log.Println("executor: Error:", err)
 		}
 		stream.Close()
@@ -89,18 +85,22 @@ func (e *executor) execute(command string) bool {
 
 	err = e.cmd.Run()
 	if err != nil {
-		e.sendLog(command, err.Error(), true, model.UnixTime())
-		e.sendLog(command, model.ExecEnd, true, model.UnixTime())
-		log.Println("executor: Error:", err)
+		e.sendLogFatal(command, err.Error())
 		return false
 	}
-	e.sendLog(command, model.ExecEnd, false, model.UnixTime())
+	e.sendLog(command, model.ExecEnd, false)
 	e.cmd = nil
 	return true
 }
 
-func (e *executor) sendLog(command, output string, error bool, time model.UnixTimeType) {
-	e.out <- model.Log{e.task, e.stage, command, output, error, time, e.debug}
+func (e *executor) sendLog(command, output string, error bool) {
+	e.logger.Send(&model.Log{e.task, e.stage, command, output, error, model.UnixTime(), e.debug})
+}
+
+func (e *executor) sendLogFatal(command, output string) {
+	log.Println("executor: Error:", output)
+	e.sendLog(command, output, true)
+	e.sendLog(command, model.ExecEnd, true)
 }
 
 func (e *executor) stop() bool {

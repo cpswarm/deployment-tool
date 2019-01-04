@@ -16,7 +16,7 @@ const (
 
 type Logger interface {
 	Report(*model.LogRequest)
-	Writer() chan<- model.Log
+	Send(*model.Log)
 }
 
 type logger struct {
@@ -60,8 +60,8 @@ func (l *logger) Report(request *model.LogRequest) {
 	log.Println("No logs since", request.IfModifiedSince)
 }
 
-func (l *logger) Writer() chan<- model.Log {
-	return l.queue
+func (l *logger) Send(logM *model.Log) {
+	l.queue <- *logM
 }
 
 func (l *logger) Stop() {
