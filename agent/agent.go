@@ -130,7 +130,7 @@ func (a *agent) startWorker() {
 	log.Println("Waiting for connection and requests...")
 	var latestMessageChecksum [16]byte
 	for request := range a.pipe.RequestCh {
-		log.Println("Request:", request.Topic)
+		log.Println("Request topic:", request.Topic)
 		switch {
 		case request.Topic == model.PipeConnected:
 			go a.advertiseTarget()
@@ -207,7 +207,7 @@ func (a *agent) handleRequest(payload []byte) {
 
 func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 	log.Printf("Received announcement: %s", taskA.ID)
-	a.sendInstallReponse(taskA.ID, model.StageStart, false, taskA.Debug)
+	a.installer.sendLog(taskA.ID, model.StageStart, false, taskA.Debug)
 
 	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
 		if a.target.TaskHistory[i] == taskA.ID {
@@ -216,14 +216,15 @@ func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 		}
 	}
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-	a.sendInstallReponse(taskA.ID, "received announcement", false, taskA.Debug)
+	a.installer.sendLog(taskA.ID, "received announcement", false, taskA.Debug)
 
 	if a.installer.evaluate(taskA) {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.sendInstallReponse(taskA.ID, "subscribed to task", false, taskA.Debug)
+		a.installer.sendLog(taskA.ID, "subscribed to task", false, taskA.Debug)
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
-		a.sendInstallReponse(taskA.ID, "not enough memory", true, taskA.Debug)
+		a.installer.sendLogFatal(taskA.ID, "not enough memory")
+		return
 	}
 }
 
@@ -240,20 +241,19 @@ func (a *agent) handleTask(payload []byte) {
 	log.Printf("Received task: %s", task.ID)
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendInstallReponse(task.ID, "received task and unsubscribed", false, task.Debug)
-	//a.sendInstallReponse(task.ID, model.StageEnd, false, task.Debug)
+	a.installer.sendLog(task.ID, "received task and unsubscribed", false, task.Debug)
 	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
 	a.installer.store(task.Artifacts, task.ID, task.Debug)
 	// TODO check storage errors?
 
 	if len(task.Stages.Assemble) > 0 {
-		a.sendInstallReponse(task.ID, "task type: assembly", false, task.Debug)
+		a.installer.sendLog(task.ID, "task type: assembly", false, task.Debug)
 		a.assemble(task.Stages, task.ID, task.Debug)
 		return
 	}
 
-	a.sendInstallReponse(task.ID, "task type: install/run", false, task.Debug)
+	a.installer.sendLog(task.ID, "task type: install/run", false, task.Debug)
 	success := a.installer.install(task.Stages.Install, task.ID, task.Debug)
 	if success {
 		a.runner.stop()            // stop runner for old task
@@ -281,18 +281,17 @@ func (a *agent) assemble(stages model.Stages, taskID string, debug bool) {
 		}
 		compressed, err := model.CompressFiles(paths...)
 		if err != nil {
-			// TODO send error to manager
-			log.Printf("error compressing package: %s", err)
+			a.installer.sendLogFatal(taskID, fmt.Sprintf("error compressing package: %s", err))
 			return
 		}
 
 		b, err := json.Marshal(model.Package{a.target.ID, taskID, compressed})
 		if err != nil {
-			// TODO send error to manager
-			log.Printf("error serializing package: %s", err)
+			a.installer.sendLogFatal(taskID, fmt.Sprintf("error serializing package: %s", err))
 			return
 		}
 		a.pipe.ResponseCh <- model.Message{model.ResponsePackage, b}
+		// TODO add guaranty of delivery
 	}
 }
 
@@ -312,10 +311,6 @@ func (a *agent) saveState() {
 		return
 	}
 	log.Println("Saved state:", DefaultStateFile)
-}
-
-func (a *agent) sendInstallReponse(taskID, message string, error, debug bool) {
-	a.logger.Writer() <- model.Log{taskID, model.StageInstall, "", message, error, model.UnixTime(), debug}
 }
 
 func (a *agent) sendAdvertisement() {

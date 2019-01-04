@@ -136,7 +136,7 @@ func (m *manager) processPackage(p *model.Package) {
 
 	err := model.DecompressFiles(p.Payload, fmt.Sprintf("%s/%s/%s", source.OrdersDir, p.Task, source.PackageDir))
 	if err != nil {
-		m.logTransferError(p.Task, "error decompressing assembled package", p.Assembler)
+		m.logTransferFatal(p.Task, "error decompressing assembled package", p.Assembler)
 		return
 	}
 
@@ -153,7 +153,7 @@ func (m *manager) processPackage(p *model.Package) {
 	child := order.getChild()
 	err = m.addOrder(child)
 	if err != nil {
-		m.logTransferError(p.Task, fmt.Sprintf("error creating child order: %s", err), p.Assembler)
+		m.logTransferFatal(p.Task, fmt.Sprintf("error creating child order: %s", err), p.Assembler)
 		return
 	}
 	m.logTransfer(p.Task, fmt.Sprintf("created child order: %s", child.ID), p.Assembler)
@@ -176,11 +176,18 @@ func (m *manager) logTransfer(order, message string, targets ...string) {
 	m.update.Broadcast()
 }
 
-func (m *manager) logTransferError(order, message string, targets ...string) {
+func (m *manager) logTransferFatal(order, message string, targets ...string) {
 	for _, target := range targets {
 		log.Println(message)
 		m.targets[target].Logs[order].insert(model.Log{
 			Output: message,
+			Task:   order,
+			Stage:  model.StageTransfer,
+			Time:   model.UnixTime(),
+			Error:  true,
+		})
+		m.targets[target].Logs[order].insert(model.Log{
+			Output: model.StageEnd,
 			Task:   order,
 			Stage:  model.StageTransfer,
 			Time:   model.UnixTime(),
@@ -225,10 +232,7 @@ func (m *manager) sendTask(order *order) {
 		var err error
 		compressedArchive, err = model.CompressFiles(path)
 		if err != nil {
-			m.logTransferError(order.ID, fmt.Sprintf("error compressing files: %s", err), receivers...)
-			m.logTransferError(order.ID, model.StageEnd, receivers...)
-
-			log.Printf("error compressing files: %s", err)
+			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), receivers...)
 			return
 		}
 		m.logTransfer(order.ID, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), receivers...)
@@ -264,8 +268,7 @@ func (m *manager) sendTask(order *order) {
 		// send actual task
 		b, err := json.Marshal(&task)
 		if err != nil {
-			log.Printf("Error serializing task: %s", err)
-			// TODO add logs and abort?
+			m.logTransferFatal(order.ID, fmt.Sprintf("error serializing task: %s", err), receivers...)
 			return
 		}
 		m.pipe.RequestCh <- model.Message{task.ID, b}
@@ -276,8 +279,8 @@ func (m *manager) sendTask(order *order) {
 		// TODO which messages are received, what is pending?
 		pending = false
 		for _, match := range receivers {
-			if log, found := m.targets[match].Logs[task.ID]; found {
-				if len(log.Install)+len(log.Run) == 0 {
+			if l, found := m.targets[match].Logs[task.ID]; found {
+				if len(l.Install)+len(l.Run) == 0 {
 					pending = true
 				} else {
 					m.logTransfer(order.ID, model.StageEnd, match) // TODO add this as soon as an ack arrives
