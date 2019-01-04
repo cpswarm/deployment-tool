@@ -114,16 +114,13 @@ func (a *restAPI) GetOrders(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) GetTargets(w http.ResponseWriter, r *http.Request) {
 
-	//var targets []*model.target
-	//for _, t := range a.manager.targets {
-	//	targets = append(targets, t)
-	//}
-	//// TODO sort by ID
+	targets, err := a.manager.getTargets()
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
 
-	a.manager.RLock()
-	defer a.manager.RUnlock()
-
-	b, err := json.Marshal(a.manager.targets)
+	b, err := json.Marshal(targets)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -137,11 +134,12 @@ func (a *restAPI) GetTarget(w http.ResponseWriter, r *http.Request) {
 
 	id := mux.Vars(r)["id"]
 
-	a.manager.RLock()
-	defer a.manager.RUnlock()
-
-	target, found := a.manager.targets[id]
-	if !found {
+	target, err := a.manager.getTarget(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if target == nil {
 		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
 		return
 	}
@@ -160,15 +158,17 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	a.manager.RLock()
-	defer a.manager.RUnlock()
-
-	if _, found := a.manager.targets[id]; !found {
-		HTTPResponseError(w, http.StatusNotFound, id, " is not found!")
+	target, err := a.manager.getTarget(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if target == nil {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
 		return
 	}
 
-	err := a.manager.requestLogs(id)
+	err = a.manager.requestLogs(id)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return
@@ -181,7 +181,7 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 	upgrader := websocket.Upgrader{} // use default options
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Print("websocket: upgrade error:", err)
+		log.Println("websocket: upgrade error:", err)
 		return
 	}
 	defer c.Close()
@@ -189,7 +189,15 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 		a.manager.update.L.Lock()
 		a.manager.update.Wait()
 		log.Println("websocket: sending update!")
-		b, _ := json.Marshal(a.manager.targets)
+
+		targets, err := a.manager.getTargets()
+		if err != nil {
+			log.Println("websocket: error getting targets:", err)
+			a.manager.update.L.Unlock()
+			break
+		}
+
+		b, _ := json.Marshal(targets)
 		err = c.WriteMessage(websocket.TextMessage, b)
 		if err != nil {
 			log.Println("websocket: write error:", err)

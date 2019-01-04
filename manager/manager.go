@@ -44,9 +44,7 @@ func (m *manager) addOrder(order *order) error {
 	order.ID = m.newTaskID()
 	order.Created = time.Now().UnixNano()
 
-	m.Lock()
-	defer m.Unlock()
-
+	m.RLock()
 TARGETS:
 	for id, target := range m.targets {
 		// target by id
@@ -68,11 +66,15 @@ TARGETS:
 			}
 		}
 	}
+	m.RUnlock()
 
 	if order.Target.Assembler != "" {
+		m.RLock()
 		if _, found := m.targets[order.Target.Assembler]; !found {
+			m.RUnlock()
 			return fmt.Errorf("target for assember is not found: %s", order.Target.Assembler)
 		}
+		m.RUnlock()
 	}
 
 	log.Println("Order receivers:", len(order.Receivers))
@@ -86,8 +88,12 @@ TARGETS:
 		return fmt.Errorf("error fetching source files: %s", err)
 	}
 
+	m.Lock()
 	m.orders[order.ID] = order
+	m.Unlock()
 	log.Println("Added order:", order.ID)
+	// sent update notification
+	m.update.Broadcast()
 
 	go m.sendTask(order)
 	return nil
@@ -103,6 +109,22 @@ func (m *manager) getOrders() (map[string]*order, error) {
 	return m.orders, nil
 }
 
+func (m *manager) getTargets() (map[string]*target, error) {
+	m.RLock()
+	defer m.RUnlock()
+	return m.targets, nil
+}
+
+func (m *manager) getTarget(id string) (*target, error) {
+	m.RLock()
+	defer m.RUnlock()
+	if _, found := m.targets[id]; !found {
+		return nil, nil
+	}
+	return m.targets[id], nil
+}
+
+// requires lock
 func (m *manager) initLogger(orderID string, targetIDs ...string) {
 	for _, targetID := range targetIDs {
 		m.targets[targetID].initTask(orderID)
@@ -164,6 +186,7 @@ func (m *manager) processPackage(p *model.Package) {
 }
 
 func (m *manager) logTransfer(order, message string, targets ...string) {
+	m.RLock()
 	for _, target := range targets {
 		m.targets[target].Logs[order].insert(model.Log{
 			Output: message,
@@ -172,11 +195,13 @@ func (m *manager) logTransfer(order, message string, targets ...string) {
 			Time:   model.UnixTime(),
 		})
 	}
+	m.RUnlock()
 	// sent update notification
 	m.update.Broadcast()
 }
 
 func (m *manager) logTransferFatal(order, message string, targets ...string) {
+	m.RLock()
 	for _, target := range targets {
 		log.Println(message)
 		m.targets[target].Logs[order].insert(model.Log{
@@ -194,6 +219,7 @@ func (m *manager) logTransferFatal(order, message string, targets ...string) {
 			Error:  true,
 		})
 	}
+	m.RUnlock()
 	// sent update notification
 	m.update.Broadcast()
 }
@@ -278,6 +304,7 @@ func (m *manager) sendTask(order *order) {
 
 		// TODO which messages are received, what is pending?
 		pending = false
+		m.RLock()
 		for _, match := range receivers {
 			if l, found := m.targets[match].Logs[task.ID]; found {
 				if len(l.Install)+len(l.Run) == 0 {
@@ -287,6 +314,7 @@ func (m *manager) sendTask(order *order) {
 				}
 			}
 		}
+		m.RUnlock()
 	}
 	log.Println("Task received by all targets.")
 	// TODO
@@ -304,14 +332,13 @@ func (m *manager) sourcePath(orderID string) string {
 }
 
 func (m *manager) requestLogs(targetID string) error {
+	m.RLock()
 	w := model.RequestWrapper{LogRequest: &model.LogRequest{
 		IfModifiedSince: m.targets[targetID].LastLogRequest,
 	}}
+	m.RUnlock()
 	b, _ := json.Marshal(&w)
-	m.pipe.RequestCh <- model.Message{
-		Topic:   model.FormatTopicID(targetID),
-		Payload: b,
-	}
+	m.pipe.RequestCh <- model.Message{model.FormatTopicID(targetID), b}
 	return nil
 }
 
