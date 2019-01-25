@@ -24,25 +24,43 @@ type registry struct {
 type order struct {
 	model.Header `yaml:",inline"`
 	Source       source.Source `json:"source"`
-	Stages       model.Stages  `json:"stages"`
-	Target       struct {
+	Build        build         `json:"build"`
+	Deploy       deploy        `json:"deploy"`
+	//Stages       model.Stages  `json:"stages"`
+	ChildOrder string `json:"childOrder,omitempty"`
+	// internal
+	receivers      []string
+	receiverTopics []string
+}
+
+type build struct {
+	Commands  []string `json:"commands"`
+	Host      string   `json:"host"`
+	Artifacts []string `json:"artifacts"`
+}
+
+type deploy struct {
+	Install struct {
+		Commands []string `json:"commands"`
+	} `json:"install"`
+	Run struct {
+		Commands    []string `json:"commands"`
+		AutoRestart bool     `json:"autoRestart"`
+	} `json:"run"`
+	Target struct {
 		Assembler string   `json:"assembler,omitempty"`
 		IDs       []string `json:"ids"`
 		Tags      []string `json:"tags"`
 	} `json:"targets"`
-	Receivers  []string `json:"receivers"`
-	ChildOrder string   `json:"childOrder,omitempty"`
-	// internal
-	receiverTopics []string
 }
 
 func (o order) validate() error {
-	if len(o.Stages.Transfer)+len(o.Stages.Install)+len(o.Stages.Run) == 0 {
+	if len(o.Build.Commands)+len(o.Deploy.Install.Commands)+len(o.Deploy.Run.Commands) == 0 {
 		return fmt.Errorf("empty stages")
 	}
-	for _, path := range o.Stages.Transfer {
+	for _, path := range o.Build.Artifacts {
 		if strings.HasPrefix(path, "/") {
-			return fmt.Errorf("transfer path should be relative to source. This path is absolute: %s", path)
+			return fmt.Errorf("path to artifact should be relative to source. Given path is absolute: %s", path)
 		}
 	}
 	return nil
@@ -50,13 +68,10 @@ func (o order) validate() error {
 
 func (o order) getChild() *order {
 	var child order
-	child.Stages.Install = o.Stages.Install
-	child.Stages.Run = o.Stages.Run
 	source := source.Order(o.ID)
 	child.Source.Order = &source
+	child.Deploy = o.Deploy
 	child.Debug = o.Debug
-	child.Target.IDs = o.Target.IDs
-	child.Target.Tags = o.Target.Tags
 	return &child
 }
 
@@ -75,7 +90,6 @@ type logs struct {
 }
 
 type stages struct {
-	//Assemble map[string][]stageLog `json:"assemble"`
 	Transfer map[string][]stageLog `json:"transfer"`
 	Install  map[string][]stageLog `json:"install"`
 	Run      map[string][]stageLog `json:"run"`

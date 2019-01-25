@@ -48,19 +48,19 @@ func (m *manager) addOrder(order *order) error {
 TARGETS:
 	for id, target := range m.targets {
 		// target by id
-		for _, id2 := range order.Target.IDs {
+		for _, id2 := range order.Deploy.Target.IDs {
 			if id == id2 {
 				order.receiverTopics = append(order.receiverTopics, model.FormatTopicID(id))
-				order.Receivers = append(order.Receivers, id)
+				order.receivers = append(order.receivers, id)
 				continue TARGETS
 			}
 		}
 		// target by tag
 		for _, t := range target.Tags {
-			for _, t2 := range order.Target.Tags {
+			for _, t2 := range order.Deploy.Target.Tags {
 				if t == t2 {
 					order.receiverTopics = append(order.receiverTopics, model.FormatTopicTag(t))
-					order.Receivers = append(order.Receivers, id)
+					order.receivers = append(order.receivers, id)
 					continue TARGETS
 				}
 			}
@@ -68,17 +68,17 @@ TARGETS:
 	}
 	m.RUnlock()
 
-	if order.Target.Assembler != "" {
+	if order.Build.Host != "" {
 		m.RLock()
-		if _, found := m.targets[order.Target.Assembler]; !found {
+		if _, found := m.targets[order.Build.Host]; !found {
 			m.RUnlock()
-			return fmt.Errorf("target for assember is not found: %s", order.Target.Assembler)
+			return fmt.Errorf("build host is not found: %s", order.Build.Host)
 		}
 		m.RUnlock()
 	}
 
-	log.Println("Order receivers:", len(order.Receivers))
-	if len(order.Receivers) == 0 {
+	log.Println("Order receivers:", len(order.receivers))
+	if len(order.receivers) == 0 {
 		return fmt.Errorf("could not match any device")
 	}
 
@@ -93,7 +93,7 @@ TARGETS:
 	m.Unlock()
 	log.Println("Added order:", order.ID)
 	// sent update notification
-	m.update.Broadcast()
+	//m.update.Broadcast() // TODO this only sends targets
 
 	go m.sendTask(order)
 	return nil
@@ -232,23 +232,23 @@ func (m *manager) sendTask(order *order) {
 		receivers      []string
 		receiverTopics []string
 	)
-	if len(order.Stages.Assemble) != 0 {
-		stages.Assemble = order.Stages.Assemble
-		stages.Transfer = order.Stages.Transfer
-		receivers = []string{order.Target.Assembler}
-		receiverTopics = []string{model.FormatTopicID(order.Target.Assembler)}
+	if len(order.Build.Commands) != 0 {
+		stages.Assemble = order.Build.Commands
+		stages.Transfer = order.Build.Artifacts
+		receivers = []string{order.Build.Host}
+		receiverTopics = []string{model.FormatTopicID(order.Build.Host)}
 
 		m.Lock()
-		m.initLogger(order.ID, order.Target.Assembler)
+		m.initLogger(order.ID, order.Build.Host)
 		m.Unlock()
 	} else {
-		stages.Install = order.Stages.Install
-		stages.Run = order.Stages.Run
-		receivers = order.Receivers
+		stages.Install = order.Deploy.Install.Commands
+		stages.Run = order.Deploy.Run.Commands
+		receivers = order.receivers
 		receiverTopics = order.receiverTopics
 
 		m.Lock()
-		m.initLogger(order.ID, order.Receivers...)
+		m.initLogger(order.ID, order.receivers...)
 		m.Unlock()
 	}
 
