@@ -68,7 +68,7 @@ TARGETS:
 	}
 	m.RUnlock()
 
-	if order.Build.Host != "" {
+	if order.Build != nil && order.Build.Host != "" {
 		m.RLock()
 		if _, found := m.targets[order.Build.Host]; !found {
 			m.RUnlock()
@@ -226,31 +226,24 @@ func (m *manager) logTransferFatal(order, message string, targets ...string) {
 
 func (m *manager) sendTask(order *order) {
 
+	// instantiated based on the task type
 	var (
-		// instantiated based on the task type
-		stages         model.Stages
-		receivers      []string
-		receiverTopics []string
+		receivers, receiverTopics []string
+		build                     *model.Build
+		deploy                    *model.Deploy
 	)
-	if len(order.Build.Commands) != 0 {
-		stages.Assemble = order.Build.Commands
-		stages.Transfer = order.Build.Artifacts
+	if order.Build != nil {
+		build = &order.Build.Build
 		receivers = []string{order.Build.Host}
 		receiverTopics = []string{model.FormatTopicID(order.Build.Host)}
-
-		m.Lock()
-		m.initLogger(order.ID, order.Build.Host)
-		m.Unlock()
 	} else {
-		stages.Install = order.Deploy.Install.Commands
-		stages.Run = order.Deploy.Run.Commands
+		deploy = &order.Deploy.Deploy
 		receivers = order.receivers
 		receiverTopics = order.receiverTopics
-
-		m.Lock()
-		m.initLogger(order.ID, order.receivers...)
-		m.Unlock()
 	}
+	m.Lock()
+	m.initLogger(order.ID, order.receivers...)
+	m.Unlock()
 
 	var compressedArchive []byte
 	m.logTransfer(order.ID, model.StageStart, receivers...)
@@ -273,7 +266,8 @@ func (m *manager) sendTask(order *order) {
 
 	task := model.Task{
 		Header:    order.Header,
-		Stages:    stages,
+		Build:     build,
+		Deploy:    deploy,
 		Artifacts: compressedArchive,
 	}
 

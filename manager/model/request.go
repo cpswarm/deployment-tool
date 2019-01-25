@@ -15,12 +15,26 @@ const (
 	PrefixSeparator = "-"
 )
 
-type Stages struct {
-	Assemble []string `json:"assemble"`
-	Transfer []string `json:"transfer"`
-	Install  []string `json:"install"`
-	//Test     []string
-	Run []string `json:"run"`
+//type Stages struct {
+//	Assemble []string `json:"assemble"`
+//	Transfer []string `json:"transfer"`
+//	Install  []string `json:"install"`
+//	Run      []string `json:"run"`
+//}
+
+type Build struct {
+	Commands  []string `json:"commands"`
+	Artifacts []string `json:"artifacts"`
+}
+
+type Deploy struct {
+	Install struct {
+		Commands []string `json:"commands"`
+	} `json:"install"`
+	Run struct {
+		Commands    []string `json:"commands"`
+		AutoRestart bool     `json:"autoRestart"`
+	} `json:"run"`
 }
 
 // Header contains information that is common among task related structs
@@ -39,8 +53,10 @@ type Announcement struct {
 // Task is a struct with all the information for deployment on a target
 type Task struct {
 	Header
-	Stages    Stages `json:"stages"`
-	Artifacts []byte `json:"artifacts,omitempty"`
+	//Stages    Stages `json:"stages"`
+	Build     *Build  `json:"b,omitempty"`
+	Deploy    *Deploy `json:"d,omitempty"`
+	Artifacts []byte  `json:"a,omitempty"`
 }
 
 type LogRequest struct {

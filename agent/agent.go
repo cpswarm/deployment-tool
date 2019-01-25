@@ -261,37 +261,38 @@ func (a *agent) handleTask(payload []byte) {
 	a.installer.store(task.Artifacts, task.ID, task.Debug)
 	// TODO check storage errors?
 
-	if len(task.Stages.Assemble) > 0 {
+	if task.Build != nil {
 		a.installer.sendLog(task.ID, "task type: assembly", false, task.Debug)
-		a.assemble(task.Stages, task.ID, task.Debug)
+		a.build(task.Build, task.ID, task.Debug)
 		return
 	}
 
 	a.installer.sendLog(task.ID, "task type: install/run", false, task.Debug)
-	success := a.installer.install(task.Stages.Install, task.ID, task.Debug)
+	success := a.installer.install(task.Deploy.Install.Commands, task.ID, task.Debug)
 	if success {
 		a.runner.stop()            // stop runner for old task
 		a.installer.clean(task.ID) // remove old task files
-		a.target.TaskRun = task.Stages.Run
+		a.target.TaskRun = task.Deploy.Run.Commands
+		a.target.TaskRunAutoRestart = task.Deploy.Run.AutoRestart
 		a.target.TaskID = task.ID
 		a.target.TaskDebug = task.Debug
 		a.saveState()
 
-		go a.runner.run(task.Stages.Run, task.ID, task.Debug)
+		go a.runner.run(task.Deploy.Run.Commands, task.ID, task.Debug)
 	}
 }
 
-func (a *agent) assemble(stages model.Stages, taskID string, debug bool) {
+func (a *agent) build(build *model.Build, taskID string, debug bool) {
 
-	success := a.installer.install(stages.Assemble, taskID, debug)
+	success := a.installer.install(build.Commands, taskID, debug)
 	if success {
 		a.installer.clean(taskID) // remove old task files
 
 		wd := fmt.Sprintf("%s/tasks/%s/%s", WorkDir, taskID, source.SourceDir)
 		// make it relative to work directory
-		paths := make([]string, len(stages.Transfer))
-		for i := range stages.Transfer {
-			paths[i] = fmt.Sprintf("%s/%s", wd, stages.Transfer[i])
+		paths := make([]string, len(build.Artifacts))
+		for i := range build.Artifacts {
+			paths[i] = fmt.Sprintf("%s/%s", wd, build.Artifacts[i])
 		}
 		compressed, err := model.CompressFiles(paths...)
 		if err != nil {

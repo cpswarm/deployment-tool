@@ -49,10 +49,11 @@ type Target struct {
 	Tags      []string `json:",omitempty"`
 
 	// active task
-	TaskID      string   `json:",omitempty"`
-	TaskDebug   bool     `json:",omitempty"`
-	TaskRun     []string `json:",omitempty"`
-	TaskHistory []string `json:",omitempty"`
+	TaskID             string   `json:",omitempty"`
+	TaskDebug          bool     `json:",omitempty"`
+	TaskRun            []string `json:",omitempty"`
+	TaskRunAutoRestart bool     `json:",omitempty"`
+	TaskHistory        []string `json:",omitempty"`
 }
 
 type Package struct {

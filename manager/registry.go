@@ -24,8 +24,8 @@ type registry struct {
 type order struct {
 	model.Header `yaml:",inline"`
 	Source       source.Source `json:"source"`
-	Build        build         `json:"build"`
-	Deploy       deploy        `json:"deploy"`
+	Build        *build        `json:"build"`
+	Deploy       *deploy       `json:"deploy"`
 	//Stages       model.Stages  `json:"stages"`
 	ChildOrder string `json:"childOrder,omitempty"`
 	// internal
@@ -34,38 +34,42 @@ type order struct {
 }
 
 type build struct {
-	Commands  []string `json:"commands"`
-	Host      string   `json:"host"`
-	Artifacts []string `json:"artifacts"`
+	model.Build `yaml:",inline"`
+	Host         string `json:"host"`
 }
 
 type deploy struct {
-	Install struct {
-		Commands []string `json:"commands"`
-	} `json:"install"`
-	Run struct {
-		Commands    []string `json:"commands"`
-		AutoRestart bool     `json:"autoRestart"`
-	} `json:"run"`
-	Target struct {
-		Assembler string   `json:"assembler,omitempty"`
-		IDs       []string `json:"ids"`
-		Tags      []string `json:"tags"`
+	model.Deploy `yaml:",inline"`
+	Target        struct {
+		IDs  []string `json:"ids"`
+		Tags []string `json:"tags"`
 	} `json:"targets"`
 }
 
 func (o order) validate() error {
-	if len(o.Build.Commands)+len(o.Deploy.Install.Commands)+len(o.Deploy.Run.Commands) == 0 {
-		return fmt.Errorf("empty stages")
-	}
-	for _, path := range o.Build.Artifacts {
-		if strings.HasPrefix(path, "/") {
-			return fmt.Errorf("path to artifact should be relative to source. Given path is absolute: %s", path)
+	// validate build
+	if o.Build != nil {
+		if len(o.Build.Commands) == 0 {
+			return fmt.Errorf("no commands for build")
+		}
+		for _, path := range o.Build.Artifacts {
+			if strings.HasPrefix(path, "/") {
+				return fmt.Errorf("path to artifact should be relative to source. Given path is absolute: %s", path)
+			}
 		}
 	}
+
+	// validate deploy
+	if o.Deploy != nil {
+		if len(o.Deploy.Install.Commands)+len(o.Deploy.Run.Commands) == 0 {
+			return fmt.Errorf("no install or run commands for deploy")
+		}
+	}
+
 	return nil
 }
 
+// getChild returns the deploy part of order
 func (o order) getChild() *order {
 	var child order
 	source := source.Order(o.ID)
