@@ -6,21 +6,13 @@ const (
 	RequestTargetID  = "ID"
 	RequestTargetTag = "TAG"
 	// Stage types
-	StageAssemble = "ASSEMBLE"
-	StageTransfer = "TRANSFER"
-	StageInstall  = "INSTALL"
-	StageTest     = "TEST"
-	StageRun      = "RUN"
+	StageBuild    = "build"
+	StageTransfer = "transfer"
+	StageInstall  = "install"
+	StageRun      = "run"
 	// Other consts
 	PrefixSeparator = "-"
 )
-
-//type Stages struct {
-//	Assemble []string `json:"assemble"`
-//	Transfer []string `json:"transfer"`
-//	Install  []string `json:"install"`
-//	Run      []string `json:"run"`
-//}
 
 type Build struct {
 	Commands  []string `json:"commands"`
@@ -39,24 +31,25 @@ type Deploy struct {
 
 // Header contains information that is common among task related structs
 type Header struct {
-	ID      string `json:"id"`
-	Debug   bool   `json:"debug"`
-	Created int64  `json:"created"`
+	ID        string `json:"i"`
+	Debug     bool   `json:"d,omitempty"`
+	Created   int64  `json:"c"`
+	BuildType bool   `json:"b,omitempty"`
 }
 
 // Announcement carries information about a task
 type Announcement struct {
 	Header
-	Size int `json:"size"`
+	Size int `json:"si"`
 }
 
 // Task is a struct with all the information for deployment on a target
 type Task struct {
 	Header
 	//Stages    Stages `json:"stages"`
-	Build     *Build  `json:"b,omitempty"`
-	Deploy    *Deploy `json:"d,omitempty"`
-	Artifacts []byte  `json:"a,omitempty"`
+	Build     *Build  `json:"bl,omitempty"`
+	Deploy    *Deploy `json:"de,omitempty"`
+	Artifacts []byte  `json:"ar,omitempty"`
 }
 
 type LogRequest struct {

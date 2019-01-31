@@ -14,6 +14,7 @@ import (
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
+	"github.com/pbnjay/memory"
 	"github.com/satori/go.uuid"
 )
 
@@ -221,7 +222,7 @@ func (a *agent) handleRequest(payload []byte) {
 
 func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 	log.Printf("Received announcement: %s", taskA.ID)
-	a.installer.sendLog(taskA.ID, model.StageStart, false, taskA.Debug)
+	a.sendLog(taskA.ID, model.StageStart, false, taskA.Debug)
 
 	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
 		if a.target.TaskHistory[i] == taskA.ID {
@@ -230,16 +231,21 @@ func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 		}
 	}
 	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-	a.installer.sendLog(taskA.ID, "received announcement", false, taskA.Debug)
+	a.sendLog(taskA.ID, "received announcement", false, taskA.Debug)
 
-	if a.installer.evaluate(taskA) {
+	if a.assessAnnouncement(taskA) {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.installer.sendLog(taskA.ID, "subscribed to task", false, taskA.Debug)
+		a.sendLog(taskA.ID, "subscribed to task", false, taskA.Debug)
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
-		a.installer.sendLogFatal(taskA.ID, "not enough memory")
+		a.sendLogFatal(taskA.ID, "not enough memory")
 		return
 	}
+}
+
+func (*agent) assessAnnouncement(ann *model.Announcement) bool {
+	sizeLimit := memory.TotalMemory() / 2 // TODO calculate this based on the available memory
+	return uint64(ann.Size) <= sizeLimit
 }
 
 // TODO make this sequenctial
@@ -255,23 +261,25 @@ func (a *agent) handleTask(payload []byte) {
 	log.Printf("Received task: %s", task.ID)
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.installer.sendLog(task.ID, "received task and unsubscribed", false, task.Debug)
+	a.sendLog(task.ID, "received task and unsubscribed", false, task.Debug)
 	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
-	a.installer.store(task.Artifacts, task.ID, task.Debug)
-	// TODO check storage errors?
-
-	if task.Build != nil {
-		a.installer.sendLog(task.ID, "task type: assembly", false, task.Debug)
-		a.build(task.Build, task.ID, task.Debug)
+	err = a.saveArtifacts(task.Artifacts, task.ID, task.Debug)
+	if err != nil {
+		a.sendLogFatal(task.ID, err.Error())
 		return
 	}
 
-	a.installer.sendLog(task.ID, "task type: install/run", false, task.Debug)
-	success := a.installer.install(task.Deploy.Install.Commands, task.ID, task.Debug)
+	if task.BuildType {
+		a.build(task.Build, task.ID, task.Debug)
+		return
+	}
+	a.sendLog(task.ID, model.StageEnd, false, task.Debug)
+
+	success := a.installer.install(task.Deploy.Install.Commands, model.StageInstall, task.ID, task.Debug)
 	if success {
-		a.runner.stop()            // stop runner for old task
-		a.installer.clean(task.ID) // remove old task files
+		a.runner.stop()             // stop runner for old task
+		a.removeOtherTasks(task.ID) // remove old task files
 		a.target.TaskRun = task.Deploy.Run.Commands
 		a.target.TaskRunAutoRestart = task.Deploy.Run.AutoRestart
 		a.target.TaskID = task.ID
@@ -284,9 +292,9 @@ func (a *agent) handleTask(payload []byte) {
 
 func (a *agent) build(build *model.Build, taskID string, debug bool) {
 
-	success := a.installer.install(build.Commands, taskID, debug)
+	success := a.installer.install(build.Commands, model.StageBuild, taskID, debug)
 	if success {
-		a.installer.clean(taskID) // remove old task files
+		a.removeOtherTasks(taskID) // remove old task files
 
 		wd := fmt.Sprintf("%s/tasks/%s/%s", WorkDir, taskID, source.SourceDir)
 		// make it relative to work directory
@@ -296,16 +304,19 @@ func (a *agent) build(build *model.Build, taskID string, debug bool) {
 		}
 		compressed, err := model.CompressFiles(paths...)
 		if err != nil {
-			a.installer.sendLogFatal(taskID, fmt.Sprintf("error compressing package: %s", err))
+			a.sendLogFatal(taskID, fmt.Sprintf("error compressing package: %s", err))
 			return
 		}
+		a.sendLog(taskID, fmt.Sprintf("compressed built package to %d bytes", len(compressed)), false, debug)
 
 		b, err := json.Marshal(model.Package{a.target.ID, taskID, compressed})
 		if err != nil {
-			a.installer.sendLogFatal(taskID, fmt.Sprintf("error serializing package: %s", err))
+			a.sendLogFatal(taskID, fmt.Sprintf("error serializing package: %s", err))
 			return
 		}
 		a.pipe.ResponseCh <- model.Message{model.ResponsePackage, b}
+		a.sendLog(taskID, fmt.Sprintf("sent built package"), false, debug)
+		a.sendLog(taskID, model.StageEnd, false, debug)
 		// TODO add guaranty of delivery
 	}
 }

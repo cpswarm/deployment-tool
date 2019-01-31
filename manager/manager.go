@@ -43,6 +43,7 @@ func (m *manager) addOrder(order *order) error {
 	// add system generated meta values
 	order.ID = m.newTaskID()
 	order.Created = time.Now().UnixNano()
+	order.BuildType = order.Build != nil
 
 	m.RLock()
 TARGETS:
@@ -68,7 +69,7 @@ TARGETS:
 	}
 	m.RUnlock()
 
-	if order.Build != nil && order.Build.Host != "" {
+	if order.BuildType && order.Build.Host != "" {
 		m.RLock()
 		if _, found := m.targets[order.Build.Host]; !found {
 			m.RUnlock()
@@ -189,10 +190,11 @@ func (m *manager) logTransfer(order, message string, targets ...string) {
 	m.RLock()
 	for _, target := range targets {
 		m.targets[target].Logs[order].insert(model.Log{
-			Output: message,
-			Task:   order,
-			Stage:  model.StageTransfer,
-			Time:   model.UnixTime(),
+			Command: model.CommandByManager,
+			Output:  message,
+			Task:    order,
+			Stage:   model.StageTransfer,
+			Time:    model.UnixTime(),
 		})
 	}
 	m.RUnlock()
@@ -205,18 +207,20 @@ func (m *manager) logTransferFatal(order, message string, targets ...string) {
 	for _, target := range targets {
 		log.Println(message)
 		m.targets[target].Logs[order].insert(model.Log{
-			Output: message,
-			Task:   order,
-			Stage:  model.StageTransfer,
-			Time:   model.UnixTime(),
-			Error:  true,
+			Command: model.CommandByManager,
+			Output:  message,
+			Task:    order,
+			Stage:   model.StageTransfer,
+			Time:    model.UnixTime(),
+			Error:   true,
 		})
 		m.targets[target].Logs[order].insert(model.Log{
-			Output: model.StageEnd,
-			Task:   order,
-			Stage:  model.StageTransfer,
-			Time:   model.UnixTime(),
-			Error:  true,
+			Command: model.CommandByManager,
+			Output:  model.StageEnd,
+			Task:    order,
+			Stage:   model.StageTransfer,
+			Time:    model.UnixTime(),
+			Error:   true,
 		})
 	}
 	m.RUnlock()
@@ -232,7 +236,7 @@ func (m *manager) sendTask(order *order) {
 		build                     *model.Build
 		deploy                    *model.Deploy
 	)
-	if order.Build != nil {
+	if order.BuildType {
 		build = &order.Build.Build
 		receivers = []string{order.Build.Host}
 		receiverTopics = []string{model.FormatTopicID(order.Build.Host)}
@@ -301,7 +305,9 @@ func (m *manager) sendTask(order *order) {
 		m.RLock()
 		for _, match := range receivers {
 			if l, found := m.targets[match].Logs[task.ID]; found {
-				if len(l.Install)+len(l.Run) == 0 {
+				if _, ok := l.Stages[model.StageInstall]; ok && len(*l.Stages[model.StageInstall]) == 0 {
+					pending = true
+				} else if _, ok := l.Stages[model.StageRun]; ok && len(*l.Stages[model.StageRun]) == 0 {
 					pending = true
 				} else {
 					m.logTransfer(order.ID, model.StageEnd, match) // TODO add this as soon as an ack arrives

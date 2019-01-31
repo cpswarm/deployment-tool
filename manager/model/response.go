@@ -12,10 +12,12 @@ const (
 	//ResponseClientError   = "CLIENT_ERROR" // client errors
 
 	// Log output constants
-	ExecStart  = "EXEC-START"
-	ExecEnd    = "EXEC-END"
-	StageStart = "STAGE-START"
-	StageEnd   = "STAGE-END"
+	ExecStart        = "EXEC-START"
+	ExecEnd          = "EXEC-END"
+	StageStart       = "STAGE-START"
+	StageEnd         = "STAGE-END"
+	CommandByAgent   = "agent"
+	CommandByManager = "manager"
 )
 
 type Response struct {

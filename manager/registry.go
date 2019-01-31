@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
@@ -26,8 +25,7 @@ type order struct {
 	Source       source.Source `json:"source"`
 	Build        *build        `json:"build"`
 	Deploy       *deploy       `json:"deploy"`
-	//Stages       model.Stages  `json:"stages"`
-	ChildOrder string `json:"childOrder,omitempty"`
+	ChildOrder   string        `json:"childOrder,omitempty"`
 	// internal
 	receivers      []string
 	receiverTopics []string
@@ -35,12 +33,12 @@ type order struct {
 
 type build struct {
 	model.Build `yaml:",inline"`
-	Host         string `json:"host"`
+	Host        string `json:"host"`
 }
 
 type deploy struct {
 	model.Deploy `yaml:",inline"`
-	Target        struct {
+	Target       struct {
 		IDs  []string `json:"ids"`
 		Tags []string `json:"tags"`
 	} `json:"targets"`
@@ -89,15 +87,11 @@ type target struct {
 }
 
 type logs struct {
-	stages
+	Stages  map[string]*stage  `json:"stages"`
 	Updated model.UnixTimeType `json:"updated"`
 }
 
-type stages struct {
-	Transfer map[string][]stageLog `json:"transfer"`
-	Install  map[string][]stageLog `json:"install"`
-	Run      map[string][]stageLog `json:"run"`
-}
+type stage map[string][]stageLog
 
 type stageLog struct {
 	Output string             `json:"output"`
@@ -114,20 +108,8 @@ func newTarget() *target {
 func (t *target) initTask(id string) {
 	if _, found := t.Logs[id]; !found {
 		t.Logs[id] = new(logs)
+		t.Logs[id].Stages = make(map[string]*stage)
 	}
-}
-
-func (logs *logs) getStage(stage string) map[string][]stageLog {
-	switch stage {
-	case model.StageTransfer:
-		return logs.stages.Transfer
-	case model.StageInstall:
-		return logs.stages.Install
-	case model.StageRun:
-		return logs.stages.Run
-	}
-	log.Println("ERROR: Unknown/unsupported stage:", stage)
-	return nil
 }
 
 func (logs *logs) insert(l model.Log) {
@@ -135,20 +117,16 @@ func (logs *logs) insert(l model.Log) {
 		l.Command = systemLogsKey
 	}
 
-	// TODO this is as ugly as code can get
-	s := logs.getStage(l.Stage)
-	if s == nil {
-		s = make(map[string][]stageLog)
+	var s stage
+	t, ok := logs.Stages[l.Stage]
+	if !ok {
+		s = make(stage)
+	} else {
+		s = *t
 	}
+
 	commit := func() {
-		switch l.Stage {
-		case model.StageTransfer:
-			logs.stages.Transfer = s
-		case model.StageInstall:
-			logs.stages.Install = s
-		case model.StageRun:
-			logs.stages.Run = s
-		}
+		logs.Stages[l.Stage] = &s
 		logs.Updated = model.UnixTime()
 	}
 
