@@ -4,18 +4,13 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"os"
-	"reflect"
-	"strings"
 	"sync"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
 	"github.com/pbnjay/memory"
-	"github.com/satori/go.uuid"
 )
 
 const (
@@ -38,10 +33,6 @@ type agent struct {
 // 	make two objects to hold active and pending tasks along with their resources
 // 	active task should be persisted for recovery
 
-type logCollector interface {
-	sendResponse(*model.Response)
-}
-
 func startAgent() *agent {
 
 	a := &agent{
@@ -61,68 +52,6 @@ func startAgent() *agent {
 
 	go a.startWorker()
 	return a
-}
-
-func (a *agent) loadState() error {
-	if _, err := os.Stat(DefaultStateFile); os.IsNotExist(err) {
-		return err
-	}
-
-	b, err := ioutil.ReadFile(DefaultStateFile)
-	if err != nil {
-		return fmt.Errorf("error reading state file: %s", err)
-	}
-
-	err = json.Unmarshal(b, &a.target)
-	if err != nil {
-		return fmt.Errorf("error parsing state file: %s", err)
-	}
-
-	log.Println("Loaded state file:", DefaultStateFile)
-	return nil
-}
-
-func (a *agent) loadConf() {
-	err := a.loadState()
-	if err != nil {
-		log.Printf("Error loading state file: %s. Starting fresh.", DefaultStateFile)
-	}
-
-	// LOAD AND REPLACE WITH ENV VARIABLES
-	var changed bool
-
-	id := os.Getenv("ID")
-	if id == "" && a.target.AutoGenID == "" {
-		a.target.AutoGenID = uuid.NewV4().String()
-		log.Println("Generated target ID:", a.target.AutoGenID)
-		a.target.ID = a.target.AutoGenID
-		changed = true
-	} else if id == "" && a.target.ID != a.target.AutoGenID {
-		log.Println("Taking previously generated ID:", a.target.AutoGenID)
-		a.target.ID = a.target.AutoGenID
-		changed = true
-	} else if id != "" && id != a.target.ID {
-		log.Println("Taking ID from env var:", id)
-		a.target.ID = id
-		changed = true
-	}
-
-	var tags []string
-	tagsString := os.Getenv("TAGS")
-	if tagsString != "" {
-		tags = strings.Split(tagsString, ",")
-		for i := 0; i < len(tags); i++ {
-			tags[i] = strings.TrimSpace(tags[i])
-		}
-	}
-	if !reflect.DeepEqual(tags, a.target.Tags) {
-		a.target.Tags = tags
-		changed = true
-	}
-
-	if changed {
-		a.saveState()
-	}
 }
 
 func (a *agent) startWorker() {
@@ -324,19 +253,6 @@ func (a *agent) build(build *model.Build, taskID string, debug bool) {
 func (a *agent) reportLogs(request *model.LogRequest) {
 	log.Println("Received log request since", request.IfModifiedSince)
 	a.logger.Report(request)
-}
-
-func (a *agent) saveState() {
-	a.Lock()
-	defer a.Unlock()
-
-	b, _ := json.MarshalIndent(&a.target, "", "\t")
-	err := ioutil.WriteFile(DefaultStateFile, b, 0600)
-	if err != nil {
-		log.Printf("Error saving state: %s", err)
-		return
-	}
-	log.Println("Saved state:", DefaultStateFile)
 }
 
 func (a *agent) close() {
