@@ -1,6 +1,6 @@
 #!/bin/sh
-echo "DEPLOYMENT AGENT INSTALLER"
-
+echo "================================================================================"
+echo "========================== DEPLOYMENT AGENT INSTALLER =========================="
 # check arguments
 if [ -z "$1" ]
 then
@@ -9,22 +9,27 @@ then
 fi
 
 wd=/var/local/linksmart-deployment-agent
-echo "\nRemoving old files..."
-echo "==============================================="
-ls deployment-agent-linux-arm.deb*
-rm deployment-agent-linux-arm.deb*
+downloadURL=https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/linux-arm-debian-package/deployment-agent-linux-arm.deb
+packageName=deployment-agent-linux-arm.deb
+envFile=.env
+serviceName=linksmart-deployment-agent
+
+echo "\n================================================================================"
+echo "Removing old files:\n"
+ls $packageName*
+rm $packageName*
 ls $wd/.env
 rm $wd/.env
 
 set -e
 
-echo "\nDownloading and installing the debian package:"
-echo "==============================================="
-wget https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/linux-arm-debian-package/deployment-agent-linux-arm.deb
-apt install ./deployment-agent-linux-arm.deb
+echo "\n================================================================================"
+echo "Downloading and installing the debian package:\n"
+wget $downloadURL
+apt install ./$packageName
 
-echo "\nWriting variables to $wd/.env:"
-echo "==============================================="
+echo "\n================================================================================"
+echo "Writing variables to $wd/$envFile:\n"
 mkdir -p $wd
 for var in "$@"
 do
@@ -32,10 +37,15 @@ do
     echo "$var" >> $wd/.env
 done
 
-echo "\nGenerating key pair for agent:"
-echo "==============================================="
-/usr/local/bin/linksmart-deployment-agent -newkeypair $wd/agent
+echo "\n================================================================================"
+echo "Generating key pair for agent:\n"
+/usr/local/bin/$serviceName -newkeypair $wd/agent
 
-echo "\nDone. \nAdd the public key to manager:"
+echo "\n================================================================================"
+echo "Restarting service...\n"
+service $serviceName restart
+
+echo "DONE! Add the public key to manager:\n"
 cat $wd/agent.pub
-echo ""
+echo "\n"
+
