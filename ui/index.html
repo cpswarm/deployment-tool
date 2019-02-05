@@ -86,29 +86,27 @@
                 <button type="button" v-on:click="fetchLogs(targetID)" class="btn btn-outline-dark btn-sm float-right">Request Logs</button></h5>
 
             <div id="tasksAccordion">
-                <div v-for="(task, taskID) in target.logs" class="card">
+                <div v-for="(logs, taskID) in target.logs" class="card">
                     <div class="card-header" :id="'heading-'+targetID+'-'+taskID">
                         <h5 class="mb-0">
                             <button class="w-100 btn btn-link" data-toggle="collapse" :data-target="'#col-'+targetID+'-'+taskID" aria-expanded="false" :aria-controls="'col-'+targetID+'-'+taskID">
-                                <span class="float-left">Task {{ taskID }}</span> <span class="badge badge-light float-right">{{formatTime(task.updated)}}</span>
+                                <span class="float-left">Task {{ taskID }}</span> <span class="badge badge-light float-right">{{formatTime(logs.updated)}}</span>
                             </button>
                         </h5>
                     </div>
 
                     <div :id="'col-'+targetID+'-'+taskID" class="collapse" :class="{show:taskID==activeTask}" :aria-labelledby="'heading-'+targetID+'-'+taskID" data-parent="#tasksAccordion">
                         <div class="card-body">
-                            <div v-for="(stage, name) in task">
-                                <template v-if="name !== 'updated' && stage">
+                            <div v-for="(stage, name) in logs.stages">
+                                <template v-if="stage">
                                     <span class="badge badge-primary">{{name}}</span>
                                     <div>
-                                        <div :class="{logerror:log.error}" class="consolas" v-for="log in stage.SYS">
-                                            {{formatTime(log.time)}} &nbsp; {{log.output}}
-                                        </div>
-                                        <div class="stageLogs" v-for="(logs, type) in stage">
-                                            <template v-if="type !=='SYS'">
+
+                                        <div class="stageLogs" v-for="(stageLogs, type) in stage">
+                                            <template>
                                                 <span class="badge badge-secondary">{{type}}</span>
-                                                <div :class="{logerror:log.error}" class="consolas" v-for="log in logs">
-                                                    {{formatTime(log.time)}} &nbsp; {{log.output}}
+                                                <div :class="{logerror:stageLog.error}" class="consolas" v-for="stageLog in stageLogs">
+                                                    {{formatTime(stageLog.time)}} &nbsp; {{stageLog.output}}
                                                 </div>
                                             </template>
                                         </div>
