@@ -8,7 +8,7 @@ An over-the-air (OTA) software deployment tool for IoT applications. This projec
 | Feature                          | Functional |
 |----------------------------------|:----------:|
 | Deployment Logs                  | ✔          |
-| Package Assembly                 | -          |
+| Package Assembly                 | ✔          |
 | Package Transfer                 | ✔          |
 | Package Installation             | ✔          |
 | Validation Testing               | -          |

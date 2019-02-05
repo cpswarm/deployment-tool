@@ -16,8 +16,8 @@ const (
 	ExecEnd          = "EXEC-END"
 	StageStart       = "STAGE-START"
 	StageEnd         = "STAGE-END"
-	CommandByAgent   = "agent"
-	CommandByManager = "manager"
+	CommandByAgent   = "$agent"
+	CommandByManager = "$manager"
 )
 
 type Response struct {

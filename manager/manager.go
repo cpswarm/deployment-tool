@@ -246,7 +246,7 @@ func (m *manager) sendTask(order *order) {
 		receiverTopics = order.receiverTopics
 	}
 	m.Lock()
-	m.initLogger(order.ID, order.receivers...)
+	m.initLogger(order.ID, receivers...)
 	m.Unlock()
 
 	var compressedArchive []byte
@@ -379,14 +379,16 @@ func (m *manager) manageResponses() {
 }
 
 func (m *manager) processTarget(target *model.Target) {
-	log.Printf("Discovered target: %s %v %s", target.ID, target.Tags, target.TaskID)
+	log.Printf("Discovered target: %s: %v: %s", target.ID, target.Tags, target.TaskID)
 
 	m.Lock()
 	defer m.Unlock()
 
 	if _, found := m.targets[target.ID]; !found {
 		m.targets[target.ID] = newTarget()
-		m.initLogger(target.TaskID, target.ID)
+		if target.TaskID != "" {
+			m.initLogger(target.TaskID, target.ID)
+		}
 	}
 	m.targets[target.ID].Tags = target.Tags
 }

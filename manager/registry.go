@@ -107,8 +107,9 @@ func newTarget() *target {
 
 func (t *target) initTask(id string) {
 	if _, found := t.Logs[id]; !found {
-		t.Logs[id] = new(logs)
-		t.Logs[id].Stages = make(map[string]*stage)
+		t.Logs[id] = &logs{
+			Stages: make(map[string]*stage),
+		}
 	}
 }
 
