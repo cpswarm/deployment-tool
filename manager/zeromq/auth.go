@@ -73,7 +73,7 @@ func loadServerKey() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error decoding server private key: %s", err)
 	}
-	fmt.Println("Loaded server key.")
+	fmt.Println("zeromq: Loaded server key.")
 	return string(key), nil
 }
 
@@ -87,7 +87,7 @@ func loadClientKeys() error {
 	file, err := ioutil.ReadFile(authorizedKeysPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Printf("Client keys file %s not found.", authorizedKeysPath)
+			log.Printf("zeromq: Client keys file %s not found.", authorizedKeysPath)
 			return nil
 		}
 		return fmt.Errorf("error reading client public key: %s", err)
@@ -99,16 +99,16 @@ func loadClientKeys() error {
 		}
 		parts := strings.Split(line, " ")
 		if len(parts) != 2 {
-			log.Println("Invalid format in client key file line", i+1)
+			log.Println("zeromq: Invalid format in authorized keys file line", i+1)
 			continue
 		}
 		decoded, err := base64.StdEncoding.DecodeString(parts[1])
 		if err != nil {
-			log.Println("Unable to decode client key file line", i+1)
+			log.Printf("zeromq: Unable to decode client key for %s in authorized keys file line %d", parts[0], i+1)
 			continue
 		}
 		zmq.AuthCurveAdd(DomainAll, string(decoded))
-		log.Println("Added client key for:", parts[0])
+		log.Println("zeromq: Added client key for:", parts[0])
 	}
 
 	return nil
@@ -116,7 +116,7 @@ func loadClientKeys() error {
 
 // TODO add mutex or synchronize it using the pipe channel
 func AddClientKey(id, key string) error {
-	log.Println("Adding client key for:", id)
+	log.Println("zeromq: Adding client key for:", id)
 	zmq.AuthCurveAdd(DomainAll, key)
 
 	authorizedKeysPath := os.Getenv(EnvAuthorizedKeys)
@@ -128,12 +128,12 @@ func AddClientKey(id, key string) error {
 	// If the file doesn't exist, create it, or append to the file
 	f, err := os.OpenFile(authorizedKeysPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0444)
 	if err != nil {
-		log.Println("Error opening client key file", err)
+		log.Println("zeromq: Error opening client key file", err)
 		return err
 	}
 	defer f.Close()
 	if _, err := f.Write([]byte(fmt.Sprintf("%s %s\n", id, key))); err != nil {
-		log.Println("Error writing to client key file:", err)
+		log.Println("zeromq: Error writing to client key file:", err)
 		return err
 	}
 
