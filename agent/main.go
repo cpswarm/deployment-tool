@@ -38,9 +38,7 @@ const (
 var WorkDir = "."
 
 func main() {
-	if parseFlags() {
-		return
-	}
+	parseFlags()
 
 	log.Println("Started deployment agent")
 	defer log.Println("bye.")
@@ -110,17 +108,27 @@ func evalEnv(key string) bool {
 	return os.Getenv(key) == "1" || os.Getenv(key) == "true" || os.Getenv(key) == "TRUE"
 }
 
-func parseFlags() bool {
+func parseFlags() {
 	name := flag.String("newkeypair", "", "Generate new Curve keypair with the given name")
+	fresh := flag.Bool("fresh", false, "Run after generating new Curve keypair")
 	flag.Parse()
+
+	// Generate keypair and exit
 	if *name != "" {
 		err := zeromq.NewCurveKeypair(*name+".key", *name+".pub")
 		if err != nil {
-			fmt.Println("Error creating keypair:", err)
-			os.Exit(1)
+			log.Fatalln("Error creating keypair:", err)
 		}
-		return true
+		os.Exit(0)
 	}
-	// nothing is parsed
-	return false
+
+	// Generate keypair and continue
+	if *fresh == true {
+		log.Println("Fresh start mode.")
+		err := writeNewKeys()
+		if err != nil {
+			log.Fatalln("Error creating keypair:", err)
+		}
+	}
+
 }

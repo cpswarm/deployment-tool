@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 	zmq "github.com/pebbe/zmq4"
 )
 
@@ -266,4 +267,30 @@ func (c *zmqClient) loadKeys() (string, string, string, error) {
 	}
 
 	return string(bytes.TrimSpace(serverPublic)), string(bytes.TrimSpace(clientSecret)), string(bytes.TrimSpace(clientPublic)), nil
+}
+
+func writeNewKeys() error {
+	privateKeyPath := os.Getenv(EnvPrivateKey)
+	publicKeyPath := os.Getenv(EnvPublicKey)
+
+	if privateKeyPath == "" {
+		privateKeyPath = DefaultPrivateKeyPath
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvPrivateKey, DefaultPrivateKeyPath)
+	}
+	if publicKeyPath == "" {
+		publicKeyPath = DefaultPublicKeyPath
+		log.Printf("zeromq: %s not set. Using default path: %s", EnvPublicKey, DefaultPublicKeyPath)
+	}
+
+	err := zeromq.NewCurveKeypair(privateKeyPath, publicKeyPath)
+	if err != nil {
+		if os.IsExist(err) {
+			log.Printf("zeromq: Key file already exists.")
+			return nil
+		}
+		return fmt.Errorf("error creating key pair: %s", err)
+	}
+
+	log.Printf("zeromq: Created new key pair.")
+	return nil
 }
