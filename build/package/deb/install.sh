@@ -4,7 +4,7 @@ echo "========================== DEPLOYMENT AGENT INSTALLER ====================
 # check arguments
 if [ -z "$1" ]
 then
-	echo "Empty argument.\n Please provide environment key-values separated by spaces. E.g.:"
+	echo "Missing arguments. Provide environment key-values separated by spaces. E.g.:"
 	echo "MANAGER_HOST=example.com MANAGER_PUBLIC_KEY_STR=keystring TAGS=linux,arm"
 	exit 1
 fi
@@ -40,6 +40,12 @@ apt install ./$packageName
 
 echo "\n================================================================================"
 # This will fail if the key name is different
-echo "DONE! Add the public key to manager ($wd/agent.pub):\n"
-cat $wd/agent.pub
-echo "\n"
+echo "Add the public key to manager ($wd/agent.pub):"
+RED='\033[1;36m'
+NC='\033[0m' # No Color
+echo "${RED}$(cat $wd/agent.pub)${NC}"
+
+echo "The service is managed by systemctl. Useful commands:"
+echo "service $serviceName (status|start|stop|restart)"
+echo "journalctl -n 100 -f -u $serviceName"
+echo "Enjoy!"

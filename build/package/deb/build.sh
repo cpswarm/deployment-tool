@@ -27,7 +27,6 @@ echo "Description: LinkSmart® Deployment Agent" >> $control
 postinst=$name/DEBIAN/postinst
 echo "systemctl daemon-reload" >> $postinst
 echo "systemctl enable" $name >> $postinst
-echo "systemctl restart" $name >> $postinst
 chmod +x $postinst
 
 cp service $name/lib/systemd/system/$name.service
