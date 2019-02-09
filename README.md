@@ -1,4 +1,8 @@
 # CPSwarm Deployment Tool 
+[![HitCount](http://hits.dwyl.io/cpswarm/deployment-tool.svg)](http://hits.dwyl.io/cpswarm/deployment-tool)
+[![GoDoc](https://godoc.org/github.com/cpswarm/deployment-tool?status.svg)](https://godoc.org/github.com/cpswarm/deployment-tool)
+[![Build Status](https://pipelines.linksmart.eu/plugins/servlet/wittified/build-status/CPSW-DTB)](https://pipelines.linksmart.eu/browse/CPSW-DTB/latest)
+
 An over-the-air (OTA) software deployment tool for IoT applications. This project is currently under active development and not ready for production.
 
 ## Documentation
@@ -23,15 +27,10 @@ An over-the-air (OTA) software deployment tool for IoT applications. This projec
 Runtime: libzmq5, Build: libzmq3-dev
 
 
-## Install (Debian)
+## Install (Debian ARM)
 ```
 wget https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/Debian-Package/deployment-agent-linux-arm.deb
 sudo apt install ./deployment-agent-linux-arm.deb
-```
-
-### Run after boot
-```
-sudo systemctl enable linksmart-deployment-agent
 ```
 
 ## Compile from source
@@ -52,5 +51,3 @@ go install code.linksmart.eu/dt/deployment-tool/agent
 sudo sh build/zeromq/install-armv7.sh
 CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lsodium -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a code.linksmart.eu/dt/deployment-tool/agent
 ```
-
-[![HitCount](http://hits.dwyl.io/cpswarm/deployment-tool.svg)](http://hits.dwyl.io/cpswarm/deployment-tool)
