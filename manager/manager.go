@@ -394,7 +394,7 @@ func (m *manager) processTarget(target *model.Target) {
 }
 
 func (m *manager) processResponse(response *model.Response) {
-	log.Println("Processing response", response)
+	log.Printf("Processing response from %s (len=%d)", response.TargetID, len(response.Logs))
 
 	m.Lock()
 	defer m.Unlock()
