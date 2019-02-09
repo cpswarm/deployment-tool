@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"syscall"
 
@@ -23,6 +24,10 @@ type executor struct {
 
 func newExecutor(task, stage string, logger Logger, debug bool) *executor {
 	wd := fmt.Sprintf("%s/tasks/%s", WorkDir, task)
+
+	// force Python std streams to be unbuffered
+	os.Setenv("PYTHONUNBUFFERED", "1")
+
 	return &executor{
 		workDir: fmt.Sprintf("%s/%s", wd, source.ExecDir(wd)),
 		task:    task,
