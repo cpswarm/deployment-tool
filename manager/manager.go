@@ -11,7 +11,7 @@ import (
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 const (
@@ -22,14 +22,21 @@ type manager struct {
 	sync.RWMutex
 	registry
 
-	pipe   model.Pipe
-	update *sync.Cond
+	storage Storage
+	pipe    model.Pipe
+	update  *sync.Cond
 }
 
 func startManager(pipe model.Pipe) (*manager, error) {
+	storage, err := NewElasticStorage("http://127.0.0.1:9200")
+	if err != nil {
+		return nil, err
+	}
+
 	m := &manager{
-		pipe:   pipe,
-		update: sync.NewCond(&sync.Mutex{}),
+		storage: storage,
+		pipe:    pipe,
+		update:  sync.NewCond(&sync.Mutex{}),
 	}
 
 	m.targets = make(map[string]*target)
@@ -92,6 +99,11 @@ TARGETS:
 	m.Lock()
 	m.orders[order.ID] = order
 	m.Unlock()
+	// TODO replace with
+	err = m.storage.AddOrder(order)
+	if err != nil {
+		return fmt.Errorf("error storing order: %s", err)
+	}
 	log.Println("Added order:", order.ID)
 	// sent update notification
 	//m.update.Broadcast() // TODO this only sends targets
@@ -107,12 +119,22 @@ func (m *manager) newTaskID() string {
 func (m *manager) getOrders() (map[string]*order, error) {
 	m.RLock()
 	defer m.RUnlock()
+	// TODO replace with
+	_, err := m.storage.GetOrders()
+	if err != nil {
+		log.Println(err)
+	}
 	return m.orders, nil
 }
 
 func (m *manager) getTargets() (map[string]*target, error) {
 	m.RLock()
 	defer m.RUnlock()
+	// TODO replace with
+	_, err := m.storage.GetTargets()
+	if err != nil {
+		log.Println(err)
+	}
 	return m.targets, nil
 }
 
@@ -123,6 +145,14 @@ func (m *manager) getTarget(id string) (*target, error) {
 		return nil, nil
 	}
 	return m.targets[id], nil
+}
+
+func (m *manager) getLogs(target, task string) ([]model.Log, error) {
+	logs, err := m.storage.GetLogs(target, task)
+	if err != nil {
+		return nil, fmt.Errorf("error querying logs: %s", err)
+	}
+	return logs, nil
 }
 
 // requires lock
@@ -391,6 +421,13 @@ func (m *manager) processTarget(target *model.Target) {
 		}
 	}
 	m.targets[target.ID].Tags = target.Tags
+	// TODO replace with
+	// TODO update every time?
+	err := m.storage.AddTarget(target)
+	if err != nil {
+		log.Printf("Error storing target: %s", err)
+		return
+	}
 }
 
 func (m *manager) processResponse(response *model.Response) {
@@ -413,6 +450,14 @@ func (m *manager) processResponse(response *model.Response) {
 	for _, l := range response.Logs {
 		m.initLogger(l.Task, response.TargetID) // TODO let the device send all task ids in advertisement and init during discovery?
 		m.targets[response.TargetID].Logs[l.Task].insert(l)
+		// TODO replace with
+		// TODO send in bulk
+		// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
+		l.Target = response.TargetID
+		err := m.storage.AddLog(&l)
+		if err != nil {
+			log.Printf("error storing log: %s", err)
+		}
 	}
 	// remove old tasks
 	if len(m.targets[response.TargetID].Logs) > maxTasksInMemory {

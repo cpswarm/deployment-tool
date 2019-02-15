@@ -117,7 +117,7 @@ func (a *agent) connected() {
 }
 
 func (a *agent) sendAdvertisement() {
-	t := model.Target{
+	t := model.TargetBase{
 		ID:     a.target.ID,
 		Tags:   a.target.Tags,
 		TaskID: a.target.TaskID,

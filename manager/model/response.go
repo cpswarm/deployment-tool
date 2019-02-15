@@ -31,31 +31,34 @@ type UnixTimeType int64
 
 // UnixTime returns the current unix time
 func UnixTime() UnixTimeType {
-	return UnixTimeType(time.Now().UnixNano())
+	return UnixTimeType(time.Now().UnixNano() / 1e6)
 }
 
 type Log struct {
-	Task    string
-	Stage   string
-	Command string `json:",omitempty"` // TODO is command unique within a stage?
-	Output  string
-	Error   bool         `json:",omitempty"`
-	Time    UnixTimeType `json:",omitempty"`
+	Target  string       `json:"target,omitempty"`
+	Task    string       `json:"task,omitempty"`
+	Stage   string       `json:"stage,omitempty"`
+	Command string       `json:"command,omitempty"` // TODO is command unique within a stage?
+	Output  string       `json:"output,omitempty"`
+	Error   bool         `json:"error,omitempty"`
+	Time    UnixTimeType `json:"time,omitempty"`
 	Debug   bool         `json:"-"`
 }
 
+type TargetBase struct {
+	ID   string   `json:"id"`
+	Tags []string `json:"tags"`
+	//Location?
+	TaskID string `json:"taskID"` // active task
+}
 type Target struct {
-	// identification attributes
-	ID        string   // TODO change this to alias and always generate UUID ? alias==tag ? //
-	AutoGenID string   `json:",omitempty"`
-	Tags      []string `json:",omitempty"`
-
+	TargetBase
+	AutoGenID string `json:"autoID,omitempty"`
 	// active task
-	TaskID             string   `json:",omitempty"`
-	TaskDebug          bool     `json:",omitempty"`
-	TaskRun            []string `json:",omitempty"`
-	TaskRunAutoRestart bool     `json:",omitempty"`
-	TaskHistory        []string `json:",omitempty"`
+	TaskDebug          bool     `json:"taskDebug,omitempty"`
+	TaskRun            []string `json:"taskRun,omitempty"`
+	TaskRunAutoRestart bool     `json:"taskRunAutoRestart,omitempty"`
+	TaskHistory        []string `json:"taskHistory,omitempty"`
 }
 
 type Package struct {
