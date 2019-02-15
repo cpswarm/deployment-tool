@@ -65,6 +65,19 @@
   version = "v1.2.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:853fe95bef4c5e8a70dcd405b5206b38a9ff09e9c26fef93d1d0adeaea39f9ce"
+  name = "github.com/mailru/easyjson"
+  packages = [
+    ".",
+    "buffer",
+    "jlexer",
+    "jwriter",
+  ]
+  pruneopts = "NUT"
+  revision = "60711f1a8329503b04e1c88535f419d0bb440bff"
+
+[[projects]]
   digest = "1:dabee2967e519f1675008ee9ab9f0df69b51489570d7155fe1912d8af5baf60b"
   name = "github.com/mholt/archiver"
   packages = ["."]
@@ -79,6 +92,18 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "e06696f847aeda6f39a8f0b7cdff193b7690aef6"
+
+[[projects]]
+  digest = "1:dc5fef0930c0aa6cd47ba9fdf3a39537dc7da1c25e1f7826e88ef78bf9040245"
+  name = "github.com/olivere/elastic"
+  packages = [
+    ".",
+    "config",
+    "uritemplates",
+  ]
+  pruneopts = "NUT"
+  revision = "407a1d940dcc89e279c579eb393d0bdde8fd9ac4"
+  version = "v6.2.16"
 
 [[projects]]
   branch = "master"
@@ -134,6 +159,14 @@
   version = "v2.0.7"
 
 [[projects]]
+  digest = "1:14715f705ff5dfe0ffd6571d7d201dd8e921030f8070321a79380d8ca4ec1a24"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
+  version = "v0.8.1"
+
+[[projects]]
   digest = "1:6bc0652ea6e39e22ccd522458b8bdd8665bf23bdc5a20eec90056e4dc7e273ca"
   name = "github.com/satori/go.uuid"
   packages = ["."]
@@ -170,6 +203,7 @@
     "github.com/gorilla/websocket",
     "github.com/joho/godotenv",
     "github.com/mholt/archiver",
+    "github.com/olivere/elastic",
     "github.com/otiai10/copy",
     "github.com/pbnjay/memory",
     "github.com/pborman/uuid",
