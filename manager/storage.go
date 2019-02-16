@@ -32,69 +32,34 @@ type storage struct {
 	ctx    context.Context
 }
 
+type mapping struct {
+	Settings struct {
+		Shards          int    `json:"number_of_shards"`
+		Replicas        int    `json:"number_of_replicas"`
+		RefreshInterval string `json:"refresh_interval"`
+	} `json:"settings"`
+	Mappings struct {
+		Doc struct {
+			Dynamic string                 `json:"dynamic"`
+			Prop    map[string]mappingProp `json:"properties"`
+		} `json:"_doc"`
+	} `json:"mappings"`
+}
+
+type mappingProp struct {
+	Type string `json:"type"`
+}
+
 const (
-	indexTarget   = "target"
-	mappingTarget = `{
-    	"settings" : {
-        	"number_of_shards" : 1,
-			"number_of_replicas": 0,
-			"refresh_interval": "1s"
-    	},
-    	"mappings" : {
-	        "_doc" : {
-				"dynamic": "strict",
-	            "properties" : {
-					"id": {"type": "keyword"},
-	            	"tags": {"type": "keyword"},
-	            	"createdAt": {"type": "date"},
-					"updatedAt": {"type": "date"},
-					"taskID": {"type": "keyword"}
-	            }
-    	    }
-	    }
-	}`
-	indexOrder   = "order"
-	mappingOrder = `{
-	    "settings" : {
-	        "number_of_shards" : 1,
-			"number_of_replicas": 0,
-			"refresh_interval": "1s"
-	    },
-	    "mappings" : {
-	        "_doc" : {
-				"dynamic": "strict",
-	            "properties" : {
-					"id": { "type" : "keyword" },
-					"debug": {"type": "boolean"},
-	            	"createdAt": {"type": "date"},
-	            	"buildType": {"type": "keyword"}
-	            }
-	        }
-	    }
-	}`
-	indexLog   = "log"
-	mappingLog = `{
-	    "settings" : {
-	        "number_of_shards" : 1,
-			"number_of_replicas": 0,
-			"refresh_interval": "1s"
-	    },
-	    "mappings" : {
-	        "_doc" : {
-				"dynamic": "strict",
-	            "properties" : {
-	            	"time": { "type" : "date" },
-	            	"target": {"type": "keyword"},
-	            	"task": {"type": "keyword"},
-					"stage": {"type": "keyword"},
-	            	"command": {"type": "keyword"},
-	            	"output": {"type": "text"},
-	            	"error": {"type": "boolean"}
-	            }
-	        }
-	    }
-	}`
-	typeFixed = "_doc"
+	indexTarget     = "target"
+	indexOrder      = "order"
+	indexLog        = "log"
+	typeFixed       = "_doc"
+	mappingStrict   = "strict"
+	propTypeKeyword = "keyword"
+	propTypeDate    = "date"
+	propTypeText    = "text"
+	propTypeBool    = "boolean"
 )
 
 func NewElasticStorage(url string) (Storage, error) {
@@ -121,15 +86,53 @@ func NewElasticStorage(url string) (Storage, error) {
 	}
 
 	// create indices
-	err = s.createIndex(indexTarget, mappingTarget)
+	m := mapping{}
+	m.Settings.Shards = 1
+	m.Settings.Replicas = 0
+	m.Settings.RefreshInterval = "1s"
+	m.Mappings.Doc.Dynamic = mappingStrict
+	m.Mappings.Doc.Prop = map[string]mappingProp{
+		"id":        {Type: propTypeKeyword},
+		"tags":      {Type: propTypeKeyword},
+		"createdAt": {Type: propTypeDate},
+		"updatedAt": {Type: propTypeDate},
+		"type":      {Type: propTypeKeyword},
+	}
+	err = s.createIndex(indexTarget, m)
 	if err != nil {
 		return nil, err
 	}
-	err = s.createIndex(indexOrder, mappingOrder)
+
+	m = mapping{}
+	m.Settings.Shards = 1
+	m.Settings.Replicas = 0
+	m.Settings.RefreshInterval = "1s"
+	m.Mappings.Doc.Dynamic = mappingStrict
+	m.Mappings.Doc.Prop = map[string]mappingProp{
+		"id":        {Type: propTypeKeyword},
+		"debug":     {Type: propTypeBool},
+		"createdAt": {Type: propTypeDate},
+	}
+	err = s.createIndex(indexOrder, m)
 	if err != nil {
 		return nil, err
 	}
-	err = s.createIndex(indexLog, mappingLog)
+
+	m = mapping{}
+	m.Settings.Shards = 1
+	m.Settings.Replicas = 0
+	m.Settings.RefreshInterval = "1s"
+	m.Mappings.Doc.Dynamic = mappingStrict
+	m.Mappings.Doc.Prop = map[string]mappingProp{
+		"time":    {Type: propTypeDate},
+		"target":  {Type: propTypeKeyword},
+		"task":    {Type: propTypeKeyword},
+		"stage":   {Type: propTypeKeyword},
+		"command": {Type: propTypeKeyword},
+		"output":  {Type: propTypeText},
+		"error":   {Type: propTypeBool},
+	}
+	err = s.createIndex(indexLog, m)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +140,7 @@ func NewElasticStorage(url string) (Storage, error) {
 	return &s, nil
 }
 
-func (s *storage) createIndex(index, mapping string) error {
+func (s *storage) createIndex(index string, mapping mapping) error {
 	// Use the IndexExists service to check if a specified index exists.
 	exists, err := s.client.IndexExists(index).Do(s.ctx)
 	if err != nil {
@@ -146,7 +149,7 @@ func (s *storage) createIndex(index, mapping string) error {
 	if !exists {
 		// Create a new index.
 		createIndex, err := s.client.CreateIndex(index).
-			BodyString(mapping).Do(s.ctx)
+			BodyJson(mapping).Do(s.ctx)
 		if err != nil {
 			return fmt.Errorf("error creating index %s: %s", index, err)
 		}
