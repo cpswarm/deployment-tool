@@ -51,6 +51,7 @@ type mappingProp struct {
 }
 
 const (
+	envElasticDebug = "DEBUG_ELASTIC"
 	indexTarget     = "target"
 	indexOrder      = "order"
 	indexLog        = "log"
@@ -65,10 +66,13 @@ const (
 func NewElasticStorage(url string) (Storage, error) {
 	ctx := context.Background()
 
-	client, err := elastic.NewSimpleClient(
-		elastic.SetURL(url),
-		elastic.SetTraceLog(log.New(os.Stdout, "[Elastic Search] ", 0)),
-	)
+	opts := []elastic.ClientOptionFunc{elastic.SetURL(url)}
+
+	if os.Getenv(envElasticDebug) == "1" {
+		opts = append(opts, elastic.SetTraceLog(log.New(os.Stdout, "[Elastic Debug] ", 0)))
+	}
+
+	client, err := elastic.NewSimpleClient(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +90,7 @@ func NewElasticStorage(url string) (Storage, error) {
 	}
 
 	// create indices
-	m := mapping{}
+	var m mapping
 	m.Settings.Shards = 1
 	m.Settings.Replicas = 0
 	m.Settings.RefreshInterval = "1s"
