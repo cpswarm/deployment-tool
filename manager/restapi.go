@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type restAPI struct {
@@ -41,6 +42,10 @@ func (a *restAPI) setupRouter() {
 	// tasks
 	r.HandleFunc("/orders", a.GetOrders).Methods("GET")
 	r.HandleFunc("/orders", a.AddOrder).Methods("POST")
+	// logs
+	r.HandleFunc("/logs", a.GetLogs).Methods("GET")
+	r.HandleFunc("/logs/search", a.GetLogs).Methods("POST") // for when GET request with body is not possible
+
 	// static
 	ui := http.Dir(WorkDir + "/ui")
 	r.PathPrefix("/ui").Handler(http.StripPrefix("/ui", http.FileServer(ui)))
@@ -97,13 +102,13 @@ func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) GetOrders(w http.ResponseWriter, r *http.Request) {
 
-	orders, err := a.manager.getOrders()
+	orders, total, err := a.manager.getOrders()
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	b, err := json.Marshal(orders)
+	b, err := json.Marshal(&searchResults{total, orders})
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -114,13 +119,13 @@ func (a *restAPI) GetOrders(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) GetTargets(w http.ResponseWriter, r *http.Request) {
 
-	targets, err := a.manager.getTargets()
+	targets, total, err := a.manager.getTargets()
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	b, err := json.Marshal(targets)
+	b, err := json.Marshal(&searchResults{total, targets})
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -174,6 +179,39 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	HTTPResponseSuccess(w, http.StatusOK, "Requested logs for ", id)
+	return
+}
+
+func (a *restAPI) GetLogs(w http.ResponseWriter, r *http.Request) {
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	search := make(map[string]interface{})
+	// body is either empty or a search object
+	if len(body) > 0 {
+		err = json.Unmarshal(body, &search)
+		if err != nil {
+			HTTPResponseError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
+	logs, total, err := a.manager.getLogs(search)
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	b, err := json.Marshal(&searchResults{Total: total, Hits: logs})
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	HTTPResponse(w, http.StatusOK, b)
 	return
 }
 

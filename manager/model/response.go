@@ -35,7 +35,6 @@ func UnixTime() UnixTimeType {
 }
 
 type Log struct {
-	Target  string       `json:"target,omitempty"`
 	Task    string       `json:"task,omitempty"`
 	Stage   string       `json:"stage,omitempty"`
 	Command string       `json:"command,omitempty"` // TODO is command unique within a stage?
@@ -43,6 +42,11 @@ type Log struct {
 	Error   bool         `json:"error,omitempty"`
 	Time    UnixTimeType `json:"time,omitempty"`
 	Debug   bool         `json:"-"`
+}
+
+type LogStored struct {
+	Log
+	Target string `json:"target,omitempty"`
 }
 
 type TargetBase struct {

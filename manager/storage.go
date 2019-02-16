@@ -5,24 +5,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"github.com/olivere/elastic"
 )
 
 type Storage interface {
-	GetOrders() ([]order, error) // TODO add pagination
+	GetOrders() ([]order, int64, error) // TODO add search and pagination
 	AddOrder(*order) error
 	GetOrder(string) (*order, error)
 	//DeleteOrder(string) error
 	//
-	GetTargets() ([]model.Target, error) // TODO add pagination
+	GetTargets() ([]model.Target, int64, error) // TODO add search and pagination
 	AddTarget(*model.Target) error
 	GetTarget(string) (*model.Target, error)
 	//DeleteTarget(string) error
 	//
-	GetLogs(target, task string) ([]model.Log, error)
-	AddLog(*model.Log) error
+	GetLogs(map[string]interface{}) ([]model.LogStored, int64, error)
+	AddLog(*model.LogStored) error
 	//DeleteLogs(target string) error
 }
 
@@ -43,12 +44,11 @@ const (
 	        "_doc" : {
 				"dynamic": "strict",
 	            "properties" : {
-					"id": { "type" : "keyword" },
-	            	"tags": { "type" : "keyword" },
+					"id": {"type": "keyword"},
+	            	"tags": {"type": "keyword"},
 	            	"createdAt": {"type": "date"},
 					"updatedAt": {"type": "date"},
-					"taskID": { "type" : "keyword" }
-"
+					"taskID": {"type": "keyword"}
 	            }
     	    }
 	    }
@@ -86,6 +86,7 @@ const (
 	            	"time": { "type" : "date" },
 	            	"target": {"type": "keyword"},
 	            	"task": {"type": "keyword"},
+					"stage": {"type": "keyword"},
 	            	"command": {"type": "keyword"},
 	            	"output": {"type": "text"},
 	            	"error": {"type": "boolean"}
@@ -101,7 +102,7 @@ func NewElasticStorage(url string) (Storage, error) {
 
 	client, err := elastic.NewSimpleClient(
 		elastic.SetURL(url),
-		//elastic.SetTraceLog(log.New(os.Stdout, "[Elastic Search] ", 0)),
+		elastic.SetTraceLog(log.New(os.Stdout, "[Elastic Search] ", 0)),
 	)
 	if err != nil {
 		return nil, err
@@ -168,11 +169,12 @@ func (s *storage) AddTarget(target *model.Target) error {
 	return nil
 }
 
-func (s *storage) GetTargets() ([]model.Target, error) {
+// TODO add query and search
+func (s *storage) GetTargets() ([]model.Target, int64, error) {
 	searchResult, err := s.client.Search().Index(indexTarget).Type(typeFixed).
 		Sort("id", true).From(0).Size(100).Do(s.ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var targets []model.Target
@@ -183,14 +185,14 @@ func (s *storage) GetTargets() ([]model.Target, error) {
 			var target model.Target
 			err := json.Unmarshal(*hit.Source, &target)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			targets = append(targets, target)
 		}
 	} else {
 		log.Print("Found no entries")
 	}
-	return targets, nil
+	return targets, searchResult.Hits.TotalHits, nil
 }
 
 func (s *storage) GetTarget(id string) (*model.Target, error) {
@@ -220,11 +222,12 @@ func (s *storage) AddOrder(order *order) error {
 	return nil
 }
 
-func (s *storage) GetOrders() ([]order, error) {
+// TODO add query and search
+func (s *storage) GetOrders() ([]order, int64, error) {
 	searchResult, err := s.client.Search().Index(indexOrder).Type(typeFixed).
 		Sort("id", true).From(0).Size(100).Do(s.ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var orders []order
@@ -235,14 +238,14 @@ func (s *storage) GetOrders() ([]order, error) {
 			var order order
 			err := json.Unmarshal(*hit.Source, &order)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			orders = append(orders, order)
 		}
 	} else {
 		log.Print("Found no entries")
 	}
-	return orders, nil
+	return orders, searchResult.Hits.TotalHits, nil
 }
 
 func (s *storage) GetOrder(id string) (*order, error) {
@@ -262,37 +265,42 @@ func (s *storage) GetOrder(id string) (*order, error) {
 	return &order, nil
 }
 
-func (s *storage) GetLogs(target, task string) ([]model.Log, error) {
+func (s *storage) GetLogs(source map[string]interface{}) ([]model.LogStored, int64, error) {
 
-	query := elastic.NewBoolQuery().
-		Must(elastic.NewMatchQuery("target", target)).
-		Must(elastic.NewMatchQuery("task", task))
+	//query := elastic.NewBoolQuery().
+	//	Must(elastic.NewMatchQuery("target", target)).
+	//	Must(elastic.NewMatchQuery("task", task))
+	//
+	//searchResult, err := s.client.Search().Index(indexOrder).Type(typeFixed).
+	//	Sort("time", true).From(0).Size(100).Query(query).Do(s.ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	searchResult, err := s.client.Search().Index(indexOrder).Type(typeFixed).
-		Sort("time", true).From(0).Size(100).Query(query).Do(s.ctx)
+	searchResult, err := s.client.Search().Index(indexLog).Type(typeFixed).
+		Source(source).Do(s.ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	var logs []model.Log
+	var logs []model.LogStored
 	if searchResult.Hits.TotalHits > 0 {
 		log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
-
 		for _, hit := range searchResult.Hits.Hits {
-			var l model.Log
+			var l model.LogStored
 			err := json.Unmarshal(*hit.Source, &l)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			logs = append(logs, l)
 		}
 	} else {
 		log.Print("Found no entries")
 	}
-	return logs, nil
+	return logs, searchResult.Hits.TotalHits, nil
 }
 
-func (s *storage) AddLog(logM *model.Log) error {
+func (s *storage) AddLog(logM *model.LogStored) error {
 	res, err := s.client.Index().Index(indexLog).Type(typeFixed).
 		BodyJson(logM).Do(s.ctx)
 	if err != nil {

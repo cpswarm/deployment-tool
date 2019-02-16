@@ -17,6 +17,11 @@ type registry struct {
 	targets map[string]*target
 }
 
+type searchResults struct {
+	Total int64       `json:"total"`
+	Hits  interface{} `json:"hits"` // array of anything
+}
+
 //
 // ORDER
 //

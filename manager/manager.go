@@ -116,26 +116,26 @@ func (m *manager) newTaskID() string {
 	return uuid.NewV4().String()
 }
 
-func (m *manager) getOrders() (map[string]*order, error) {
+func (m *manager) getOrders() (map[string]*order, int64, error) {
 	m.RLock()
 	defer m.RUnlock()
 	// TODO replace with
-	_, err := m.storage.GetOrders()
+	_, _, err := m.storage.GetOrders()
 	if err != nil {
 		log.Println(err)
 	}
-	return m.orders, nil
+	return m.orders, 0, nil
 }
 
-func (m *manager) getTargets() (map[string]*target, error) {
+func (m *manager) getTargets() (map[string]*target, int64, error) {
 	m.RLock()
 	defer m.RUnlock()
 	// TODO replace with
-	_, err := m.storage.GetTargets()
+	_, _, err := m.storage.GetTargets()
 	if err != nil {
 		log.Println(err)
 	}
-	return m.targets, nil
+	return m.targets, 0, nil
 }
 
 func (m *manager) getTarget(id string) (*target, error) {
@@ -147,12 +147,12 @@ func (m *manager) getTarget(id string) (*target, error) {
 	return m.targets[id], nil
 }
 
-func (m *manager) getLogs(target, task string) ([]model.Log, error) {
-	logs, err := m.storage.GetLogs(target, task)
+func (m *manager) getLogs(search map[string]interface{}) ([]model.LogStored, int64, error) {
+	logs, total, err := m.storage.GetLogs(search)
 	if err != nil {
-		return nil, fmt.Errorf("error querying logs: %s", err)
+		return nil, 0, fmt.Errorf("error querying logs: %s", err)
 	}
-	return logs, nil
+	return logs, total, nil
 }
 
 // requires lock
@@ -453,8 +453,8 @@ func (m *manager) processResponse(response *model.Response) {
 		// TODO replace with
 		// TODO send in bulk
 		// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
-		l.Target = response.TargetID
-		err := m.storage.AddLog(&l)
+		//l.Target = response.TargetID
+		err := m.storage.AddLog(&model.LogStored{Log: l, Target:response.TargetID})
 		if err != nil {
 			log.Printf("error storing log: %s", err)
 		}
