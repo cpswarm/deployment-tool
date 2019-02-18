@@ -43,8 +43,20 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/orders", a.GetOrders).Methods("GET")
 	r.HandleFunc("/orders", a.AddOrder).Methods("POST")
 	// logs
-	r.HandleFunc("/logs", a.GetLogs).Methods("GET")
-	r.HandleFunc("/logs/search", a.GetLogs).Methods("POST") // for when GET request with body is not possible
+	r.HandleFunc("/logs/search", a.SearchLogs).Methods("GET")
+
+	/*
+		/orders
+		/targets
+		/logs?targetID=id&task=id
+		/tokens (post # or get)
+		/users (future work)
+
+		Events:
+		new order
+		new/updated target
+		new log
+	*/
 
 	// static
 	ui := http.Dir(WorkDir + "/ui")
@@ -182,7 +194,7 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) GetLogs(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) SearchLogs(w http.ResponseWriter, r *http.Request) {
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -200,7 +212,7 @@ func (a *restAPI) GetLogs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logs, total, err := a.manager.getLogs(search)
+	logs, total, err := a.manager.searchLogs(search)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return
@@ -228,7 +240,7 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 		a.manager.update.Wait()
 		log.Println("websocket: sending update!")
 
-		targets, err := a.manager.getTargets()
+		targets, _, err := a.manager.getTargets()
 		if err != nil {
 			log.Println("websocket: error getting targets:", err)
 			a.manager.update.L.Unlock()

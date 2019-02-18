@@ -53,16 +53,16 @@ type TargetBase struct {
 	ID   string   `json:"id"`
 	Tags []string `json:"tags"`
 	//Location?
-	TaskID string `json:"taskID"` // active task
 }
 type Target struct {
 	TargetBase
 	AutoGenID string `json:"autoID,omitempty"`
 	// active task
-	TaskDebug          bool     `json:"taskDebug,omitempty"`
-	TaskRun            []string `json:"taskRun,omitempty"`
-	TaskRunAutoRestart bool     `json:"taskRunAutoRestart,omitempty"`
-	TaskHistory        []string `json:"taskHistory,omitempty"`
+	TaskID             string           `json:"taskID"`
+	TaskDebug          bool             `json:"taskDebug,omitempty"`
+	TaskRun            []string         `json:"taskRun,omitempty"`
+	TaskRunAutoRestart bool             `json:"taskRunAutoRestart,omitempty"`
+	TaskHistory        map[string]uint8 `json:"taskHistory,omitempty"`
 }
 
 type Package struct {

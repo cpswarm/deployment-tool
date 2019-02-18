@@ -1,5 +1,7 @@
 package model
 
+import "fmt"
+
 const (
 	// Request types (should not contain PrefixSeparator or TopicSeperator chars)
 	RequestTargetAll = "ALL"
@@ -10,8 +12,11 @@ const (
 	StageTransfer = "transfer"
 	StageInstall  = "install"
 	StageRun      = "run"
-	// Other consts
+	// Topic consts
 	PrefixSeparator = "-"
+	// Task types
+	TaskTypeBuild  = 1
+	TaskTypeDeploy = 2
 )
 
 type Build struct {
@@ -31,16 +36,17 @@ type Deploy struct {
 
 // Header contains information that is common among task related structs
 type Header struct {
-	ID        string `json:"i"`
-	Debug     bool   `json:"d,omitempty"`
-	Created   int64  `json:"c"`
-	BuildType bool   `json:"b,omitempty"`
+	ID      string `json:"id"`
+	Debug   bool   `json:"debug,omitempty"`
+	Created int64  `json:"createdAt"`
+	//BuildType bool   `json:"b,omitempty"`
 }
 
 // Announcement carries information about a task
 type Announcement struct {
 	Header
-	Size int `json:"si"`
+	Size int   `json:"s"`
+	Type uint8 `json:"b,omitempty"`
 }
 
 // Task is a struct with all the information for deployment on a target
@@ -50,6 +56,13 @@ type Task struct {
 	Build     *Build  `json:"bl,omitempty"`
 	Deploy    *Deploy `json:"de,omitempty"`
 	Artifacts []byte  `json:"ar,omitempty"`
+}
+
+func (t *Task) Validate() error {
+	if t.Build != nil && t.Deploy != nil {
+		return fmt.Errorf("task contains both build and deploy stages")
+	}
+	return nil
 }
 
 type LogRequest struct {

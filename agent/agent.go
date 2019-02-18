@@ -39,6 +39,7 @@ func startAgent() *agent {
 		pipe:         model.NewPipe(),
 		disconnected: make(chan bool),
 	}
+	a.target.TaskHistory = make(map[string]uint8)
 	a.loadConf()
 
 	a.logger = NewLogger(a.target.ID, a.target.TaskDebug, a.pipe.ResponseCh)
@@ -118,9 +119,8 @@ func (a *agent) connected() {
 
 func (a *agent) sendAdvertisement() {
 	t := model.TargetBase{
-		ID:     a.target.ID,
-		Tags:   a.target.Tags,
-		TaskID: a.target.TaskID,
+		ID:   a.target.ID,
+		Tags: a.target.Tags,
 	}
 	log.Println("Sent adv:", t.ID, t.Tags)
 	b, _ := json.Marshal(t)
@@ -150,16 +150,18 @@ func (a *agent) handleRequest(payload []byte) {
 }
 
 func (a *agent) handleAnnouncement(taskA *model.Announcement) {
-	log.Printf("Received announcement: %s", taskA.ID)
-	a.sendLog(taskA.ID, model.StageStart, false, taskA.Debug)
 
-	for i := len(a.target.TaskHistory) - 1; i >= 0; i-- {
-		if a.target.TaskHistory[i] == taskA.ID {
-			log.Println("Dropping announcement for task", taskA.ID)
-			return
-		}
+	if a.target.TaskHistory[taskA.ID] >= taskA.Type {
+		// repeated because other agents expects it or manager hasn't received all acknowledgements
+		log.Printf("Dropped repeated announcement %s/%d", taskA.ID, taskA.Type)
+		return
 	}
-	a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
+
+	log.Printf("Received announcement %s/%d", taskA.ID, taskA.Type)
+	a.target.TaskHistory[taskA.ID] = taskA.Type
+	a.saveState()
+
+	a.sendLog(taskA.ID, model.StageStart, false, taskA.Debug)
 	a.sendLog(taskA.ID, "received announcement", false, taskA.Debug)
 
 	if a.assessAnnouncement(taskA) {
@@ -191,7 +193,6 @@ func (a *agent) handleTask(payload []byte) {
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
 	a.sendLog(task.ID, "received task and unsubscribed", false, task.Debug)
-	a.target.TaskHistory = append(a.target.TaskHistory, task.ID)
 
 	err = a.saveArtifacts(task.Artifacts, task.ID, task.Debug)
 	if err != nil {
@@ -199,7 +200,7 @@ func (a *agent) handleTask(payload []byte) {
 		return
 	}
 
-	if task.BuildType {
+	if task.Build != nil {
 		a.build(task.Build, task.ID, task.Debug)
 		return
 	}

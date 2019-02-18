@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sort"
 	"sync"
 	"time"
 
@@ -14,14 +13,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-const (
-	maxTasksInMemory = 2
-)
-
 type manager struct {
-	sync.RWMutex
-	registry
-
 	storage Storage
 	pipe    model.Pipe
 	update  *sync.Cond
@@ -39,9 +31,6 @@ func startManager(pipe model.Pipe) (*manager, error) {
 		update:  sync.NewCond(&sync.Mutex{}),
 	}
 
-	m.targets = make(map[string]*target)
-	m.orders = make(map[string]*order)
-
 	go m.manageResponses()
 	return m, nil
 }
@@ -49,57 +38,38 @@ func startManager(pipe model.Pipe) (*manager, error) {
 func (m *manager) addOrder(order *order) error {
 	// add system generated meta values
 	order.ID = m.newTaskID()
-	order.Created = time.Now().UnixNano()
-	order.BuildType = order.Build != nil
+	order.Created = time.Now().UnixNano() // TODO why nano?
 
-	m.RLock()
-TARGETS:
-	for id, target := range m.targets {
-		// target by id
-		for _, id2 := range order.Deploy.Target.IDs {
-			if id == id2 {
-				order.receiverTopics = append(order.receiverTopics, model.FormatTopicID(id))
-				order.receivers = append(order.receivers, id)
-				continue TARGETS
-			}
+	// check if build host exists
+	if order.Build != nil {
+		target, err := m.storage.GetTarget(order.Build.Host)
+		if err != nil {
+			return fmt.Errorf("error getting build host: %s", err)
 		}
-		// target by tag
-		for _, t := range target.Tags {
-			for _, t2 := range order.Deploy.Target.Tags {
-				if t == t2 {
-					order.receiverTopics = append(order.receiverTopics, model.FormatTopicTag(t))
-					order.receivers = append(order.receivers, id)
-					continue TARGETS
-				}
-			}
+		if target == nil {
+			return fmt.Errorf("build host not found: %s", order.Build.Host)
 		}
 	}
-	m.RUnlock()
 
-	if order.BuildType && order.Build.Host != "" {
-		m.RLock()
-		if _, found := m.targets[order.Build.Host]; !found {
-			m.RUnlock()
-			return fmt.Errorf("build host is not found: %s", order.Build.Host)
-		}
-		m.RUnlock()
-	}
+	receivers, hitIDs, hitTags, err := m.storage.MatchTargets(order.Deploy.Target.IDs, order.Deploy.Target.Tags)
+	if err != nil {
+		return fmt.Errorf("error matching targets: %s", err)
 
-	log.Println("Order receivers:", len(order.receivers))
-	if len(order.receivers) == 0 {
-		return fmt.Errorf("could not match any device")
 	}
+	if len(receivers) == 0 {
+		return fmt.Errorf("deployment matches no targets")
+	}
+	order.Deploy.OptimalMatch.IDs = hitIDs
+	order.Deploy.OptimalMatch.Tags = hitTags
+	order.Deploy.OptimalMatch.List = receivers
 
 	// place into work directory
-	err := m.fetchSource(order.ID, order.Source)
+	err = m.fetchSource(order.ID, order.Source)
 	if err != nil {
 		return fmt.Errorf("error fetching source files: %s", err)
 	}
 
-	m.Lock()
-	m.orders[order.ID] = order
-	m.Unlock()
-	// TODO replace with
+	order.Source = nil
 	err = m.storage.AddOrder(order)
 	if err != nil {
 		return fmt.Errorf("error storing order: %s", err)
@@ -108,70 +78,67 @@ TARGETS:
 	// sent update notification
 	//m.update.Broadcast() // TODO this only sends targets
 
-	go m.sendTask(order)
+	go m.composeTask(order)
 	return nil
+}
+
+func (m *manager) targetTopics(ids, tags []string) []string {
+	var receiverTopics []string
+	for _, id := range ids {
+		receiverTopics = append(receiverTopics, model.FormatTopicID(id))
+	}
+	for _, tag := range tags {
+		receiverTopics = append(receiverTopics, model.FormatTopicTag(tag))
+	}
+	return receiverTopics
 }
 
 func (m *manager) newTaskID() string {
 	return uuid.NewV4().String()
 }
 
-func (m *manager) getOrders() (map[string]*order, int64, error) {
-	m.RLock()
-	defer m.RUnlock()
-	// TODO replace with
-	_, _, err := m.storage.GetOrders()
+func (m *manager) getOrders() ([]order, int64, error) {
+	orders, total, err := m.storage.GetOrders()
 	if err != nil {
-		log.Println(err)
+		return nil, 0, fmt.Errorf("error querying orders: %s", err)
 	}
-	return m.orders, 0, nil
+	return orders, total, nil
 }
 
-func (m *manager) getTargets() (map[string]*target, int64, error) {
-	m.RLock()
-	defer m.RUnlock()
-	// TODO replace with
-	_, _, err := m.storage.GetTargets()
+func (m *manager) getTargets() ([]target, int64, error) {
+	targets, total, err := m.storage.GetTargets([]string{}, []string{"amd64", "swarm"}, 0, 100) // TODO pass pagination
 	if err != nil {
 		log.Println(err)
 	}
-	return m.targets, 0, nil
+	return targets, total, nil
 }
 
 func (m *manager) getTarget(id string) (*target, error) {
-	m.RLock()
-	defer m.RUnlock()
-	if _, found := m.targets[id]; !found {
-		return nil, nil
+	target, err := m.storage.GetTarget(id)
+	if err != nil {
+		return nil, fmt.Errorf("error querying target: %s", err)
 	}
-	return m.targets[id], nil
+	return target, nil
 }
 
-func (m *manager) getLogs(search map[string]interface{}) ([]model.LogStored, int64, error) {
-	logs, total, err := m.storage.GetLogs(search)
+func (m *manager) searchLogs(search map[string]interface{}) ([]model.LogStored, int64, error) {
+	logs, total, err := m.storage.SearchLogs(search)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying logs: %s", err)
 	}
 	return logs, total, nil
 }
 
-// requires lock
-func (m *manager) initLogger(orderID string, targetIDs ...string) {
-	for _, targetID := range targetIDs {
-		m.targets[targetID].initTask(orderID)
-	}
-}
-
-func (m *manager) fetchSource(orderID string, src source.Source) error {
+func (m *manager) fetchSource(orderID string, src *source.Source) error {
 	switch {
 	case src.Paths != nil:
 		return src.Paths.Copy(orderID)
 	case src.Zip != nil:
 		return src.Zip.Store(orderID)
-	case src.Git != nil:
-		return src.Git.Clone(orderID)
-	case src.Order != nil:
-		return src.Order.Fetch(orderID)
+		//case src.Git != nil:
+		//	return src.Git.Clone(orderID)
+		//case src.Order != nil:
+		//	return src.Order.Fetch(orderID)
 	}
 	return nil
 }
@@ -193,121 +160,142 @@ func (m *manager) processPackage(p *model.Package) {
 		return
 	}
 
-	m.RLock()
-	order, found := m.orders[p.Task]
-	if !found {
-		log.Printf("Package for unknown order: %s", p.Task)
-		m.RUnlock()
-		return
-	}
-	m.RUnlock()
-
-	// assemble is done, make a new order for install and run
-	child := order.getChild()
-	err = m.addOrder(child)
+	order, err := m.storage.GetOrder(p.Task)
 	if err != nil {
-		m.logTransferFatal(p.Task, fmt.Sprintf("error creating child order: %s", err), p.Assembler)
+		m.logTransferFatal(p.Task, fmt.Sprintf("error querying order: %s", err), p.Assembler)
 		return
 	}
-	m.logTransfer(p.Task, fmt.Sprintf("created child order: %s", child.ID), p.Assembler)
 
-	m.Lock()
-	order.ChildOrder = child.ID
-	m.Unlock()
+	order.Build = nil
+	m.composeTask(order)
 }
 
 func (m *manager) logTransfer(order, message string, targets ...string) {
-	m.RLock()
 	for _, target := range targets {
-		m.targets[target].Logs[order].insert(model.Log{
+		err := m.storage.AddLog(&model.LogStored{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  message,
 			Task:    order,
 			Stage:   model.StageTransfer,
 			Time:    model.UnixTime(),
-		})
+		}, Target: target})
+		if err != nil {
+			log.Printf("Error storing log: %s", err)
+		}
 	}
-	m.RUnlock()
 	// sent update notification
 	m.update.Broadcast()
 }
 
 func (m *manager) logTransferFatal(order, message string, targets ...string) {
-	m.RLock()
+	log.Println("Fatal error:", message)
 	for _, target := range targets {
-		log.Println(message)
-		m.targets[target].Logs[order].insert(model.Log{
+		// the error message
+		err := m.storage.AddLog(&model.LogStored{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  message,
 			Task:    order,
 			Stage:   model.StageTransfer,
 			Time:    model.UnixTime(),
 			Error:   true,
-		})
-		m.targets[target].Logs[order].insert(model.Log{
+		}, Target: target})
+		if err != nil {
+			log.Printf("Error storing log: %s", err)
+		}
+		// end flag
+		err = m.storage.AddLog(&model.LogStored{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  model.StageEnd,
 			Task:    order,
 			Stage:   model.StageTransfer,
 			Time:    model.UnixTime(),
 			Error:   true,
-		})
+		}, Target: target})
+		if err != nil {
+			log.Printf("Error storing log: %s", err)
+		}
 	}
-	m.RUnlock()
 	// sent update notification
 	m.update.Broadcast()
 }
 
-func (m *manager) sendTask(order *order) {
-
-	// instantiated based on the task type
-	var (
-		receivers, receiverTopics []string
-		build                     *model.Build
-		deploy                    *model.Deploy
-	)
-	if order.BuildType {
-		build = &order.Build.Build
-		receivers = []string{order.Build.Host}
-		receiverTopics = []string{model.FormatTopicID(order.Build.Host)}
-	} else {
-		deploy = &order.Deploy.Deploy
-		receivers = order.receivers
-		receiverTopics = order.receiverTopics
-	}
-	m.Lock()
-	m.initLogger(order.ID, receivers...)
-	m.Unlock()
-
-	var compressedArchive []byte
-	m.logTransfer(order.ID, model.StageStart, receivers...)
-	if path := m.sourcePath(order.ID); path != "" {
-		var err error
-		compressedArchive, err = model.CompressFiles(path)
+func (m *manager) compressSource(orderID string, receivers ...string) ([]byte, error) {
+	m.logTransfer(orderID, model.StageStart, receivers...)
+	if path := m.sourcePath(orderID); path != "" {
+		compressedArchive, err := model.CompressFiles(path)
 		if err != nil {
-			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), receivers...)
+			return nil, err
+		}
+		m.logTransfer(orderID, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), receivers...)
+		return compressedArchive, nil
+	}
+	m.logTransfer(orderID, "no source files to transfer", receivers...)
+	return nil, nil
+}
+
+func (m *manager) composeTask(order *order) {
+	// a single order can result in two tasks: build and deploy
+
+	if order.Build != nil {
+		compressedArchive, err := m.compressSource(order.ID, order.Build.Host)
+		if err != nil {
+			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), order.Build.Host)
 			return
 		}
-		m.logTransfer(order.ID, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), receivers...)
+
+		task := model.Task{
+			Header:    order.Header,
+			Build:     &order.Build.Build,
+			Artifacts: compressedArchive,
+		}
+		err = task.Validate()
+		if err != nil {
+			m.logTransferFatal(order.ID, fmt.Sprintf("invalid task: %s", err), order.Build.Host)
+			return
+		}
+
+		match := optimalMatch{IDs: []string{order.Build.Host}, List: []string{order.Build.Host}} // just one device
+		m.sendTask(&task, match)
 	} else {
-		m.logTransfer(order.ID, "no source files to transfer", receivers...)
+
+		compressedArchive, err := m.compressSource(order.ID, order.Deploy.OptimalMatch.List...)
+		if err != nil {
+			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), order.Deploy.OptimalMatch.List...)
+		}
+
+		task := model.Task{
+			Header:    order.Header,
+			Deploy:    &order.Deploy.Deploy,
+			Artifacts: compressedArchive,
+		}
+		err = task.Validate()
+		if err != nil {
+			m.logTransferFatal(order.ID, fmt.Sprintf("invalid task: %s", err), order.Deploy.OptimalMatch.List...)
+			return
+		}
+
+		m.sendTask(&task, order.Deploy.OptimalMatch)
 	}
+
+}
+
+func (m *manager) sendTask(task *model.Task, match optimalMatch) {
+
+	receiverTopics := m.targetTopics(match.IDs, match.Tags)
 
 	ann := model.Announcement{
-		Header: order.Header,
-		Size:   len(compressedArchive),
+		Header: task.Header,
+		Size:   len(task.Artifacts),
 	}
 
-	task := model.Task{
-		Header:    order.Header,
-		Build:     build,
-		Deploy:    deploy,
-		Artifacts: compressedArchive,
+	if task.Build != nil {
+		ann.Type = model.TaskTypeBuild
+	} else {
+		ann.Type = model.TaskTypeDeploy
 	}
 
 	for pending := true; pending; {
-		log.Printf("Sending task %s to %s", task.ID, receiverTopics)
-		//log.Printf("sendTask: %+v", task)
+		log.Printf("Sending task %s/%d to %s", task.ID, ann.Type, receiverTopics)
 
 		// send announcement
 		w := model.RequestWrapper{Announcement: &ann}
@@ -315,38 +303,39 @@ func (m *manager) sendTask(order *order) {
 		for _, topic := range receiverTopics {
 			m.pipe.RequestCh <- model.Message{topic, b}
 		}
-		m.logTransfer(order.ID, "sent announcement", receivers...)
+		m.logTransfer(task.ID, "sent announcement", match.List...)
 
 		time.Sleep(time.Second)
 
 		// send actual task
 		b, err := json.Marshal(&task)
 		if err != nil {
-			m.logTransferFatal(order.ID, fmt.Sprintf("error serializing task: %s", err), receivers...)
+			m.logTransferFatal(task.ID, fmt.Sprintf("error serializing task: %s", err), match.List...)
 			return
 		}
 		m.pipe.RequestCh <- model.Message{task.ID, b}
-		m.logTransfer(order.ID, "sent task", receivers...)
+		m.logTransfer(task.ID, "sent task", match.List...)
 
 		time.Sleep(10 * time.Second)
 
-		// TODO which messages are received, what is pending?
 		pending = false
-		m.RLock()
-		for _, match := range receivers {
-			if l, found := m.targets[match].Logs[task.ID]; found {
-				if _, ok := l.Stages[model.StageInstall]; ok && len(*l.Stages[model.StageInstall]) == 0 {
-					pending = true
-				} else if _, ok := l.Stages[model.StageRun]; ok && len(*l.Stages[model.StageRun]) == 0 {
-					pending = true
-				} else {
-					m.logTransfer(order.ID, model.StageEnd, match) // TODO add this as soon as an ack arrives
-				}
+		for _, target := range match.List {
+			delivered, err := m.storage.DeliveredTask(target, task.ID)
+			if err != nil {
+				log.Printf("Error searching for delivered task: %s", err)
+				m.logTransferFatal(task.ID, fmt.Sprintf("error searching for delivered task: %s", err), target)
+				break
+			}
+			if delivered {
+				log.Printf("Task %s/%d delivered to %s", task.ID, ann.Type, target)
+				m.logTransfer(task.ID, model.StageEnd, target) // TODO send this as soon as a log message is received?
+			} else {
+				pending = true
+				break
 			}
 		}
-		m.RUnlock()
 	}
-	log.Println("Task received by all targets.")
+	log.Printf("Task %s/%d received by all.", task.ID, ann.Type)
 	// TODO
 	// remove the directory
 }
@@ -362,11 +351,13 @@ func (m *manager) sourcePath(orderID string) string {
 }
 
 func (m *manager) requestLogs(targetID string) error {
-	m.RLock()
+	target, err := m.storage.GetTarget(targetID)
+	if err != nil {
+		return fmt.Errorf("error querying target: %s", err)
+	}
 	w := model.RequestWrapper{LogRequest: &model.LogRequest{
-		IfModifiedSince: m.targets[targetID].LastLogRequest,
+		IfModifiedSince: target.LogRequestAt,
 	}}
-	m.RUnlock()
 	b, _ := json.Marshal(&w)
 	m.pipe.RequestCh <- model.Message{model.FormatTopicID(targetID), b}
 	return nil
@@ -376,14 +367,14 @@ func (m *manager) manageResponses() {
 	for resp := range m.pipe.ResponseCh {
 		switch resp.Topic {
 		case model.ResponseAdvertisement:
-			var target model.Target
+			var target target
 			err := json.Unmarshal(resp.Payload, &target)
 			if err != nil {
 				log.Printf("error parsing advert response: %s", err)
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			m.processTarget(&target)
+			go m.processTarget(&target)
 		case model.ResponsePackage:
 			var pkg model.Package
 			err := json.Unmarshal(resp.Payload, &pkg)
@@ -392,7 +383,7 @@ func (m *manager) manageResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			m.processPackage(&pkg)
+			go m.processPackage(&pkg)
 		default:
 			var response model.Response
 			err := json.Unmarshal(resp.Payload, &response)
@@ -401,28 +392,18 @@ func (m *manager) manageResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			m.processResponse(&response)
+			go m.processResponse(&response)
 		}
 		// sent update notification
 		m.update.Broadcast()
 	}
 }
 
-func (m *manager) processTarget(target *model.Target) {
-	log.Printf("Discovered target: %s: %v: %s", target.ID, target.Tags, target.TaskID)
+func (m *manager) processTarget(target *target) {
+	log.Printf("Discovered target: %s: %v", target.ID, target.Tags)
 
-	m.Lock()
-	defer m.Unlock()
-
-	if _, found := m.targets[target.ID]; !found {
-		m.targets[target.ID] = newTarget()
-		if target.TaskID != "" {
-			m.initLogger(target.TaskID, target.ID)
-		}
-	}
-	m.targets[target.ID].Tags = target.Tags
-	// TODO replace with
 	// TODO update every time?
+	target.UpdatedAt = model.UnixTime()
 	err := m.storage.AddTarget(target)
 	if err != nil {
 		log.Printf("Error storing target: %s", err)
@@ -433,54 +414,29 @@ func (m *manager) processTarget(target *model.Target) {
 func (m *manager) processResponse(response *model.Response) {
 	log.Printf("Processing response from %s (len=%d)", response.TargetID, len(response.Logs))
 
-	m.Lock()
-	defer m.Unlock()
 	start := time.Now()
-
-	if _, found := m.targets[response.TargetID]; !found {
-		log.Println("Log from unknown target:", response.TargetID)
-		return
-	}
 
 	// response to log request
 	if response.OnRequest {
-		m.targets[response.TargetID].LastLogRequest = response.Logs[len(response.Logs)-1].Time
+		// TODO replace with
+		fields := map[string]interface{}{
+			"logRequestAt": response.Logs[len(response.Logs)-1].Time,
+		}
+		err := m.storage.PatchTarget(response.TargetID, fields)
+		if err != nil {
+			log.Printf("Error updating target: %s", err)
+		}
 	}
 
 	for _, l := range response.Logs {
-		m.initLogger(l.Task, response.TargetID) // TODO let the device send all task ids in advertisement and init during discovery?
-		m.targets[response.TargetID].Logs[l.Task].insert(l)
-		// TODO replace with
 		// TODO send in bulk
 		// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 		//l.Target = response.TargetID
-		err := m.storage.AddLog(&model.LogStored{Log: l, Target:response.TargetID})
+		err := m.storage.AddLog(&model.LogStored{Log: l, Target: response.TargetID})
 		if err != nil {
-			log.Printf("error storing log: %s", err)
+			log.Printf("Error storing log: %s", err)
 		}
 	}
-	// remove old tasks
-	if len(m.targets[response.TargetID].Logs) > maxTasksInMemory {
-		var times []int64
-		for k := range m.targets[response.TargetID].Logs {
-			// TODO this should not be needed if registry is persisted
-			if _, found := m.orders[k]; !found {
-				log.Println("Adding missing order to registry (Created=0):", k)
-				m.orders[k] = &order{}
-				m.orders[k].ID = k
-				m.orders[k].Created = 0
-			}
-			times = append(times, m.orders[k].Created)
-		}
-		sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
-		// delete the oldest item(s)
-		pivot := times[len(times)-maxTasksInMemory]
-		for k := range m.targets[response.TargetID].Logs {
-			if m.orders[k].Created == 0 || m.orders[k].Created < pivot {
-				log.Println("Removing logs for", k)
-				delete(m.targets[response.TargetID].Logs, k)
-			}
-		}
-	}
+
 	log.Println("Processing response took", time.Since(start))
 }

@@ -8,7 +8,7 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 )
 
-type Zip string
+type Zip string // TODO change to []byte?
 
 // Decode base64 encoded zip archive and write it to order directory
 func (zip Zip) Store(orderID string) error {
