@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
@@ -18,7 +19,7 @@ type Storage interface {
 	//DeleteOrder(string) error
 	//
 	GetTargets(ids, tags []string, from, size int) ([]Target, int64, error)
-	PatchTarget(id string, fields map[string]interface{}) error
+	PatchTarget(id string, target *Target) (bool, error)
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
 	SearchTargets(map[string]interface{}) ([]Target, int64, error)
 	AddTarget(*Target) error
@@ -217,13 +218,18 @@ func (s *storage) AddTarget(target *Target) error {
 	return nil
 }
 
-func (s *storage) PatchTarget(id string, fields map[string]interface{}) error {
-	res, err := s.client.Update().Index(indexTarget).Type(typeFixed).Id(id).Doc(fields).Do(s.ctx)
+// PathTarget updates fields that are not omitted, returns false if target is not found
+func (s *storage) PatchTarget(id string, target *Target) (bool, error) {
+	res, err := s.client.Update().Index(indexTarget).Type(typeFixed).Id(id).Doc(target).Do(s.ctx)
 	if err != nil {
-		return err
+		e := err.(*elastic.Error)
+		if e.Status == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
 	}
 	log.Printf("Updated %s/%s v%d", res.Index, res.Id, res.Version)
-	return nil
+	return true, nil
 }
 
 func (s *storage) GetTargets(ids, tags []string, from, size int) ([]Target, int64, error) {

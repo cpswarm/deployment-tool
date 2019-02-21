@@ -42,8 +42,9 @@ type Log struct {
 }
 
 type TargetBase struct {
-	ID   string   `json:"id"`
-	Tags []string `json:"tags"`
+	// omitempty for all fields to allow patch updates
+	ID   string   `json:"id,omitempty"`
+	Tags []string `json:"tags,omitempty"`
 	//Location?
 }
 type Target struct {

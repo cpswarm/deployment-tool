@@ -425,12 +425,18 @@ func (m *manager) manageResponses() {
 func (m *manager) processTarget(target *storage.Target) {
 	log.Printf("Discovered target: %s: %v", target.ID, target.Tags)
 
-	// TODO update every time?
 	target.UpdatedAt = model.UnixTime()
-	err := m.storage.AddTarget(target)
+	found, err := m.storage.PatchTarget(target.ID, target)
 	if err != nil {
-		log.Printf("Error storing target: %s", err)
+		log.Printf("Error updating target: %s", err)
 		return
+	}
+	if !found {
+		err := m.storage.AddTarget(target)
+		if err != nil {
+			log.Printf("Error adding target: %s", err)
+			return
+		}
 	}
 }
 
@@ -441,10 +447,10 @@ func (m *manager) processResponse(response *model.Response) {
 
 	// response to log request
 	if response.OnRequest {
-		fields := map[string]interface{}{
-			"logRequestAt": response.Logs[len(response.Logs)-1].Time,
+		target := storage.Target{
+			LogRequestAt: response.Logs[len(response.Logs)-1].Time,
 		}
-		err := m.storage.PatchTarget(response.TargetID, fields)
+		_, err := m.storage.PatchTarget(response.TargetID, &target)
 		if err != nil {
 			log.Printf("Error updating target: %s", err)
 		}

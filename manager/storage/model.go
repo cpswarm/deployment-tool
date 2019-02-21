@@ -72,8 +72,8 @@ func (o Order) Validate() error {
 //
 type Target struct {
 	model.TargetBase
-	UpdatedAt    model.UnixTimeType `json:"updatedAt"`
-	LogRequestAt model.UnixTimeType `json:"logRequestAt"`
+	UpdatedAt    model.UnixTimeType `json:"updatedAt,omitempty"`
+	LogRequestAt model.UnixTimeType `json:"logRequestAt,omitempty"`
 }
 
 //
