@@ -28,6 +28,7 @@ type Storage interface {
 	//GetLogs(target string) error
 	SearchLogs(map[string]interface{}) ([]Log, int64, error)
 	AddLog(*Log) error
+	AddLogs(logs []Log) error
 	//DeleteLogs(target string) error
 	DeliveredTask(target, task string) (bool, error)
 }
@@ -458,6 +459,19 @@ func (s *storage) AddLog(logM *Log) error {
 		return err
 	}
 	log.Printf("Indexed %s from %s/%s", res.Index, logM.Target, logM.Task)
+	return nil
+}
+
+func (s *storage) AddLogs(logs []Log) error {
+	bulk := s.client.Bulk()
+	for i := range logs {
+		bulk.Add(elastic.NewBulkIndexRequest().Index(indexLog).Type(typeFixed).Doc(logs[i]))
+	}
+	res, err := bulk.Do(s.ctx)
+	if err != nil {
+		return err
+	}
+	log.Printf("Indexed %d log(s)", len(res.Indexed()))
 	return nil
 }
 

@@ -180,49 +180,53 @@ func (m *manager) processPackage(p *model.Package) {
 }
 
 func (m *manager) logTransfer(order, message string, targets ...string) {
-	for _, target := range targets {
-		err := m.storage.AddLog(&storage.Log{Log: model.Log{
+	logs := make([]storage.Log, len(targets))
+	for i := range targets {
+		// the error message
+		logs[i] = storage.Log{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  message,
 			Task:    order,
 			Stage:   model.StageTransfer,
 			Time:    model.UnixTime(),
-		}, Target: target})
-		if err != nil {
-			log.Printf("Error storing log_: %s", err)
-		}
+		}, Target: targets[i]}
+	}
+	err := m.storage.AddLogs(logs)
+	if err != nil {
+		log.Printf("Error storing logs: %s", err)
+		return
 	}
 	// sent update notification
 	m.update.Broadcast()
 }
 
 func (m *manager) logTransferFatal(order, message string, targets ...string) {
-	log.Println("Fatal error:", message)
-	for _, target := range targets {
+	log.Println("Fatal order error:", message)
+	logs := make([]storage.Log, 0, len(targets)*2)
+	for i := range targets {
 		// the error message
-		err := m.storage.AddLog(&storage.Log{Log: model.Log{
+		logs = append(logs, storage.Log{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  message,
 			Task:    order,
 			Stage:   model.StageTransfer,
 			Time:    model.UnixTime(),
 			Error:   true,
-		}, Target: target})
-		if err != nil {
-			log.Printf("Error storing log: %s", err)
-		}
+		}, Target: targets[i]})
 		// end flag
-		err = m.storage.AddLog(&storage.Log{Log: model.Log{
+		logs = append(logs, storage.Log{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  model.StageEnd,
 			Task:    order,
 			Stage:   model.StageTransfer,
 			Time:    model.UnixTime(),
 			Error:   true,
-		}, Target: target})
-		if err != nil {
-			log.Printf("Error storing log_: %s", err)
-		}
+		}, Target: targets[i]})
+	}
+	err := m.storage.AddLogs(logs)
+	if err != nil {
+		log.Printf("Error storing logs: %s", err)
+		return
 	}
 	// sent update notification
 	m.update.Broadcast()
@@ -423,11 +427,10 @@ func (m *manager) processTarget(target *storage.Target) {
 func (m *manager) processResponse(response *model.Response) {
 	log.Printf("Processing response from %s (len=%d)", response.TargetID, len(response.Logs))
 
-	start := time.Now()
+	defer func(start time.Time) { log.Println("Processing response took", time.Since(start)) }(time.Now())
 
 	// response to log request
 	if response.OnRequest {
-		// TODO replace with
 		fields := map[string]interface{}{
 			"logRequestAt": response.Logs[len(response.Logs)-1].Time,
 		}
@@ -437,15 +440,14 @@ func (m *manager) processResponse(response *model.Response) {
 		}
 	}
 
-	for _, l := range response.Logs {
-		// TODO send in bulk
-		// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
-		//l.Target = response.TargetID
-		err := m.storage.AddLog(&storage.Log{Log: l, Target: response.TargetID})
-		if err != nil {
-			log.Printf("Error storing log: %s", err)
-		}
+	// convert and store
+	logs := make([]storage.Log, len(response.Logs))
+	for i := range response.Logs {
+		logs[i] = storage.Log{Log: response.Logs[i], Target: response.TargetID}
 	}
-
-	log.Println("Processing response took", time.Since(start))
+	err := m.storage.AddLogs(logs)
+	if err != nil {
+		log.Printf("Error storing logs: %s", err)
+		return
+	}
 }
