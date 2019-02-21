@@ -273,6 +273,9 @@ func (s *storage) GetTargets(ids, tags []string, from, size int) ([]Target, int6
 // MatchTargets searches for targets with IDs and tags and returns a list of tags and ids covering all the matches
 // The search result gives priority to tags (in the given order) and then IDs
 func (s *storage) MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error) {
+	if len(ids)+len(tags) == 0 {
+		return
+	}
 
 	// highlight tags, sorted by the score (boost value)
 	highlight := elastic.NewHighlight().

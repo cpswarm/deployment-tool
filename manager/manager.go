@@ -52,20 +52,23 @@ func (m *manager) addOrder(order *storage.Order) error {
 		}
 	}
 
-	receivers, hitIDs, hitTags, err := m.storage.MatchTargets(order.Deploy.Target.IDs, order.Deploy.Target.Tags)
-	if err != nil {
-		return fmt.Errorf("error matching targets: %s", err)
+	// check if deploy matches any targets
+	if order.Deploy != nil {
+		receivers, hitIDs, hitTags, err := m.storage.MatchTargets(order.Deploy.Target.IDs, order.Deploy.Target.Tags)
+		if err != nil {
+			return fmt.Errorf("error matching targets: %s", err)
 
+		}
+		if len(receivers) == 0 {
+			return fmt.Errorf("deployment matches no targets")
+		}
+		order.Deploy.Match.IDs = hitIDs
+		order.Deploy.Match.Tags = hitTags
+		order.Deploy.Match.List = receivers
 	}
-	if len(receivers) == 0 {
-		return fmt.Errorf("deployment matches no targets")
-	}
-	order.Deploy.Match.IDs = hitIDs
-	order.Deploy.Match.Tags = hitTags
-	order.Deploy.Match.List = receivers
 
 	// place into work directory
-	err = m.fetchSource(order.ID, order.Source)
+	err := m.fetchSource(order.ID, order.Source)
 	if err != nil {
 		return fmt.Errorf("error fetching source files: %s", err)
 	}
@@ -175,6 +178,12 @@ func (m *manager) processPackage(p *model.Package) {
 		return
 	}
 
+	if order.Deploy == nil {
+		m.logTransfer(p.Task, fmt.Sprintf("no deployment instructions for package"), p.Assembler)
+		log.Println("No deployment instructions for package.")
+		return
+	}
+
 	order.Build = nil
 	m.composeTask(order)
 }
@@ -233,7 +242,6 @@ func (m *manager) logTransferFatal(order, message string, targets ...string) {
 }
 
 func (m *manager) compressSource(orderID string, receivers ...string) ([]byte, error) {
-	m.logTransfer(orderID, model.StageStart, receivers...)
 	if path := m.sourcePath(orderID); path != "" {
 		compressedArchive, err := model.CompressFiles(path)
 		if err != nil {
@@ -248,8 +256,9 @@ func (m *manager) compressSource(orderID string, receivers ...string) ([]byte, e
 
 func (m *manager) composeTask(order *storage.Order) {
 	// a single order can result in two tasks: build and deploy
-
 	if order.Build != nil {
+		m.logTransfer(order.ID, model.StageStart, order.Build.Host, model.StageStart)
+
 		compressedArchive, err := m.compressSource(order.ID, order.Build.Host)
 		if err != nil {
 			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), order.Build.Host)
@@ -270,6 +279,7 @@ func (m *manager) composeTask(order *storage.Order) {
 		match := storage.Match{IDs: []string{order.Build.Host}, List: []string{order.Build.Host}} // just one device
 		m.sendTask(&task, match)
 	} else {
+		m.logTransfer(order.ID, model.StageStart, order.Deploy.Match.List...)
 
 		compressedArchive, err := m.compressSource(order.ID, order.Deploy.Match.List...)
 		if err != nil {

@@ -45,7 +45,7 @@ func (o Order) Validate() error {
 			return fmt.Errorf("build host not given")
 		}
 		if len(o.Build.Commands) == 0 {
-			return fmt.Errorf("no commands for build")
+			return fmt.Errorf("build has no commands")
 		}
 		for _, path := range o.Build.Artifacts {
 			if strings.HasPrefix(path, "/") {
@@ -56,8 +56,11 @@ func (o Order) Validate() error {
 
 	// validate deploy
 	if o.Deploy != nil {
+		if len(o.Deploy.Target.IDs)+len(o.Deploy.Target.Tags) == 0 {
+			return fmt.Errorf("deploy.target contains no ids and tags")
+		}
 		if len(o.Deploy.Install.Commands)+len(o.Deploy.Run.Commands) == 0 {
-			return fmt.Errorf("no install or run commands for deploy")
+			return fmt.Errorf("deploy has no install and run commands")
 		}
 	}
 
