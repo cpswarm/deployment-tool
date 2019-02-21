@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"code.linksmart.eu/dt/deployment-tool/manager/storage"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	yaml "gopkg.in/yaml.v2"
@@ -16,6 +17,11 @@ import (
 type restAPI struct {
 	manager *manager
 	router  *mux.Router
+}
+
+type searchResults struct {
+	Total int64       `json:"total"`
+	Hits  interface{} `json:"hits"` // array of anything
 }
 
 func startRESTAPI(bindAddr string, manager *manager) {
@@ -36,14 +42,17 @@ func startRESTAPI(bindAddr string, manager *manager) {
 func (a *restAPI) setupRouter() {
 	r := mux.NewRouter()
 	// targets
-	r.HandleFunc("/targets/{id}/logs", a.GetTargetLogs).Methods("PUT")
-	r.HandleFunc("/targets/{id}", a.GetTarget).Methods("GET")
-	r.HandleFunc("/targets", a.GetTargets).Methods("GET")
+	r.HandleFunc("/targets", a.getTargets).Methods("GET")
+	r.HandleFunc("/targets/{id}", a.getTarget).Methods("GET")
+	r.HandleFunc("/targets/{id}/logs", a.requestTargetLogs).Methods("PUT")
 	// tasks
-	r.HandleFunc("/orders", a.GetOrders).Methods("GET")
-	r.HandleFunc("/orders", a.AddOrder).Methods("POST")
+	r.HandleFunc("/orders", a.getOrders).Methods("GET")
+	r.HandleFunc("/orders/{id}", a.getOrder).Methods("GET")
+	r.HandleFunc("/orders", a.addOrder).Methods("POST")
 	// logs
-	r.HandleFunc("/logs/search", a.SearchLogs).Methods("GET")
+	r.HandleFunc("/logs/search", a.searchLogs).Methods("GET")
+	// tokens
+	//r.HandleFunc("/targets/{total}", a.createTokens).Methods("PUT")
 
 	/*
 		/orders
@@ -77,12 +86,12 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) addOrder(w http.ResponseWriter, r *http.Request) {
 
 	decoder := yaml.NewDecoder(r.Body)
 	defer r.Body.Close()
 
-	var order order
+	var order storage.Order
 	err := decoder.Decode(&order)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
@@ -90,7 +99,7 @@ func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Received order:", order)
 
-	err = order.validate()
+	err = order.Validate()
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, "Invalid order: ", err)
 		return
@@ -112,7 +121,31 @@ func (a *restAPI) AddOrder(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) GetOrders(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) getOrder(w http.ResponseWriter, r *http.Request) {
+
+	id := mux.Vars(r)["id"]
+
+	order, err := a.manager.getOrder(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if order == nil {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	b, err := json.Marshal(order)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	HTTPResponse(w, http.StatusOK, b)
+	return
+}
+
+func (a *restAPI) getOrders(w http.ResponseWriter, r *http.Request) {
 
 	orders, total, err := a.manager.getOrders()
 	if err != nil {
@@ -129,7 +162,7 @@ func (a *restAPI) GetOrders(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) GetTargets(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) getTargets(w http.ResponseWriter, r *http.Request) {
 
 	targets, total, err := a.manager.getTargets()
 	if err != nil {
@@ -147,7 +180,7 @@ func (a *restAPI) GetTargets(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) GetTarget(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) getTarget(w http.ResponseWriter, r *http.Request) {
 
 	id := mux.Vars(r)["id"]
 
@@ -171,7 +204,7 @@ func (a *restAPI) GetTarget(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) requestTargetLogs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
@@ -194,7 +227,7 @@ func (a *restAPI) GetTargetLogs(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) SearchLogs(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {

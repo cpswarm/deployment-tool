@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"fmt"
@@ -8,15 +8,10 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
 )
 
-type searchResults struct {
-	Total int64       `json:"total"`
-	Hits  interface{} `json:"hits"` // array of anything
-}
-
 //
 // ORDER
 //
-type order struct {
+type Order struct {
 	model.Header `yaml:",inline"`
 	Source       *source.Source `json:"source,omitempty"`
 	Build        *build         `json:"build"`
@@ -34,16 +29,16 @@ type deploy struct {
 		IDs  []string `json:"ids"`
 		Tags []string `json:"tags"`
 	} `json:"target"`
-	OptimalMatch optimalMatch `json:"optimalMatch"`
+	Match Match `json:"match"`
 }
 
-type optimalMatch struct {
+type Match struct {
 	IDs  []string `json:"ids"` // ids of targets not covered by tags
 	Tags []string `json:"tags"`
 	List []string `json:"list"` // all ids
 }
 
-func (o order) validate() error {
+func (o Order) Validate() error {
 	// validate build
 	if o.Build != nil {
 		if o.Build.Host == "" {
@@ -72,8 +67,16 @@ func (o order) validate() error {
 //
 // TARGET
 //
-type target struct {
+type Target struct {
 	model.TargetBase
 	UpdatedAt    model.UnixTimeType `json:"updatedAt"`
 	LogRequestAt model.UnixTimeType `json:"logRequestAt"`
+}
+
+//
+// LOG
+//
+type Log struct {
+	model.Log
+	Target string `json:"target,omitempty"`
 }

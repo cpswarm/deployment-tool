@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"context"
@@ -12,22 +12,22 @@ import (
 )
 
 type Storage interface {
-	GetOrders() ([]order, int64, error) // TODO add search and pagination
-	AddOrder(*order) error
-	GetOrder(string) (*order, error)
+	GetOrders() ([]Order, int64, error) // TODO add search and pagination
+	AddOrder(*Order) error
+	GetOrder(string) (*Order, error)
 	//DeleteOrder(string) error
 	//
-	GetTargets(ids, tags []string, from, size int) ([]target, int64, error)
+	GetTargets(ids, tags []string, from, size int) ([]Target, int64, error)
 	PatchTarget(id string, fields map[string]interface{}) error
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
-	SearchTargets(map[string]interface{}) ([]target, int64, error)
-	AddTarget(*target) error
-	GetTarget(string) (*target, error)
+	SearchTargets(map[string]interface{}) ([]Target, int64, error)
+	AddTarget(*Target) error
+	GetTarget(string) (*Target, error)
 	//DeleteTarget(string) error
 	//
 	//GetLogs(target string) error
-	SearchLogs(map[string]interface{}) ([]model.LogStored, int64, error)
-	AddLog(*model.LogStored) error
+	SearchLogs(map[string]interface{}) ([]Log, int64, error)
+	AddLog(*Log) error
 	//DeleteLogs(target string) error
 	DeliveredTask(target, task string) (bool, error)
 }
@@ -147,7 +147,7 @@ func NewElasticStorage(url string) (Storage, error) {
 						"tags": {Type: propTypeKeyword}, // array
 					},
 				},
-				"optimalMatch": {
+				"match": {
 					Properties: map[string]mappingProp{
 						"ids":  {Type: propTypeKeyword}, // array
 						"tags": {Type: propTypeKeyword}, // array
@@ -206,7 +206,7 @@ func (s *storage) createIndex(index string, mapping mapping) error {
 	return nil
 }
 
-func (s *storage) AddTarget(target *target) error {
+func (s *storage) AddTarget(target *Target) error {
 	res, err := s.client.Index().Index(indexTarget).Type(typeFixed).
 		Id(target.ID).BodyJson(target).Do(s.ctx)
 	if err != nil {
@@ -225,7 +225,7 @@ func (s *storage) PatchTarget(id string, fields map[string]interface{}) error {
 	return nil
 }
 
-func (s *storage) GetTargets(ids, tags []string, from, size int) ([]target, int64, error) {
+func (s *storage) GetTargets(ids, tags []string, from, size int) ([]Target, int64, error) {
 
 	// TODO make this a special get targets function?
 
@@ -250,12 +250,12 @@ func (s *storage) GetTargets(ids, tags []string, from, size int) ([]target, int6
 		return nil, 0, err
 	}
 
-	var targets []target
+	var targets []Target
 	if searchResult.Hits.TotalHits > 0 {
 		//log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 
 		for _, hit := range searchResult.Hits.Hits {
-			var target target
+			var target Target
 			err := json.Unmarshal(*hit.Source, &target)
 			if err != nil {
 				return nil, 0, err
@@ -325,7 +325,7 @@ func (s *storage) MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []st
 
 // SearchTargets takes an Elastic Search's Request Body to perform any query on the index
 // Request body should follow: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html
-func (s *storage) SearchTargets(source map[string]interface{}) ([]target, int64, error) {
+func (s *storage) SearchTargets(source map[string]interface{}) ([]Target, int64, error) {
 
 	searchResult, err := s.client.Search().Index(indexTarget).Type(typeFixed).
 		Source(source).Do(s.ctx)
@@ -333,11 +333,11 @@ func (s *storage) SearchTargets(source map[string]interface{}) ([]target, int64,
 		return nil, 0, err
 	}
 
-	var targets []target
+	var targets []Target
 	if searchResult.Hits.TotalHits > 0 {
 		log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 		for _, hit := range searchResult.Hits.Hits {
-			var t target
+			var t Target
 			err := json.Unmarshal(*hit.Source, &t)
 			if err != nil {
 				return nil, 0, err
@@ -350,7 +350,7 @@ func (s *storage) SearchTargets(source map[string]interface{}) ([]target, int64,
 	return targets, searchResult.Hits.TotalHits, nil
 }
 
-func (s *storage) GetTarget(id string) (*target, error) {
+func (s *storage) GetTarget(id string) (*Target, error) {
 	res, err := s.client.Get().Index(indexTarget).Type(typeFixed).
 		Id(id).Do(s.ctx)
 	if err != nil {
@@ -358,7 +358,7 @@ func (s *storage) GetTarget(id string) (*target, error) {
 	}
 	if res.Found {
 		//log.Printf("Got document %s/%s v%d", res.Index, res.Id, res.Version)
-		var target target
+		var target Target
 		err = json.Unmarshal(*res.Source, &target)
 		if err != nil {
 			return nil, err
@@ -369,7 +369,7 @@ func (s *storage) GetTarget(id string) (*target, error) {
 	return nil, nil
 }
 
-func (s *storage) AddOrder(order *order) error {
+func (s *storage) AddOrder(order *Order) error {
 	res, err := s.client.Index().Index(indexOrder).Type(typeFixed).
 		Id(order.ID).BodyJson(order).Do(s.ctx)
 	if err != nil {
@@ -380,19 +380,19 @@ func (s *storage) AddOrder(order *order) error {
 }
 
 // TODO add query and search
-func (s *storage) GetOrders() ([]order, int64, error) {
+func (s *storage) GetOrders() ([]Order, int64, error) {
 	searchResult, err := s.client.Search().Index(indexOrder).Type(typeFixed).
 		Sort("id", true).From(0).Size(100).Do(s.ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	var orders []order
+	var orders []Order
 	if searchResult.Hits.TotalHits > 0 {
 		log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 
 		for _, hit := range searchResult.Hits.Hits {
-			var order order
+			var order Order
 			err := json.Unmarshal(*hit.Source, &order)
 			if err != nil {
 				return nil, 0, err
@@ -405,7 +405,7 @@ func (s *storage) GetOrders() ([]order, int64, error) {
 	return orders, searchResult.Hits.TotalHits, nil
 }
 
-func (s *storage) GetOrder(id string) (*order, error) {
+func (s *storage) GetOrder(id string) (*Order, error) {
 	res, err := s.client.Get().Index(indexOrder).Type(typeFixed).
 		Id(id).Do(s.ctx)
 	if err != nil {
@@ -413,7 +413,7 @@ func (s *storage) GetOrder(id string) (*order, error) {
 	}
 	if res.Found {
 		//log.Printf("Got document %s/%s v%d", res.Index, res.Id, res.Version)
-		var order order
+		var order Order
 		err = json.Unmarshal(*res.Source, &order)
 		if err != nil {
 			return nil, err
@@ -426,7 +426,7 @@ func (s *storage) GetOrder(id string) (*order, error) {
 
 // SearchLogs takes an Elastic Search's Request Body to perform any query on the index
 // Request body should follow: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html
-func (s *storage) SearchLogs(source map[string]interface{}) ([]model.LogStored, int64, error) {
+func (s *storage) SearchLogs(source map[string]interface{}) ([]Log, int64, error) {
 
 	searchResult, err := s.client.Search().Index(indexLog).Type(typeFixed).
 		Source(source).Do(s.ctx)
@@ -434,11 +434,11 @@ func (s *storage) SearchLogs(source map[string]interface{}) ([]model.LogStored, 
 		return nil, 0, err
 	}
 
-	var logs []model.LogStored
+	var logs []Log
 	if searchResult.Hits.TotalHits > 0 {
 		log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 		for _, hit := range searchResult.Hits.Hits {
-			var l model.LogStored
+			var l Log
 			err := json.Unmarshal(*hit.Source, &l)
 			if err != nil {
 				return nil, 0, err
@@ -451,7 +451,7 @@ func (s *storage) SearchLogs(source map[string]interface{}) ([]model.LogStored, 
 	return logs, searchResult.Hits.TotalHits, nil
 }
 
-func (s *storage) AddLog(logM *model.LogStored) error {
+func (s *storage) AddLog(logM *Log) error {
 	res, err := s.client.Index().Index(indexLog).Type(typeFixed).
 		BodyJson(logM).Do(s.ctx)
 	if err != nil {

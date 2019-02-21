@@ -7,9 +7,6 @@ const (
 	ResponseLog           = "LOG" // logs
 	ResponseAdvertisement = "ADV" // device advertisement
 	ResponsePackage       = "PKG" // assembled artifacts
-	//ResponseSuccess = "SUCCESS" // stage ended without errors
-	//ResponseError   = "ERROR"   // stage ended with errors
-	//ResponseClientError   = "CLIENT_ERROR" // client errors
 
 	// Log output constants
 	ExecStart        = "EXEC-START"
@@ -42,11 +39,6 @@ type Log struct {
 	Error   bool         `json:"error,omitempty"`
 	Time    UnixTimeType `json:"time,omitempty"`
 	Debug   bool         `json:"-"`
-}
-
-type LogStored struct {
-	Log
-	Target string `json:"target,omitempty"`
 }
 
 type TargetBase struct {

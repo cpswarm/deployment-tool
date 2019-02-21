@@ -10,17 +10,18 @@ import (
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
+	"code.linksmart.eu/dt/deployment-tool/manager/storage"
 	uuid "github.com/satori/go.uuid"
 )
 
 type manager struct {
-	storage Storage
+	storage storage.Storage
 	pipe    model.Pipe
 	update  *sync.Cond
 }
 
 func startManager(pipe model.Pipe) (*manager, error) {
-	storage, err := NewElasticStorage("http://127.0.0.1:9200")
+	storage, err := storage.NewElasticStorage("http://127.0.0.1:9200")
 	if err != nil {
 		return nil, err
 	}
@@ -35,10 +36,10 @@ func startManager(pipe model.Pipe) (*manager, error) {
 	return m, nil
 }
 
-func (m *manager) addOrder(order *order) error {
+func (m *manager) addOrder(order *storage.Order) error {
 	// add system generated meta values
 	order.ID = m.newTaskID()
-	order.Created = time.Now().UnixNano() // TODO why nano?
+	order.Created = model.UnixTime()
 
 	// check if build host exists
 	if order.Build != nil {
@@ -59,9 +60,9 @@ func (m *manager) addOrder(order *order) error {
 	if len(receivers) == 0 {
 		return fmt.Errorf("deployment matches no targets")
 	}
-	order.Deploy.OptimalMatch.IDs = hitIDs
-	order.Deploy.OptimalMatch.Tags = hitTags
-	order.Deploy.OptimalMatch.List = receivers
+	order.Deploy.Match.IDs = hitIDs
+	order.Deploy.Match.Tags = hitTags
+	order.Deploy.Match.List = receivers
 
 	// place into work directory
 	err = m.fetchSource(order.ID, order.Source)
@@ -97,7 +98,7 @@ func (m *manager) newTaskID() string {
 	return uuid.NewV4().String()
 }
 
-func (m *manager) getOrders() ([]order, int64, error) {
+func (m *manager) getOrders() ([]storage.Order, int64, error) {
 	orders, total, err := m.storage.GetOrders()
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying orders: %s", err)
@@ -105,7 +106,15 @@ func (m *manager) getOrders() ([]order, int64, error) {
 	return orders, total, nil
 }
 
-func (m *manager) getTargets() ([]target, int64, error) {
+func (m *manager) getOrder(id string) (*storage.Order, error) {
+	order, err := m.storage.GetOrder(id)
+	if err != nil {
+		return nil, fmt.Errorf("error querying order: %s", err)
+	}
+	return order, nil
+}
+
+func (m *manager) getTargets() ([]storage.Target, int64, error) {
 	targets, total, err := m.storage.GetTargets([]string{}, []string{"amd64", "swarm"}, 0, 100) // TODO pass pagination
 	if err != nil {
 		log.Println(err)
@@ -113,7 +122,7 @@ func (m *manager) getTargets() ([]target, int64, error) {
 	return targets, total, nil
 }
 
-func (m *manager) getTarget(id string) (*target, error) {
+func (m *manager) getTarget(id string) (*storage.Target, error) {
 	target, err := m.storage.GetTarget(id)
 	if err != nil {
 		return nil, fmt.Errorf("error querying target: %s", err)
@@ -121,7 +130,7 @@ func (m *manager) getTarget(id string) (*target, error) {
 	return target, nil
 }
 
-func (m *manager) searchLogs(search map[string]interface{}) ([]model.LogStored, int64, error) {
+func (m *manager) searchLogs(search map[string]interface{}) ([]storage.Log, int64, error) {
 	logs, total, err := m.storage.SearchLogs(search)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying logs: %s", err)
@@ -172,7 +181,7 @@ func (m *manager) processPackage(p *model.Package) {
 
 func (m *manager) logTransfer(order, message string, targets ...string) {
 	for _, target := range targets {
-		err := m.storage.AddLog(&model.LogStored{Log: model.Log{
+		err := m.storage.AddLog(&storage.Log{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  message,
 			Task:    order,
@@ -180,7 +189,7 @@ func (m *manager) logTransfer(order, message string, targets ...string) {
 			Time:    model.UnixTime(),
 		}, Target: target})
 		if err != nil {
-			log.Printf("Error storing log: %s", err)
+			log.Printf("Error storing log_: %s", err)
 		}
 	}
 	// sent update notification
@@ -191,7 +200,7 @@ func (m *manager) logTransferFatal(order, message string, targets ...string) {
 	log.Println("Fatal error:", message)
 	for _, target := range targets {
 		// the error message
-		err := m.storage.AddLog(&model.LogStored{Log: model.Log{
+		err := m.storage.AddLog(&storage.Log{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  message,
 			Task:    order,
@@ -203,7 +212,7 @@ func (m *manager) logTransferFatal(order, message string, targets ...string) {
 			log.Printf("Error storing log: %s", err)
 		}
 		// end flag
-		err = m.storage.AddLog(&model.LogStored{Log: model.Log{
+		err = m.storage.AddLog(&storage.Log{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  model.StageEnd,
 			Task:    order,
@@ -212,7 +221,7 @@ func (m *manager) logTransferFatal(order, message string, targets ...string) {
 			Error:   true,
 		}, Target: target})
 		if err != nil {
-			log.Printf("Error storing log: %s", err)
+			log.Printf("Error storing log_: %s", err)
 		}
 	}
 	// sent update notification
@@ -233,7 +242,7 @@ func (m *manager) compressSource(orderID string, receivers ...string) ([]byte, e
 	return nil, nil
 }
 
-func (m *manager) composeTask(order *order) {
+func (m *manager) composeTask(order *storage.Order) {
 	// a single order can result in two tasks: build and deploy
 
 	if order.Build != nil {
@@ -254,13 +263,13 @@ func (m *manager) composeTask(order *order) {
 			return
 		}
 
-		match := optimalMatch{IDs: []string{order.Build.Host}, List: []string{order.Build.Host}} // just one device
+		match := storage.Match{IDs: []string{order.Build.Host}, List: []string{order.Build.Host}} // just one device
 		m.sendTask(&task, match)
 	} else {
 
-		compressedArchive, err := m.compressSource(order.ID, order.Deploy.OptimalMatch.List...)
+		compressedArchive, err := m.compressSource(order.ID, order.Deploy.Match.List...)
 		if err != nil {
-			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), order.Deploy.OptimalMatch.List...)
+			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), order.Deploy.Match.List...)
 		}
 
 		task := model.Task{
@@ -270,16 +279,16 @@ func (m *manager) composeTask(order *order) {
 		}
 		err = task.Validate()
 		if err != nil {
-			m.logTransferFatal(order.ID, fmt.Sprintf("invalid task: %s", err), order.Deploy.OptimalMatch.List...)
+			m.logTransferFatal(order.ID, fmt.Sprintf("invalid task: %s", err), order.Deploy.Match.List...)
 			return
 		}
 
-		m.sendTask(&task, order.Deploy.OptimalMatch)
+		m.sendTask(&task, order.Deploy.Match)
 	}
 
 }
 
-func (m *manager) sendTask(task *model.Task, match optimalMatch) {
+func (m *manager) sendTask(task *model.Task, match storage.Match) {
 
 	receiverTopics := m.targetTopics(match.IDs, match.Tags)
 
@@ -367,7 +376,7 @@ func (m *manager) manageResponses() {
 	for resp := range m.pipe.ResponseCh {
 		switch resp.Topic {
 		case model.ResponseAdvertisement:
-			var target target
+			var target storage.Target
 			err := json.Unmarshal(resp.Payload, &target)
 			if err != nil {
 				log.Printf("error parsing advert response: %s", err)
@@ -399,7 +408,7 @@ func (m *manager) manageResponses() {
 	}
 }
 
-func (m *manager) processTarget(target *target) {
+func (m *manager) processTarget(target *storage.Target) {
 	log.Printf("Discovered target: %s: %v", target.ID, target.Tags)
 
 	// TODO update every time?
@@ -432,7 +441,7 @@ func (m *manager) processResponse(response *model.Response) {
 		// TODO send in bulk
 		// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 		//l.Target = response.TargetID
-		err := m.storage.AddLog(&model.LogStored{Log: l, Target: response.TargetID})
+		err := m.storage.AddLog(&storage.Log{Log: l, Target: response.TargetID})
 		if err != nil {
 			log.Printf("Error storing log: %s", err)
 		}

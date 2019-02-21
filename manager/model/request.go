@@ -36,10 +36,9 @@ type Deploy struct {
 
 // Header contains information that is common among task related structs
 type Header struct {
-	ID      string `json:"id"`
-	Debug   bool   `json:"debug,omitempty"`
-	Created int64  `json:"createdAt"`
-	//BuildType bool   `json:"b,omitempty"`
+	ID      string       `json:"id"`
+	Debug   bool         `json:"debug,omitempty"`
+	Created UnixTimeType `json:"createdAt"`
 }
 
 // Announcement carries information about a task
@@ -52,7 +51,6 @@ type Announcement struct {
 // Task is a struct with all the information for deployment on a target
 type Task struct {
 	Header
-	//Stages    Stages `json:"stages"`
 	Build     *Build  `json:"bl,omitempty"`
 	Deploy    *Deploy `json:"de,omitempty"`
 	Artifacts []byte  `json:"ar,omitempty"`
