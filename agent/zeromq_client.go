@@ -96,6 +96,9 @@ func (c *zmqClient) startListener() {
 			log.Println("zeromq: Error receiving event:", err)
 			continue
 		}
+		if evalEnv(EnvDebug) {
+			log.Printf("zeromq: Received %d bytes", len([]byte(msg)))
+		}
 		// split the prefix
 		parts := strings.SplitN(msg, model.TopicSeperator, 2)
 		if len(parts) != 2 {
@@ -109,9 +112,12 @@ func (c *zmqClient) startListener() {
 
 func (c *zmqClient) startResponder() {
 	for resp := range c.pipe.ResponseCh {
-		_, err := c.publisher.Send(resp.Topic+":"+string(resp.Payload), 0)
+		length, err := c.publisher.Send(resp.Topic+":"+string(resp.Payload), 0)
 		if err != nil {
 			log.Println("zeromq: Error sending event:", err)
+		}
+		if evalEnv(EnvDebug) {
+			log.Printf("zeromq: Sent %d bytes", length)
 		}
 	}
 }

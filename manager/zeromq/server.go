@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	EnvDebug       = "DEBUG"        // print debug messages
 	EnvDisableAuth = "DISABLE_AUTH" // disable authentication completely
 )
 
@@ -22,7 +23,7 @@ type zmqClient struct {
 }
 
 func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
-	log.Printf("Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
+	log.Printf("zeromq: Using v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 
 	c := &zmqClient{
 		Pipe: model.NewPipe(),
@@ -31,7 +32,7 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	var err error
 	var serverSecret string
 	if evalEnv(EnvDisableAuth) {
-		log.Println("WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
+		log.Println("zeromq: WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
 	} else {
 		//  Start authentication engine
 		zmq.AuthSetVerbose(true)
@@ -87,9 +88,12 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 
 func (c *zmqClient) startPublisher() {
 	for request := range c.Pipe.RequestCh {
-		_, err := c.publisher.Send(request.Topic+":"+string(request.Payload), 0)
+		length, err := c.publisher.Send(request.Topic+":"+string(request.Payload), 0)
 		if err != nil {
-			log.Printf("error publishing: %s", err)
+			log.Printf("zeromq: Error publishing: %s", err)
+		}
+		if evalEnv(EnvDebug) {
+			log.Printf("zeromq: Sent %d bytes", length)
 		}
 	}
 }
@@ -98,21 +102,23 @@ func (c *zmqClient) startListener() {
 	for {
 		msg, err := c.subscriber.Recv(0)
 		if err != nil {
-			log.Printf("Error receiving event: %s", err)
+			log.Printf("zeromq: Error receiving event: %s", err)
+		}
+		if evalEnv(EnvDebug) {
+			log.Printf("zeromq: Received %d bytes", len([]byte(msg)))
 		}
 		// split the prefix
 		parts := strings.SplitN(msg, model.TopicSeperator, 2)
 		if len(parts) != 2 {
-			log.Printf("Unable to parse response: %s", msg)
+			log.Printf("zeromq: Unable to parse response: %s", msg)
 			continue
 		}
-		//log.Printf("startListener %+v", msg)
 		c.Pipe.ResponseCh <- model.Message{parts[0], []byte(parts[1])}
 	}
 }
 
 func (c *zmqClient) Close() error {
-	log.Println("Closing ZeroMQ sockets...")
+	log.Println("zeromq: Closing sockets...")
 
 	err := c.subscriber.Close()
 	if err != nil {

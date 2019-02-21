@@ -11,7 +11,7 @@ import (
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func (a *agent) sendLog(task, output string, error bool, debug bool) {
@@ -80,7 +80,6 @@ func (*agent) removeOtherTasks(taskID string) {
 	}
 	for i := 0; i < len(files); i++ {
 		if files[i].Name() != taskID {
-			log.Println(files[i].Name(), taskID)
 			filename := fmt.Sprintf("%s/%s", wd, files[i].Name())
 			log.Printf("installer: Removing: %s", filename)
 			err = os.RemoveAll(filename)
@@ -152,7 +151,6 @@ func (a *agent) loadState() error {
 	log.Println("Loaded state file:", DefaultStateFile)
 	return nil
 }
-
 
 func (a *agent) saveState() {
 	a.Lock()
