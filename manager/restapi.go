@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,19 @@ import (
 )
 
 const (
+	// query parameter key/values
+	_page          = "page"
+	_perPage       = "perPage"
+	_sortBy        = "sortBy"
+	_sortOrder     = "sortOrder"
+	_asc           = "asc"
+	_desc          = "desc"
+	_time          = "time"
+	_target        = "target"
+	_task          = "task"
+	_stage         = "stage"
+	_command       = "command"
+	_tags          = "tags"
 	defaultPage    = 1
 	defaultPerPage = 100
 )
@@ -157,7 +171,7 @@ func (a *restAPI) getOrder(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) getOrders(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	page, perPage, err := parsePagingAttributes(query.Get("page"), query.Get("perPage"))
+	page, perPage, err := parsePagingAttributes(query)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return
@@ -180,12 +194,14 @@ func (a *restAPI) getOrders(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) getTargets(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	tags := query.Get("tags")
-	page, perPage, err := parsePagingAttributes(query.Get("page"), query.Get("perPage"))
+	tags := query.Get(_tags)
+
+	page, perPage, err := parsePagingAttributes(query)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
 	var tagSlice []string
 	if tags != "" {
 		tagSlice = strings.Split(tags, ",")
@@ -257,40 +273,34 @@ func (a *restAPI) requestTargetLogs(w http.ResponseWriter, r *http.Request) {
 func (a *restAPI) getLogs(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
-	target := query.Get("target")
-	task := query.Get("task")
-	stage := query.Get("stage")
-	command := query.Get("command")
-	sort := query.Get("sort")
-	page, perPage, err := parsePagingAttributes(query.Get("page"), query.Get("perPage"))
+	fields := map[string]string{
+		_target:  query.Get(_target),
+		_task:    query.Get(_task),
+		_stage:   query.Get(_stage),
+		_command: query.Get(_command),
+		_time:    "",
+	}
+
+	page, perPage, err := parsePagingAttributes(query)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// parse sorting attributes
-	sortField, sortAsc := "time", true
-	if sort != "" {
-		sortArgs := strings.Split(sort, ",")
-		if len(sortArgs) == 1 || len(sortArgs) == 2 {
-			if sortArgs[0] == "asc" {
-				sortAsc = true
-			} else if sortArgs[0] == "desc" {
-				sortAsc = false
-			} else {
-				HTTPResponseError(w, http.StatusBadRequest, fmt.Sprintf("sort query order must be %s or %s", "asc", "desc"))
-				return
-			}
-			if len(sortArgs) == 2 {
-				sortField = sortArgs[1]
-			}
-		} else {
-			HTTPResponseError(w, http.StatusBadRequest, "sort query must contain one or two values")
-			return
-		}
+	sortBy, ascending, err := parseSortingParameters(query)
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if sortBy == "" {
+		sortBy = _time
+	}
+	if _, ok := fields[sortBy]; !ok {
+		HTTPResponseError(w, http.StatusBadRequest, fmt.Sprintf("%s query parameter has invalid value", _sortBy))
+		return
 	}
 
-	logs, total, err := a.manager.getLogs(target, task, stage, command, sortField, sortAsc, page, perPage)
+	logs, total, err := a.manager.getLogs(fields[_target], fields[_task], fields[_stage], fields[_command], sortBy, ascending, page, perPage)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return
@@ -369,27 +379,37 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func parsePagingAttributes(pageStr, perPageStr string) (page int, perPage int, err error) {
+func parsePagingAttributes(query url.Values) (page int, perPage int, err error) {
 	page, perPage = defaultPage, defaultPerPage
-	if pageStr != "" {
-		page, err = strconv.Atoi(pageStr)
+	if query.Get(_page) != "" {
+		page, err = strconv.Atoi(query.Get(_page))
 		if err != nil {
-			return 0, 0, fmt.Errorf("error parsing page query: %s", err)
+			return 0, 0, fmt.Errorf("error parsing %s query parameter: %s", _page, err)
 		}
 		if page < 1 {
-			return 0, 0, fmt.Errorf("page must be positive")
+			return 0, 0, fmt.Errorf("%s query parameter must be positive", _page)
 		}
 	}
-	if perPageStr != "" {
-		perPage, err = strconv.Atoi(perPageStr)
+	if query.Get(_perPage) != "" {
+		perPage, err = strconv.Atoi(query.Get(_perPage))
 		if err != nil {
-			return 0, 0, fmt.Errorf("error parsing perPage query: %s", err)
+			return 0, 0, fmt.Errorf("error parsing %s query parameter: %s", _perPage, err)
 		}
 		if perPage < 1 {
-			return 0, 0, fmt.Errorf("perPage must be positive")
+			return 0, 0, fmt.Errorf("%s query parameter must be positive", _perPage)
 		}
 	}
 	return page, perPage, nil
+}
+
+func parseSortingParameters(query url.Values) (sortBy string, ascending bool, err error) {
+	sortBy, order := query.Get(_sortBy), query.Get(_sortOrder)
+	if order == "" || order == _asc {
+		return sortBy, true, nil
+	} else if order == _desc {
+		return sortBy, false, nil
+	}
+	return "", false, fmt.Errorf("%s query parameter has invalid value", _sortOrder)
 }
 
 // HTTPResponseError serializes and writes an error response
