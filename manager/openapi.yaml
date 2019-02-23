@@ -1,0 +1,205 @@
+openapi: 3.0.0
+
+info:
+  description: The API of Deployment Tool (Manager)
+  version: "0.4.0"
+  title: Deployment Tool REST API
+  license:
+    name: Apache 2.0
+    url: 'https://github.com/cpswarm/deployment-tool/blob/master/LICENSE'
+tags:
+  - name: tasks
+    description: Managing deployment tasks
+  - name: targets
+    description: Managing targets
+paths:
+  /tasks:
+    post:
+      tags:
+        - tasks
+      summary: adds a task
+      requestBody:
+        description: Task to add
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+      responses:
+        '201':
+          description: task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: 'invalid input, object invalid'
+    get:
+      tags:
+        - tasks
+      summary: retrieves list of tasks
+      responses:
+        '200':
+          description: success response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+  /tasks/{id}:
+    parameters:
+      - in: path
+        name: id
+        description: id of the task
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - tasks
+      summary: retrieves a task description
+      responses:
+        '200':
+          description: success response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          description: not found
+  /targets:
+    get:
+      tags:
+        - targets
+      summary: retrieves list of targets
+      responses:
+        '200':
+          description: success response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/Target'
+  #    post:
+  /targets/{id}:
+    parameters:
+      - in: path
+        name: id
+        description: id of the target
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - targets
+      summary: retrieves a target
+      responses:
+        '200':
+          description: success response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Target'
+        '404':
+          description: not found
+#    put:
+components:
+  schemas:
+    Task:
+      title: Task
+      type: object
+      required:
+        - stages
+        - target
+      properties:
+        stages:
+          description: Deployment stages
+          type: object
+          properties:
+            transfer:
+              description: list of files and directories copied to targets
+              type: array
+              items:
+                type: string
+                example: "./package/directory-or-file"
+            install:
+              description: commands run on target devices
+              type: array
+              items:
+                type: string
+                example: "command"
+            run:
+              description: package execution on target devices
+              type: array
+              items:
+                type: string
+                example: "command"
+        target:
+          description: Which target devices should receive the package
+          type: object
+          properties:
+            tags:
+              type: array
+              items:
+                type: string
+        debug:
+          description: Whether the device should send all standard output (true) or just status info
+          type: boolean
+          default: false
+        deploymentInfo:
+          readOnly: true
+          type: object
+          properties:
+            created:
+              type: string
+              format: date-time
+            transferSize:
+              type: integer
+            matchingTargets:
+              type: array
+              items:
+                type: string
+    Target:
+      title: Target
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+        tasks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              stages:
+                type: object
+                properties:
+                  transfer:
+                    $ref: '#/components/schemas/logs'
+                  install:
+                    $ref: '#/components/schemas/logs'
+                  run:
+                    $ref: '#/components/schemas/logs'
+              updated:
+                type: string
+                format: date-time
+    logs:
+      title: Stage Logs
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: object
+          properties:
+            time:
+              type: integer
+              format: int64
+            output:
+              type: string
+            error:
+              type: boolean
+              default: false
