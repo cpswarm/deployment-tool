@@ -2,51 +2,54 @@ openapi: 3.0.0
 
 info:
   description: The API of Deployment Tool (Manager)
-  version: "0.4.0"
+  version: "0.5.0"
   title: Deployment Tool REST API
+  contact:
+    name: Source Code
+    url: https://github.com/cpswarm/deployment-tool
   license:
     name: Apache 2.0
     url: 'https://github.com/cpswarm/deployment-tool/blob/master/LICENSE'
 tags:
-  - name: tasks
-    description: Managing deployment tasks
+  - name: orders
+    description: Managing deployment orders
   - name: targets
     description: Managing targets
 paths:
-  /tasks:
+  /orders:
     post:
       tags:
-        - tasks
-      summary: adds a task
+        - orders
+      summary: adds an order
       requestBody:
-        description: Task to add
+        description: Order to add
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Task'
+              $ref: '#/components/schemas/Order'
       responses:
         '201':
-          description: task created
+          description: order created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Task'
+                $ref: '#/components/schemas/Order'
         '400':
           description: 'invalid input, object invalid'
     get:
       tags:
-        - tasks
-      summary: retrieves list of tasks
+        - orders
+      summary: retrieves list of orders
       responses:
         '200':
           description: success response
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Task'
-  /tasks/{id}:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/Order'
+  /orders/{id}:
     parameters:
       - in: path
         name: id
@@ -57,15 +60,15 @@ paths:
           format: uuid
     get:
       tags:
-        - tasks
-      summary: retrieves a task description
+        - orders
+      summary: retrieves an order
       responses:
         '200':
           description: success response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Task'
+                $ref: '#/components/schemas/Order'
         '404':
           description: not found
   /targets:
@@ -108,60 +111,98 @@ paths:
 #    put:
 components:
   schemas:
-    Task:
-      title: Task
+    Order:
+      title: Order
       type: object
       required:
         - stages
         - target
       properties:
-        stages:
+        id:
+          type: string
+          readOnly: true
+        source:
+          type: object
+          description: Source files
+          properties:
+            zip:
+              description: Base64 encoded zip of artifacts
+              type: string
+            order:
+              description: Copy artifacts from a previous order
+              type: string
+            paths:
+              description: Copy from a local directory on the server (for internal use)
+              type: array
+              items:
+                type: string
+        build:
+          description: Build stages
+          type: object
+          properties:
+            host:
+              description: ID of the target hosting the build
+              type: string
+            commands:
+              description: build shell commands
+              type: array
+              items:
+                type: string
+                example: "go build app"
+            artifacts:
+              description: list of paths to files and directories copied to manager after the build
+              type: array
+              items:
+                type: string
+                example: "app"
+        deploy:
           description: Deployment stages
           type: object
           properties:
-            transfer:
-              description: list of files and directories copied to targets
-              type: array
-              items:
-                type: string
-                example: "./package/directory-or-file"
             install:
-              description: commands run on target devices
-              type: array
-              items:
-                type: string
-                example: "command"
-            run:
-              description: package execution on target devices
-              type: array
-              items:
-                type: string
-                example: "command"
-        target:
-          description: Which target devices should receive the package
-          type: object
-          properties:
-            tags:
-              type: array
-              items:
-                type: string
+              type: object
+              properties:
+                commands:
+                  description: installation commands executed sequentially on target devices
+                  type: array
+                  items:
+                    type: string
+                    example: "chmod +x app"
+            launch:
+              type: object
+              properties:
+                commands:
+                  description: commands for executing the applications on target devices
+                  type: array
+                  items:
+                    type: string
+                    example: "./app"
+            target:
+              description: Which target devices should receive the package
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                    example: [raspi3, gateway]
         debug:
           description: Whether the device should send all standard output (true) or just status info
           type: boolean
           default: false
-        deploymentInfo:
+        created:
+          type: integer
+          format: int64
           readOnly: true
-          type: object
-          properties:
-            created:
-              type: string
-              format: date-time
-            transferSize:
-              type: integer
-            matchingTargets:
-              type: array
-              items:
-                type: string
+        childOrder:
+          description: The ID of child order generated for deployment of packages
+          type: string
+          readOnly: true
+
     Target:
       title: Target
       type: object
@@ -170,36 +211,42 @@ components:
           type: array
           items:
             type: string
-        tasks:
+        logs:
           type: object
           additionalProperties:
             type: object
             properties:
-              stages:
+              transfer:
                 type: object
-                properties:
-                  transfer:
-                    $ref: '#/components/schemas/logs'
-                  install:
-                    $ref: '#/components/schemas/logs'
-                  run:
-                    $ref: '#/components/schemas/logs'
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/stageLog'
+              install:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/stageLog'
+              run:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/stageLog'
               updated:
-                type: string
-                format: date-time
-    logs:
-      title: Stage Logs
+                type: integer
+                format: int64
+                readOnly: true
+    stageLog:
+      title: Stage Log
       type: object
-      additionalProperties:
-        type: array
-        items:
-          type: object
-          properties:
-            time:
-              type: integer
-              format: int64
-            output:
-              type: string
-            error:
-              type: boolean
-              default: false
+      properties:
+        time:
+          type: integer
+          format: int64
+        output:
+          type: string
+        error:
+          type: boolean
+          default: false
