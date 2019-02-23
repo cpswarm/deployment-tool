@@ -101,8 +101,8 @@ func (m *manager) newTaskID() string {
 	return uuid.NewV4().String()
 }
 
-func (m *manager) getOrders() ([]storage.Order, int64, error) {
-	orders, total, err := m.storage.GetOrders()
+func (m *manager) getOrders(page, perPage int) ([]storage.Order, int64, error) {
+	orders, total, err := m.storage.GetOrders(int((page-1)*perPage), perPage)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying orders: %s", err)
 	}
@@ -117,10 +117,10 @@ func (m *manager) getOrder(id string) (*storage.Order, error) {
 	return order, nil
 }
 
-func (m *manager) getTargets() ([]storage.Target, int64, error) {
-	targets, total, err := m.storage.GetTargets([]string{}, []string{"amd64", "swarm"}, 0, 100) // TODO pass pagination
+func (m *manager) getTargets(tags []string, page, perPage int) ([]storage.Target, int64, error) {
+	targets, total, err := m.storage.GetTargets(tags, int((page-1)*perPage), perPage)
 	if err != nil {
-		log.Println(err)
+		return nil, 0, fmt.Errorf("error querying targets: %s", err)
 	}
 	return targets, total, nil
 }
@@ -131,6 +131,14 @@ func (m *manager) getTarget(id string) (*storage.Target, error) {
 		return nil, fmt.Errorf("error querying target: %s", err)
 	}
 	return target, nil
+}
+
+func (m *manager) getLogs(target, task, stage, command, sortField string, sortAsc bool,page, perPage int) ([]storage.Log, int64, error) {
+	logs, total, err := m.storage.GetLogs(target, task, stage, command, sortField, sortAsc, int((page-1)*perPage), perPage)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error querying logs: %s", err)
+	}
+	return logs, total, nil
 }
 
 func (m *manager) searchLogs(search map[string]interface{}) ([]storage.Log, int64, error) {

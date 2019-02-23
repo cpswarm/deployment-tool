@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/storage"
@@ -14,14 +16,21 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+const (
+	defaultPage    = 1
+	defaultPerPage = 100
+)
+
 type restAPI struct {
 	manager *manager
 	router  *mux.Router
 }
 
-type searchResults struct {
-	Total int64       `json:"total"`
-	Hits  interface{} `json:"hits"` // array of anything
+type list struct {
+	Total   int64       `json:"total"`
+	Items   interface{} `json:"items"` // array of anything
+	Page    int         `json:"page"`
+	PerPage int         `json:"perPage"`
 }
 
 func startRESTAPI(bindAddr string, manager *manager) {
@@ -50,6 +59,7 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/orders/{id}", a.getOrder).Methods("GET")
 	r.HandleFunc("/orders", a.addOrder).Methods("POST")
 	// logs
+	r.HandleFunc("/logs", a.getLogs).Methods("GET")
 	r.HandleFunc("/logs/search", a.searchLogs).Methods("GET")
 	// tokens
 	//r.HandleFunc("/targets/{total}", a.createTokens).Methods("PUT")
@@ -146,14 +156,20 @@ func (a *restAPI) getOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *restAPI) getOrders(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	page, perPage, err := parsePagingAttributes(query.Get("page"), query.Get("perPage"))
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	orders, total, err := a.manager.getOrders()
+	orders, total, err := a.manager.getOrders(page, perPage)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	b, err := json.Marshal(&searchResults{total, orders})
+	b, err := json.Marshal(&list{total, orders, page, perPage})
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -163,14 +179,25 @@ func (a *restAPI) getOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *restAPI) getTargets(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	tags := query.Get("tags")
+	page, perPage, err := parsePagingAttributes(query.Get("page"), query.Get("perPage"))
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	var tagSlice []string
+	if tags != "" {
+		tagSlice = strings.Split(tags, ",")
+	}
 
-	targets, total, err := a.manager.getTargets()
+	targets, total, err := a.manager.getTargets(tagSlice, page, perPage)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	b, err := json.Marshal(&searchResults{total, targets})
+	b, err := json.Marshal(&list{total, targets, page, perPage})
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -227,6 +254,57 @@ func (a *restAPI) requestTargetLogs(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func (a *restAPI) getLogs(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	target := query.Get("target")
+	task := query.Get("task")
+	stage := query.Get("stage")
+	command := query.Get("command")
+	sort := query.Get("sort")
+	page, perPage, err := parsePagingAttributes(query.Get("page"), query.Get("perPage"))
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// parse sorting attributes
+	sortField, sortAsc := "time", true
+	if sort != "" {
+		sortArgs := strings.Split(sort, ",")
+		if len(sortArgs) == 1 || len(sortArgs) == 2 {
+			if sortArgs[0] == "asc" {
+				sortAsc = true
+			} else if sortArgs[0] == "desc" {
+				sortAsc = false
+			} else {
+				HTTPResponseError(w, http.StatusBadRequest, fmt.Sprintf("sort query order must be %s or %s", "asc", "desc"))
+				return
+			}
+			if len(sortArgs) == 2 {
+				sortField = sortArgs[1]
+			}
+		} else {
+			HTTPResponseError(w, http.StatusBadRequest, "sort query must contain one or two values")
+			return
+		}
+	}
+
+	logs, total, err := a.manager.getLogs(target, task, stage, command, sortField, sortAsc, page, perPage)
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	b, err := json.Marshal(&list{total, logs, page, perPage})
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	HTTPResponse(w, http.StatusOK, b)
+	return
+}
+
 func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 
 	body, err := ioutil.ReadAll(r.Body)
@@ -251,7 +329,7 @@ func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := json.Marshal(&searchResults{Total: total, Hits: logs})
+	b, err := json.Marshal(&list{total, logs, -1, -1}) // TODO add paging info
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -273,7 +351,7 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 		a.manager.update.Wait()
 		log.Println("websocket: sending update!")
 
-		targets, _, err := a.manager.getTargets()
+		targets, _, err := a.manager.getTargets([]string{}, defaultPage, defaultPerPage) // TODO
 		if err != nil {
 			log.Println("websocket: error getting targets:", err)
 			a.manager.update.L.Unlock()
@@ -289,6 +367,29 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 		}
 		a.manager.update.L.Unlock()
 	}
+}
+
+func parsePagingAttributes(pageStr, perPageStr string) (page int, perPage int, err error) {
+	page, perPage = defaultPage, defaultPerPage
+	if pageStr != "" {
+		page, err = strconv.Atoi(pageStr)
+		if err != nil {
+			return 0, 0, fmt.Errorf("error parsing page query: %s", err)
+		}
+		if page < 1 {
+			return 0, 0, fmt.Errorf("page must be positive")
+		}
+	}
+	if perPageStr != "" {
+		perPage, err = strconv.Atoi(perPageStr)
+		if err != nil {
+			return 0, 0, fmt.Errorf("error parsing perPage query: %s", err)
+		}
+		if perPage < 1 {
+			return 0, 0, fmt.Errorf("perPage must be positive")
+		}
+	}
+	return page, perPage, nil
 }
 
 // HTTPResponseError serializes and writes an error response
