@@ -171,6 +171,7 @@ func (m *manager) processPackage(p *model.Package) {
 	- send acknowledgement and remove it on assembler
 	- continue with the order
 	*/
+	defer recovery()
 	log.Println("processPackage", p.Task, p.Assembler, len(p.Payload))
 	m.logTransfer(p.Task, fmt.Sprintf("received package sized %d bytes", len(p.Payload)), p.Assembler)
 
@@ -263,6 +264,7 @@ func (m *manager) compressSource(orderID string, receivers ...string) ([]byte, e
 }
 
 func (m *manager) composeTask(order *storage.Order) {
+	defer recovery()
 	// a single order can result in two tasks: build and deploy
 	if order.Build != nil {
 		m.logTransfer(order.ID, model.StageStart, order.Build.Host, model.StageStart)
@@ -395,6 +397,7 @@ func (m *manager) requestLogs(targetID string) error {
 }
 
 func (m *manager) manageResponses() {
+	defer recovery()
 	for resp := range m.pipe.ResponseCh {
 		switch resp.Topic {
 		case model.ResponseAdvertisement:
@@ -431,6 +434,7 @@ func (m *manager) manageResponses() {
 }
 
 func (m *manager) processTarget(target *storage.Target) {
+	defer recovery()
 	log.Printf("Discovered target: %s: %v", target.ID, target.Tags)
 
 	target.UpdatedAt = model.UnixTime()
@@ -449,6 +453,7 @@ func (m *manager) processTarget(target *storage.Target) {
 }
 
 func (m *manager) processResponse(response *model.Response) {
+	defer recovery()
 	log.Printf("Processing response from %s (len=%d)", response.TargetID, len(response.Logs))
 
 	defer func(start time.Time) { log.Println("Processing response took", time.Since(start)) }(time.Now())

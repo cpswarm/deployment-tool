@@ -39,6 +39,10 @@ type Match struct {
 }
 
 func (o Order) Validate() error {
+	if o.Build == nil && o.Deploy == nil {
+		return fmt.Errorf("neither build nor deploy are defined")
+	}
+
 	// validate build
 	if o.Build != nil {
 		if o.Build.Host == "" {

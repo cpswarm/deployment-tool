@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/storage"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	yaml "gopkg.in/yaml.v2"
@@ -81,6 +82,7 @@ func (a *restAPI) setupRouter() {
 	r.PathPrefix("/ui").Handler(http.StripPrefix("/ui", http.FileServer(ui)))
 	r.PathPrefix("/ws").HandlerFunc(a.websocket)
 
+	r.Use(handlers.RecoveryHandler())
 	r.Use(loggingMiddleware)
 
 	a.router = r

@@ -60,3 +60,7 @@
 [[constraint]]
   name = "github.com/olivere/elastic"
   version = "6.2.16"
+
+[[constraint]]
+  name = "github.com/gorilla/handlers"
+  version = "1.4.0"

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 )
@@ -89,4 +90,10 @@ func parseFlags() bool {
 	}
 	// nothing is parsed
 	return false
+}
+
+func recovery() {
+	if r := recover(); r != nil {
+		log.Printf("PANIC: %v\n%s", r, debug.Stack())
+	}
 }
