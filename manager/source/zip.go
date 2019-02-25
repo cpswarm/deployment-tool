@@ -1,24 +1,25 @@
 package source
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"log"
 
-	"code.linksmart.eu/dt/deployment-tool/manager/model"
+	"github.com/mholt/archiver"
 )
 
-type Zip string // TODO change to []byte?
+type Zip string
 
 // Decode base64 encoded zip archive and write it to order directory
 func (zip Zip) Store(orderID string) error {
-	log.Println("Storing the base64 encoded archive...")
+	log.Println("zip: Storing the base64 encoded archive...")
 	data, err := base64.StdEncoding.DecodeString(string(zip))
 	if err != nil {
 		return err
 	}
-	log.Printf("Size of data: %d bytes", len(data))
-	err = model.DecompressFiles(data, fmt.Sprintf("%s/%s/%s", OrdersDir, orderID, SourceDir))
+	log.Printf("zip: Size of data: %d bytes", len(data))
+	err = archiver.Zip.Read(bytes.NewBuffer(data), fmt.Sprintf("%s/%s/%s", OrdersDir, orderID, SourceDir))
 	if err != nil {
 		return err
 	}
