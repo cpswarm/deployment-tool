@@ -43,8 +43,8 @@ type restAPI struct {
 type list struct {
 	Total   int64       `json:"total"`
 	Items   interface{} `json:"items"` // array of anything
-	Page    int         `json:"page"`
-	PerPage int         `json:"perPage"`
+	Page    int         `json:"page,omitempty"`
+	PerPage int         `json:"perPage,omitempty"`
 }
 
 func startRESTAPI(bindAddr string, manager *manager) {
@@ -75,21 +75,6 @@ func (a *restAPI) setupRouter() {
 	// logs
 	r.HandleFunc("/logs", a.getLogs).Methods("GET")
 	r.HandleFunc("/logs/search", a.searchLogs).Methods("GET")
-	// tokens
-	//r.HandleFunc("/targets/{total}", a.createTokens).Methods("PUT")
-
-	/*
-		/orders
-		/targets
-		/logs?targetID=id&task=id
-		/tokens (post # or get)
-		/users (future work)
-
-		Events:
-		new order
-		new/updated target
-		new log
-	*/
 
 	// static
 	ui := http.Dir(WorkDir + "/ui")
@@ -339,7 +324,7 @@ func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := json.Marshal(&list{total, logs, -1, -1}) // TODO add paging info
+	b, err := json.Marshal(&list{Total: total, Items: logs}) // without paging info
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
 		return
