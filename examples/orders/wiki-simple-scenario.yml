@@ -1,0 +1,24 @@
+source:
+  paths:
+    - package
+  #zip: <base64-string>
+
+deploy:
+  # How to install the package(s)
+  install:
+    commands:
+      - go build package/count_to_three.go
+
+  # How to launch the application(s)
+  run:
+    commands:
+      - ./count_to_three
+
+  # Which target devices should receive the package
+  target:
+    ids:
+    tags:
+      - dev
+
+# Whether the device should send all standard output (true) or just status info
+debug: true
