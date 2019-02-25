@@ -13,9 +13,10 @@ import (
 
 const (
 	// Environment keys
-	EnvDebug   = "DEBUG"   // print debug messages
-	EnvVerbose = "VERBOSE" // print extra information e.g. line number)
-	EnvWorkdir = "WORKDIR" // work directory of the manager
+	EnvDebug      = "DEBUG"       // print debug messages
+	EnvVerbose    = "VERBOSE"     // print extra information e.g. line number)
+	EnvWorkdir    = "WORKDIR"     // work directory of the manager
+	EnvStorageDSN = "STORAGE_DSN" // Storage DSN i.e. Elasticsearch's URL
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 	}
 	defer zmqServer.Close()
 
-	m, err := startManager(zmqServer.Pipe)
+	m, err := startManager(zmqServer.Pipe, os.Getenv(EnvStorageDSN))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,6 +64,10 @@ func init() {
 			log.Fatal(err)
 		}
 		WorkDir = dir
+	}
+
+	if os.Getenv(EnvStorageDSN) == "" {
+		os.Setenv(EnvStorageDSN, "http://localhost:9200")
 	}
 }
 

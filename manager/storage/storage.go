@@ -72,6 +72,7 @@ const (
 )
 
 func NewElasticStorage(url string) (Storage, error) {
+	log.Println("Elasticsearch URL:", url)
 	ctx := context.Background()
 
 	opts := []elastic.ClientOptionFunc{elastic.SetURL(url)}

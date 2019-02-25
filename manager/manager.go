@@ -20,8 +20,8 @@ type manager struct {
 	update  *sync.Cond
 }
 
-func startManager(pipe model.Pipe) (*manager, error) {
-	storage, err := storage.NewElasticStorage("http://127.0.0.1:9200")
+func startManager(pipe model.Pipe, storageDSN string) (*manager, error) {
+	storage, err := storage.NewElasticStorage(storageDSN)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (m *manager) getTarget(id string) (*storage.Target, error) {
 	return target, nil
 }
 
-func (m *manager) getLogs(target, task, stage, command, sortField string, sortAsc bool,page, perPage int) ([]storage.Log, int64, error) {
+func (m *manager) getLogs(target, task, stage, command, sortField string, sortAsc bool, page, perPage int) ([]storage.Log, int64, error) {
 	logs, total, err := m.storage.GetLogs(target, task, stage, command, sortField, sortAsc, int((page-1)*perPage), perPage)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying logs: %s", err)
