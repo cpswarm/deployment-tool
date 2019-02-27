@@ -7,14 +7,16 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/storage"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/justinas/alice"
+	"github.com/rs/cors"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -56,8 +58,14 @@ func startRESTAPI(bindAddr string, manager *manager) {
 
 	a.setupRouter()
 
+	chain := alice.New(
+		recoveryMiddleware,
+		loggingMiddleware,
+		cors.AllowAll().Handler,
+	)
+
 	log.Println("RESTAPI: Binding to", bindAddr)
-	err := http.ListenAndServe(bindAddr, a.router)
+	err := http.ListenAndServe(bindAddr, chain.Then(a.router))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,6 +73,8 @@ func startRESTAPI(bindAddr string, manager *manager) {
 
 func (a *restAPI) setupRouter() {
 	r := mux.NewRouter()
+
+	r.HandleFunc("/", a.index).Methods("GET")
 	// targets
 	r.HandleFunc("/targets", a.getTargets).Methods("GET")
 	r.HandleFunc("/targets/{id}", a.getTarget).Methods("GET")
@@ -82,19 +92,11 @@ func (a *restAPI) setupRouter() {
 	r.PathPrefix("/ui").Handler(http.StripPrefix("/ui", http.FileServer(ui)))
 	r.PathPrefix("/ws").HandlerFunc(a.websocket)
 
-	r.Use(handlers.RecoveryHandler())
-	r.Use(loggingMiddleware)
-
 	a.router = r
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		log.Println(r.Method, r.RequestURI)
-		next.ServeHTTP(w, r)
-		log.Println(r.Method, r.URL, "responded in", time.Since(start))
-	})
+func (a *restAPI) index(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Welcome!\n")
 }
 
 func (a *restAPI) addOrder(w http.ResponseWriter, r *http.Request) {
@@ -434,4 +436,26 @@ func HTTPResponse(w http.ResponseWriter, code int, body []byte) {
 	if err != nil {
 		log.Printf("HTTPResponse: error writing reponse: %s", err)
 	}
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		log.Println(r.Method, r.RequestURI)
+		next.ServeHTTP(w, r)
+		log.Println(r.Method, r.URL, "responded in", time.Since(start))
+	})
+}
+
+func recoveryMiddleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("PANIC: %v\n%s", r, debug.Stack())
+				HTTPResponseError(w, 500, r)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(fn)
 }

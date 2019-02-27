@@ -74,6 +74,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:01144ccbbd97fe4d710b96c1db19e631ea3b491fffc8b4fb53274cdd2be1061e"
+  name = "github.com/justinas/alice"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "03f45bd4b7dad4734bc4620e46a35789349abb20"
+
+[[projects]]
+  branch = "master"
   digest = "1:853fe95bef4c5e8a70dcd405b5206b38a9ff09e9c26fef93d1d0adeaea39f9ce"
   name = "github.com/mailru/easyjson"
   packages = [
@@ -175,6 +183,14 @@
   version = "v0.8.1"
 
 [[projects]]
+  digest = "1:f250ca51e5b9215bc2df18f92060a9a835e9f85ab18ebbba0e1a6ef1f8fcdbfe"
+  name = "github.com/rs/cors"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "9a47f48565a795472d43519dd49aac781f3034fb"
+  version = "v1.6.0"
+
+[[projects]]
   digest = "1:6bc0652ea6e39e22ccd522458b8bdd8665bf23bdc5a20eec90056e4dc7e273ca"
   name = "github.com/satori/go.uuid"
   packages = ["."]
@@ -211,6 +227,7 @@
     "github.com/gorilla/mux",
     "github.com/gorilla/websocket",
     "github.com/joho/godotenv",
+    "github.com/justinas/alice",
     "github.com/mholt/archiver",
     "github.com/olivere/elastic",
     "github.com/otiai10/copy",
@@ -225,6 +242,7 @@
     "github.com/pebbe/zmq4/examples/kvmsg",
     "github.com/pebbe/zmq4/examples/kvsimple",
     "github.com/pebbe/zmq4/examples/mdapi",
+    "github.com/rs/cors",
     "github.com/satori/go.uuid",
     "gopkg.in/yaml.v2",
   ]
