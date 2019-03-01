@@ -341,7 +341,9 @@ func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
-	upgrader := websocket.Upgrader{} // use default options
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true }, // allow all origins
+	}
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("websocket: upgrade error:", err)
