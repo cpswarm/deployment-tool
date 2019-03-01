@@ -91,7 +91,9 @@ func (a *restAPI) setupRouter() {
 	// static
 	ui := http.Dir(WorkDir + "/ui")
 	r.PathPrefix("/ui").Handler(http.StripPrefix("/ui", http.FileServer(ui)))
-	r.PathPrefix("/ws").HandlerFunc(a.websocket)
+
+	// websocket
+	r.PathPrefix("/events").HandlerFunc(a.websocket)
 
 	a.router = r
 }
@@ -343,6 +345,7 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("websocket: upgrade error:", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	defer c.Close()

@@ -1,12 +1,11 @@
 <html>
 
 <head>
-    <title>Deployment Manager UI</title>
+    <title>Event Subscriber</title>
 
     <script src="lib/axios.min.js"></script>
     <script src="lib/jquery-3.2.1.slim.min.js"></script>
     <script src="lib/highlighter.js"></script>
-
 </head>
 
 <body>
@@ -20,7 +19,7 @@
                 return;
             }
 
-            var ws = new WebSocket("ws://localhost:8080/ws?topics=logs,targetAdded,targetUpdated");
+            var ws = new WebSocket("ws://localhost:8080/events?topics=logs,targetAdded,targetUpdated");
             ws.onopen = function () {
                 console.log("Socket connected.");
                 document.body.style.backgroundColor = "#fff";
