@@ -68,3 +68,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/justinas/alice"
+
+[[constraint]]
+  name = "github.com/cskr/pubsub"
+  version = "1.0.2"

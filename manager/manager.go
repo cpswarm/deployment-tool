@@ -5,19 +5,30 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
 	"code.linksmart.eu/dt/deployment-tool/manager/storage"
+	"github.com/cskr/pubsub"
 	uuid "github.com/satori/go.uuid"
 )
 
 type manager struct {
 	storage storage.Storage
 	pipe    model.Pipe
-	update  *sync.Cond
+	events  *pubsub.PubSub
+}
+
+const (
+	EventLogs          = "logs"
+	EventTargetAdded   = "targetAdded"
+	EventTargetUpdated = "targetUpdated"
+)
+
+type event struct {
+	Topic   string      `json:"topic"`
+	Payload interface{} `json:"payload"`
 }
 
 func startManager(pipe model.Pipe, storageDSN string) (*manager, error) {
@@ -29,7 +40,7 @@ func startManager(pipe model.Pipe, storageDSN string) (*manager, error) {
 	m := &manager{
 		storage: storage,
 		pipe:    pipe,
-		update:  sync.NewCond(&sync.Mutex{}),
+		events:  pubsub.New(10),
 	}
 
 	go m.manageResponses()
@@ -214,8 +225,7 @@ func (m *manager) logTransfer(order, message string, targets ...string) {
 		log.Printf("Error storing logs: %s", err)
 		return
 	}
-	// sent update notification
-	m.update.Broadcast()
+	m.publishEvent(EventLogs, logs)
 }
 
 func (m *manager) logTransferFatal(order, message string, targets ...string) {
@@ -246,8 +256,7 @@ func (m *manager) logTransferFatal(order, message string, targets ...string) {
 		log.Printf("Error storing logs: %s", err)
 		return
 	}
-	// sent update notification
-	m.update.Broadcast()
+	m.publishEvent(EventLogs, logs)
 }
 
 func (m *manager) compressSource(orderID string, receivers ...string) ([]byte, error) {
@@ -428,8 +437,6 @@ func (m *manager) manageResponses() {
 			}
 			go m.processResponse(&response)
 		}
-		// sent update notification
-		m.update.Broadcast()
 	}
 }
 
@@ -449,7 +456,9 @@ func (m *manager) processTarget(target *storage.Target) {
 			log.Printf("Error adding target: %s", err)
 			return
 		}
+		m.publishEvent(EventTargetAdded, target)
 	}
+	m.publishEvent(EventTargetUpdated, target)
 }
 
 func (m *manager) processResponse(response *model.Response) {
@@ -479,4 +488,9 @@ func (m *manager) processResponse(response *model.Response) {
 		log.Printf("Error storing logs: %s", err)
 		return
 	}
+	m.publishEvent(EventLogs, logs)
+}
+
+func (m *manager) publishEvent(topic string, payload interface{}) {
+	m.events.TryPub(event{Topic: topic, Payload: payload}, topic)
 }

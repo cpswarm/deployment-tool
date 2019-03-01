@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:782f05e87c639ab4a0c8b346088a4bae62f137756a94c993d71ada2b5d295152"
+  name = "github.com/cskr/pubsub"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "65166f5ae403cbf6dcdced31e1f8f8ad95485cb3"
+  version = "v1.0.2"
+
+[[projects]]
   branch = "master"
   digest = "1:e54c39e0efe496d1092cf08eaf5109758af22e68d26732683009704db1d0afbe"
   name = "github.com/dsnet/compress"
@@ -223,6 +231,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/cskr/pubsub",
     "github.com/gorilla/handlers",
     "github.com/gorilla/mux",
     "github.com/gorilla/websocket",

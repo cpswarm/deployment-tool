@@ -34,6 +34,7 @@ const (
 	_stage         = "stage"
 	_command       = "command"
 	_tags          = "tags"
+	_topics        = "topics"
 	defaultPage    = 1
 	defaultPerPage = 100
 )
@@ -345,27 +346,31 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer c.Close()
-	for {
-		a.manager.update.L.Lock()
-		a.manager.update.Wait()
+
+	query := r.URL.Query()
+	topics := []string{EventLogs, EventTargetAdded, EventTargetUpdated}
+	if topicsQuery := query.Get(_topics); topicsQuery != "" {
+		topics = strings.Split(topicsQuery, ",")
+	}
+
+	events := a.manager.events.Sub(topics...)
+	log.Println("websocket: client subscribed to:", topics)
+
+	for event := range events {
 		log.Println("websocket: sending update!")
-
-		targets, _, err := a.manager.getTargets([]string{}, defaultPage, defaultPerPage) // TODO
-		if err != nil {
-			log.Println("websocket: error getting targets:", err)
-			a.manager.update.L.Unlock()
-			break
-		}
-
-		b, _ := json.Marshal(targets)
+		b, _ := json.Marshal(event)
 		err = c.WriteMessage(websocket.TextMessage, b)
 		if err != nil {
 			log.Println("websocket: write error:", err)
-			a.manager.update.L.Unlock()
+			go a.manager.events.Unsub(events)
+			if len(events) > 0 {
+				<-events
+			}
+			log.Println("websocket: closed the subscriber.")
 			break
 		}
-		a.manager.update.L.Unlock()
 	}
+
 }
 
 func parsePagingAttributes(query url.Values) (page int, perPage int, err error) {
