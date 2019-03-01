@@ -10,29 +10,9 @@
 </head>
 
 <body>
-    <pre></pre>
+    <div id="events"><p>Events are prepended.</p></div>
 
     <script>
-
-        function getTargets() {
-            axios.get('http://localhost:8080/targets')
-                    .then(function (response) {
-                        // console.log(response);
-                        json = syntaxHighlight(JSON.stringify(response.data, null, 2));
-                        $('pre').html(json);
-                        // setTimeout(function () { getTargets(); }, 1000);
-                    })
-                    .catch(function (error) {
-                        // handle error
-                        console.log(error);
-                        setTimeout(function () {
-                            getTargets();
-                        }, 5000);
-                    })
-                    .then(function () {
-
-                    });
-        }
 
         function listen() {
             if (!("WebSocket" in window)) {
@@ -40,21 +20,22 @@
                 return;
             }
 
-            var ws = new WebSocket("ws://localhost:8080/ws");
+            var ws = new WebSocket("ws://localhost:8080/ws?topics=logs,targetAdded,targetUpdated");
             ws.onopen = function () {
                 console.log("Socket connected.");
                 document.body.style.backgroundColor = "#fff";
-                getTargets();
+                $('#events').prepend("<p>Connected!</p>");
             }
             ws.onmessage = function (event) {
                 // console.log(event.data);
                 var obj = JSON.parse(event.data);
                 json = syntaxHighlight(JSON.stringify(obj, null, 2));
-                $('pre').html(json);
+                $('#events').prepend("<pre>"+json+"</pre>");
             }
             ws.onclose = function () {
                 console.log("Socket disconnected.");
                 document.body.style.backgroundColor = "#fcc";
+                $('#events').prepend("<p>Disconnected!</p>");
                 setTimeout(function () {
                     listen();
                 }, 5000);
@@ -62,7 +43,6 @@
 
         }
 
-        getTargets();
         listen();
 
     </script>
