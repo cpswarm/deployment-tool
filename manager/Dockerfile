@@ -2,7 +2,7 @@ FROM ubuntu:bionic
 
 WORKDIR /home
 
-ADD https://pipelines.linksmart.eu/artifact/CPSW-DTB/shared/build-latest/linux-amd64-binary-distributions/deployment-manager-linux-amd64 .
+COPY deployment-manager-linux-amd64 .
 RUN chmod +x deployment-manager-linux-amd64
 
 ADD https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/Frontend-UI/deployment-tool-ui.tar .
