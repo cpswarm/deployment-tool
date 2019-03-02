@@ -359,23 +359,17 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	events := a.manager.events.Sub(topics...)
-	log.Println("websocket: client subscribed to:", topics)
+	defer a.manager.events.Unsub(events) // publisher should only use the TryPub method to avoid panics
 
 	for event := range events {
-		log.Println("websocket: sending update!")
 		b, _ := json.Marshal(event)
 		err = c.WriteMessage(websocket.TextMessage, b)
 		if err != nil {
 			log.Println("websocket: write error:", err)
-			go a.manager.events.Unsub(events)
-			if len(events) > 0 {
-				<-events
-			}
-			log.Println("websocket: closed the subscriber.")
 			break
 		}
+		log.Println("websocket: sent event.")
 	}
-
 }
 
 func parsePagingAttributes(query url.Values) (page int, perPage int, err error) {
