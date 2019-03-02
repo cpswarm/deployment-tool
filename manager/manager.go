@@ -336,6 +336,7 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 		ann.Type = model.TaskTypeDeploy
 	}
 
+	backOff := 0
 	for pending := true; pending; {
 		log.Printf("Sending task %s/%d to %s", task.ID, ann.Type, receiverTopics)
 
@@ -345,7 +346,7 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 		for _, topic := range receiverTopics {
 			m.pipe.RequestCh <- model.Message{topic, b}
 		}
-		m.logTransfer(task.ID, "sent announcement", match.List...)
+		//m.logTransfer(task.ID, "sent announcement", match.List...)
 
 		time.Sleep(time.Second)
 
@@ -358,7 +359,11 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 		m.pipe.RequestCh <- model.Message{task.ID, b}
 		m.logTransfer(task.ID, "sent task", match.List...)
 
-		time.Sleep(10 * time.Second)
+		// TODO resend when device is online
+		if backOff < 60 {
+			backOff += 10
+		}
+		time.Sleep(time.Duration(backOff) * time.Second)
 
 		pending = false
 		for _, target := range match.List {
