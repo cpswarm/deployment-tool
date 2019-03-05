@@ -17,7 +17,7 @@ func CompressFiles(paths ...string) ([]byte, error) {
 		return nil, fmt.Errorf("no path provided")
 	}
 	var b bytes.Buffer
-	err := archiver.TarGz.Write(&b, paths)
+	err := archiver.Zip.Write(&b, paths)
 	if err != nil {
 		return nil, err
 	}
@@ -29,5 +29,5 @@ func DecompressFiles(b []byte, dir string) error {
 	if Env(EnvDebug) {
 		log.Printf("Decompressing %d bytes to %s", len(b), dir)
 	}
-	return archiver.TarGz.Read(bytes.NewBuffer(b), dir)
+	return archiver.Zip.Read(bytes.NewBuffer(b), dir)
 }
