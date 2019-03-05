@@ -276,7 +276,7 @@ func (m *manager) composeTask(order *storage.Order) {
 	defer recovery()
 	// a single order can result in two tasks: build and deploy
 	if order.Build != nil {
-		m.logTransfer(order.ID, model.StageStart, order.Build.Host, order.Build.Host)
+		m.logTransfer(order.ID, model.StageStart, order.Build.Host)
 
 		compressedArchive, err := m.compressSource(order.ID, order.Build.Host)
 		if err != nil {
