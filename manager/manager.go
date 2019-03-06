@@ -174,8 +174,6 @@ func (m *manager) fetchSource(orderID string, src *source.Source) error {
 		return src.Paths.Copy(orderID)
 	case src.Zip != nil:
 		return src.Zip.Store(orderID)
-		//case src.Git != nil:
-		//	return src.Git.Clone(orderID)
 		//case src.Order != nil:
 		//	return src.Order.Fetch(orderID)
 	}
