@@ -44,27 +44,31 @@ func (o Order) Validate() error {
 	}
 
 	// validate build
-	if o.Build != nil {
-		if o.Build.Host == "" {
-			return fmt.Errorf("build host not given")
-		}
+	if o.Build != nil && len(o.Build.Commands)+len(o.Build.Artifacts)+len(o.Build.Host) > 0 {
 		if len(o.Build.Commands) == 0 {
-			return fmt.Errorf("build has no commands")
+			return fmt.Errorf("build.commands empty")
 		}
+		if len(o.Build.Artifacts) == 0 {
+			return fmt.Errorf("build.artifacts empty")
+		}
+		if o.Build.Host == "" {
+			return fmt.Errorf("build.host not given")
+		}
+
 		for _, path := range o.Build.Artifacts {
 			if strings.HasPrefix(path, "/") {
-				return fmt.Errorf("path to artifact should be relative to source. Given path is absolute: %s", path)
+				return fmt.Errorf("path in build.artifacts should be relative to source. Given path is absolute: %s", path)
 			}
 		}
 	}
 
 	// validate deploy
-	if o.Deploy != nil {
+	if o.Deploy != nil && len(o.Deploy.Install.Commands)+len(o.Deploy.Run.Commands)+len(o.Deploy.Target.IDs)+len(o.Deploy.Target.Tags) > 0 {
 		if len(o.Deploy.Target.IDs)+len(o.Deploy.Target.Tags) == 0 {
-			return fmt.Errorf("deploy.target contains no ids and tags")
+			return fmt.Errorf("both deploy.target.ids and deploy.target.ids are empty")
 		}
 		if len(o.Deploy.Install.Commands)+len(o.Deploy.Run.Commands) == 0 {
-			return fmt.Errorf("deploy has no install and run commands")
+			return fmt.Errorf("both deploy.install.commands and deploy.run.commands are empty")
 		}
 	}
 

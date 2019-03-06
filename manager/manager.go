@@ -52,6 +52,14 @@ func (m *manager) addOrder(order *storage.Order) error {
 	order.ID = m.newTaskID()
 	order.Created = model.UnixTime()
 
+	// cleanup
+	if len(order.Build.Commands) + len(order.Build.Artifacts) + len(order.Build.Host) == 0 {
+		order.Build = nil
+	}
+	if len(order.Deploy.Install.Commands) + len(order.Deploy.Run.Commands) == 0 {
+		order.Deploy = nil
+	}
+
 	// check if build host exists
 	if order.Build != nil {
 		target, err := m.storage.GetTarget(order.Build.Host)
