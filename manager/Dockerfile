@@ -5,7 +5,7 @@ WORKDIR /home
 COPY deployment-manager-linux-amd64 .
 RUN chmod +x deployment-manager-linux-amd64
 
-ADD https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/Frontend-UI/deployment-tool-ui.tar .
+COPY deployment-tool-ui.tar .
 RUN tar xvf deployment-tool-ui.tar
 
 ENV PRIVATE_KEY=/home/keys/manager.key
