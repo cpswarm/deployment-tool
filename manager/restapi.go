@@ -368,12 +368,31 @@ func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
 	if topicsQuery := query.Get(_topics); topicsQuery != "" {
 		topics = strings.Split(topicsQuery, ",")
 	}
+	task := query.Get(_task)
+	target := query.Get(_target)
 
 	events := a.manager.events.Sub(topics...)
 	defer a.manager.events.Unsub(events) // publisher should only use the TryPub method to avoid panics
 
-	for event := range events {
-		b, _ := json.Marshal(event)
+	for raw := range events {
+		// filter logs, very inefficiently!
+		if e, ok := raw.(event); ok {
+			if e.Topic == EventLogs {
+				if logs, ok := e.Payload.([]storage.Log); ok {
+					filtered := make([]storage.Log, 0, len(logs))
+					for i := range logs {
+						if (task == "" || logs[i].Task == task) && (target == "" || logs[i].Target == target) {
+							filtered = append(filtered, logs[i])
+						}
+					}
+					if len(filtered) == 0 { // nothing left to send
+						continue
+					}
+					raw = event{Topic: e.Topic, Payload: filtered}
+				}
+			}
+		}
+		b, _ := json.Marshal(raw)
 		err = c.WriteMessage(websocket.TextMessage, b)
 		if err != nil {
 			log.Println("websocket: write error:", err)
