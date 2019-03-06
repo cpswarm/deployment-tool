@@ -266,7 +266,7 @@ func (s *storage) GetTargets(tags []string, from, size int) ([]Target, int64, er
 
 // MatchTargets searches for targets with IDs and tags and returns a list of tags and ids covering all the matches
 // The search result gives priority to tags (in the given order) and then IDs
-func (s *storage) MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error) {
+func (s *storage) MatchTargets(ids, tags []string) (allIDs, matchIDs, matchTags []string, err error) {
 	if len(ids)+len(tags) == 0 {
 		return
 	}
@@ -286,6 +286,7 @@ func (s *storage) MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []st
 		query.Should(elastic.NewMatchQuery("id", id))
 	}
 
+	hitIDs, hitTags := make(map[string]bool), make(map[string]bool)
 	const perPage = 100
 	for from := 0; ; from += perPage {
 
@@ -304,9 +305,9 @@ func (s *storage) MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []st
 					if len(highlights) < 1 {
 						return nil, nil, nil, fmt.Errorf("unexpected search response. Highlights has length 0")
 					}
-					hitTags = append(hitTags, highlights[0])
+					hitTags[highlights[0]] = true
 				} else {
-					hitIDs = append(hitIDs, hit.Id)
+					hitIDs[hit.Id] = true
 				}
 			}
 		} else {
@@ -318,6 +319,12 @@ func (s *storage) MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []st
 		}
 	}
 
+	for id := range hitIDs {
+		matchIDs = append(matchIDs, id)
+	}
+	for tag := range hitTags {
+		matchTags = append(matchTags, tag)
+	}
 	return
 }
 
