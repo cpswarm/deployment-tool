@@ -2,7 +2,7 @@ openapi: 3.0.0
 
 info:
   description: The API of Deployment Tool (Manager)
-  version: "0.6.0"
+  version: "0.6.1"
   title: Deployment Tool REST API
   contact:
     name: Source Code
@@ -64,7 +64,7 @@ paths:
     parameters:
       - in: path
         name: id
-        description: id of the task
+        description: ID of the task
         required: true
         schema:
           type: string
@@ -162,11 +162,24 @@ paths:
             type: string
           description: Command
         - in: query
+          name: output
+          schema:
+            type: string
+          description: Output text search
+        - in: query
+          name: error
+          schema:
+            type: string
+            enum: [true, false]
+            default: false
+          description: Error
+        - in: query
           name: sortBy
           required: false
           schema:
             type: string
             enum: [time,target,task,stage,command]
+            default: time
           description: The field that items should be sorted by
         - $ref: "#/components/parameters/sortOrder"
         - $ref: "#/components/parameters/page"
@@ -218,13 +231,13 @@ components:
               description: ID of the target hosting the build
               type: string
             commands:
-              description: build shell commands
+              description: Build shell commands
               type: array
               items:
                 type: string
                 example: "go build app"
             artifacts:
-              description: list of paths to files and directories copied to manager after the build
+              description: List of paths to files and directories copied to manager after the build
               type: array
               items:
                 type: string
@@ -237,7 +250,7 @@ components:
               type: object
               properties:
                 commands:
-                  description: installation commands executed sequentially on target devices
+                  description: Installation commands executed sequentially on target devices
                   type: array
                   items:
                     type: string
@@ -246,13 +259,13 @@ components:
               type: object
               properties:
                 commands:
-                  description: commands for executing the applications on target devices
+                  description: Commands for executing the applications on target devices
                   type: array
                   items:
                     type: string
                     example: "./app"
             target:
-              description: Which target devices should receive the package
+              description: Devices which should receive the package
               type: object
               properties:
                 ids:
@@ -264,8 +277,28 @@ components:
                   items:
                     type: string
                     example: [raspi3, gateway]
+            match:
+              readOnly: true
+              description: System generated list of matched targets
+              type: object
+              properties:
+                ids:
+                  description: IDs that match the target ID definition
+                  type: array
+                  items:
+                    type: string
+                tags:
+                  description: Tags that match the target tag definition
+                  type: array
+                  items:
+                    type: string
+                list:
+                  description: IDs of all matching targets
+                  type: array
+                  items:
+                    type: string
         debug:
-          description: Whether the device should send all standard output (true) or just status info
+          description: Collect all standard output (true) or just status info
           type: boolean
           default: false
         createdAt:
@@ -332,7 +365,7 @@ components:
         type: integer
         minimum: 1
         default: 1
-      description: The page that should be retrieved
+      description: The page to be retrieved
     perPage:
       in: query
       name: perPage
@@ -349,4 +382,5 @@ components:
       schema:
         type: string
         enum: [asc, desc]
+        default: asc
       description: The sorting order
