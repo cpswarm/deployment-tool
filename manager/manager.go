@@ -32,13 +32,13 @@ type event struct {
 }
 
 func startManager(pipe model.Pipe, storageDSN string) (*manager, error) {
-	storage, err := storage.NewElasticStorage(storageDSN)
+	s, err := storage.NewElasticStorage(storageDSN)
 	if err != nil {
 		return nil, err
 	}
 
 	m := &manager{
-		storage: storage,
+		storage: s,
 		pipe:    pipe,
 		events:  pubsub.New(10),
 	}
@@ -219,57 +219,6 @@ func (m *manager) processPackage(p *model.Package) {
 
 	order.Build = nil
 	m.composeTask(order)
-}
-
-func (m *manager) logTransfer(order, message string, targets ...string) {
-	logs := make([]storage.Log, len(targets))
-	for i := range targets {
-		// the error message
-		logs[i] = storage.Log{Log: model.Log{
-			Command: model.CommandByManager,
-			Output:  message,
-			Task:    order,
-			Stage:   model.StageTransfer,
-			Time:    model.UnixTime(),
-		}, Target: targets[i]}
-	}
-	err := m.storage.AddLogs(logs)
-	if err != nil {
-		log.Printf("Error storing logs: %s", err)
-		return
-	}
-	m.publishEvent(EventLogs, logs)
-}
-
-func (m *manager) logTransferFatal(order, message string, targets ...string) {
-	log.Println("Fatal order error:", message)
-	logs := make([]storage.Log, 0, len(targets)*2)
-	for i := range targets {
-		// the error message
-		logs = append(logs, storage.Log{Log: model.Log{
-			Command: model.CommandByManager,
-			Output:  message,
-			Task:    order,
-			Stage:   model.StageTransfer,
-			Time:    model.UnixTime(),
-			Error:   true,
-		}, Target: targets[i]})
-		// end flag
-		logs = append(logs, storage.Log{Log: model.Log{
-			Command: model.CommandByManager,
-			Output:  model.StageEnd,
-			Task:    order,
-			Stage:   model.StageTransfer,
-			Time:    model.UnixTime(),
-			Error:   true,
-		}, Target: targets[i]})
-	}
-	err := m.storage.AddLogs(logs)
-	if err != nil {
-		log.Printf("Error storing logs: %s", err)
-		return
-	}
-	m.publishEvent(EventLogs, logs)
 }
 
 func (m *manager) compressSource(orderID string, receivers ...string) ([]byte, error) {
@@ -500,6 +449,57 @@ func (m *manager) processResponse(response *model.Response) {
 	logs := make([]storage.Log, len(response.Logs))
 	for i := range response.Logs {
 		logs[i] = storage.Log{Log: response.Logs[i], Target: response.TargetID}
+	}
+	err := m.storage.AddLogs(logs)
+	if err != nil {
+		log.Printf("Error storing logs: %s", err)
+		return
+	}
+	m.publishEvent(EventLogs, logs)
+}
+
+func (m *manager) logTransfer(order, message string, targets ...string) {
+	logs := make([]storage.Log, len(targets))
+	for i := range targets {
+		// the error message
+		logs[i] = storage.Log{Log: model.Log{
+			Command: model.CommandByManager,
+			Output:  message,
+			Task:    order,
+			Stage:   model.StageTransfer,
+			Time:    model.UnixTime(),
+		}, Target: targets[i]}
+	}
+	err := m.storage.AddLogs(logs)
+	if err != nil {
+		log.Printf("Error storing logs: %s", err)
+		return
+	}
+	m.publishEvent(EventLogs, logs)
+}
+
+func (m *manager) logTransferFatal(order, message string, targets ...string) {
+	log.Println("Fatal order error:", message)
+	logs := make([]storage.Log, 0, len(targets)*2)
+	for i := range targets {
+		// the error message
+		logs = append(logs, storage.Log{Log: model.Log{
+			Command: model.CommandByManager,
+			Output:  message,
+			Task:    order,
+			Stage:   model.StageTransfer,
+			Time:    model.UnixTime(),
+			Error:   true,
+		}, Target: targets[i]})
+		// end flag
+		logs = append(logs, storage.Log{Log: model.Log{
+			Command: model.CommandByManager,
+			Output:  model.StageEnd,
+			Task:    order,
+			Stage:   model.StageTransfer,
+			Time:    model.UnixTime(),
+			Error:   true,
+		}, Target: targets[i]})
 	}
 	err := m.storage.AddLogs(logs)
 	if err != nil {
