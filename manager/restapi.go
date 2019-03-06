@@ -33,6 +33,8 @@ const (
 	_task          = "task"
 	_stage         = "stage"
 	_command       = "command"
+	_output        = "output"
+	_error         = "error"
 	_tags          = "tags"
 	_topics        = "topics"
 	defaultPage    = 1
@@ -270,6 +272,8 @@ func (a *restAPI) getLogs(w http.ResponseWriter, r *http.Request) {
 		_task:    query.Get(_task),
 		_stage:   query.Get(_stage),
 		_command: query.Get(_command),
+		_output:  query.Get(_output),
+		_error:   query.Get(_error),
 		_time:    "",
 	}
 
@@ -292,7 +296,14 @@ func (a *restAPI) getLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logs, total, err := a.manager.getLogs(fields[_target], fields[_task], fields[_stage], fields[_command], sortBy, ascending, page, perPage)
+	logs, total, err := a.manager.getLogs(
+		fields[_target],
+		fields[_task],
+		fields[_stage],
+		fields[_command],
+		fields[_output],
+		fields[_error],
+		sortBy, ascending, page, perPage)
 	if err != nil {
 		HTTPResponseError(w, http.StatusBadRequest, err.Error())
 		return

@@ -26,7 +26,7 @@ type Storage interface {
 	GetTarget(string) (*Target, error)
 	//DeleteTarget(string) error
 	//
-	GetLogs(target, task, stage, command, sortField string, sortAsc bool, from, size int) ([]Log, int64, error)
+	GetLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, from, size int) ([]Log, int64, error)
 	SearchLogs(map[string]interface{}) ([]Log, int64, error)
 	AddLog(*Log) error
 	AddLogs(logs []Log) error
@@ -421,7 +421,7 @@ func (s *storage) GetOrder(id string) (*Order, error) {
 	return nil, nil
 }
 
-func (s *storage) GetLogs(target, task, stage, command, sortField string, sortAsc bool, from, size int) ([]Log, int64, error) {
+func (s *storage) GetLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, from, size int) ([]Log, int64, error) {
 	query := elastic.NewBoolQuery()
 	if target != "" {
 		query.Must(elastic.NewMatchQuery("target", target))
@@ -434,6 +434,12 @@ func (s *storage) GetLogs(target, task, stage, command, sortField string, sortAs
 	}
 	if command != "" {
 		query.Must(elastic.NewMatchQuery("command", command))
+	}
+	if error == "true" {
+		query.Must(elastic.NewMatchQuery("error", error))
+	}
+	if output != "" { // output has text type
+		query.Must(elastic.NewMatchQuery("output", output).Operator("and"))
 	}
 
 	searchResult, err := s.client.Search().Index(indexLog).Type(typeFixed).

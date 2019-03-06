@@ -53,10 +53,10 @@ func (m *manager) addOrder(order *storage.Order) error {
 	order.Created = model.UnixTime()
 
 	// cleanup
-	if len(order.Build.Commands) + len(order.Build.Artifacts) + len(order.Build.Host) == 0 {
+	if len(order.Build.Commands)+len(order.Build.Artifacts)+len(order.Build.Host) == 0 {
 		order.Build = nil
 	}
-	if len(order.Deploy.Install.Commands) + len(order.Deploy.Run.Commands) == 0 {
+	if len(order.Deploy.Install.Commands)+len(order.Deploy.Run.Commands) == 0 {
 		order.Deploy = nil
 	}
 
@@ -152,8 +152,15 @@ func (m *manager) getTarget(id string) (*storage.Target, error) {
 	return target, nil
 }
 
-func (m *manager) getLogs(target, task, stage, command, sortField string, sortAsc bool, page, perPage int) ([]storage.Log, int64, error) {
-	logs, total, err := m.storage.GetLogs(target, task, stage, command, sortField, sortAsc, int((page-1)*perPage), perPage)
+func (m *manager) getLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, page, perPage int) ([]storage.Log, int64, error) {
+	logs, total, err := m.storage.GetLogs(
+		target,
+		task,
+		stage,
+		command,
+		output,
+		error,
+		sortField, sortAsc, int((page-1)*perPage), perPage)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying logs: %s", err)
 	}
