@@ -350,11 +350,17 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 		pending = pendingTemp
 
 		// log the statuses
-		m.logTransfer(task.ID, "delivered", deliveredTemp...)
-		m.logTransfer(task.ID, model.StageEnd, deliveredTemp...)
-		m.logTransfer(task.ID, fmt.Sprintf("not delivered. Attempt %d/%d", attempt, maxAttempt), pendingTemp...)
+		if len(deliveredTemp) > 0 {
+			m.logTransfer(task.ID, "delivered", deliveredTemp...)
+			m.logTransfer(task.ID, model.StageEnd, deliveredTemp...)
+		}
+		if len(pendingTemp) > 0 {
+			m.logTransfer(task.ID, fmt.Sprintf("not delivered. Attempt %d/%d", attempt, maxAttempt), pendingTemp...)
+		}
 	}
-	m.logTransferFatal(task.ID, "unable to deliver", pending...)
+	if len(pending) > 0 {
+		m.logTransferFatal(task.ID, "unable to deliver", pending...)
+	}
 	log.Printf("Task %s/%d received by %d/%d.", task.ID, ann.Type, len(match.List)-len(pending), len(match.List))
 	// TODO
 	// remove the directory
@@ -470,9 +476,6 @@ func (m *manager) processResponse(response *model.Response) {
 }
 
 func (m *manager) logTransfer(order, message string, targets ...string) {
-	if len(targets) == 0 {
-		return
-	}
 	logs := make([]storage.Log, len(targets))
 	for i := range targets {
 		// the error message
@@ -494,9 +497,6 @@ func (m *manager) logTransfer(order, message string, targets ...string) {
 
 func (m *manager) logTransferFatal(order, message string, targets ...string) {
 	log.Println("Fatal order error:", message)
-	if len(targets) == 0 {
-		return
-	}
 	logs := make([]storage.Log, 0, len(targets)*2)
 	for i := range targets {
 		// the error message
