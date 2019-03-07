@@ -299,8 +299,13 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 	}
 
 	backOff := 0
-	for pending := true; pending; {
-		log.Printf("Sending task %s/%d to %s", task.ID, ann.Type, receiverTopics)
+	const maxAttempt = 3
+	pending := make([]string, len(match.List))
+	copy(pending, match.List)
+	m.logTransfer(task.ID, "sending task", match.List...)
+
+	for attempt := 1; attempt <= maxAttempt && len(pending) > 0; attempt++ {
+		log.Printf("Sending task %s/%d to %s Attempt %d/%d", task.ID, ann.Type, receiverTopics, attempt, maxAttempt)
 
 		// send announcement
 		w := model.RequestWrapper{Announcement: &ann}
@@ -319,32 +324,38 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 			return
 		}
 		m.pipe.RequestCh <- model.Message{task.ID, b}
-		m.logTransfer(task.ID, "sent task", match.List...)
+		//m.logTransfer(task.ID, "sent task", match.List...)
 
-		// TODO resend when device is online
-		if backOff < 60 {
-			backOff += 10
-		}
+		// TODO resend when device is online?
+		backOff += 10
 		time.Sleep(time.Duration(backOff) * time.Second)
 
-		pending = false
-		for _, target := range match.List {
+		var pendingTemp, deliveredTemp []string
+		for _, target := range pending {
 			delivered, err := m.storage.DeliveredTask(target, task.ID)
 			if err != nil {
-				log.Printf("Error searching for delivered task: %s", err)
 				m.logTransferFatal(task.ID, fmt.Sprintf("error searching for delivered task: %s", err), target)
 				break
 			}
+
 			if delivered {
 				log.Printf("Task %s/%d delivered to %s", task.ID, ann.Type, target)
-				m.logTransfer(task.ID, model.StageEnd, target) // TODO send this as soon as a log message is received?
+				// this can also be done at log reception but at the cost of checking every log
+				deliveredTemp = append(deliveredTemp, target)
 			} else {
-				pending = true
-				break
+
+				pendingTemp = append(pendingTemp, target)
 			}
 		}
+		pending = pendingTemp
+
+		// log the statuses
+		m.logTransfer(task.ID, "delivered", deliveredTemp...)
+		m.logTransfer(task.ID, model.StageEnd, deliveredTemp...)
+		m.logTransfer(task.ID, fmt.Sprintf("not delivered. Attempt %d/%d", attempt, maxAttempt), pendingTemp...)
 	}
-	log.Printf("Task %s/%d received by all.", task.ID, ann.Type)
+	m.logTransferFatal(task.ID, "unable to deliver", pending...)
+	log.Printf("Task %s/%d received by %d/%d.", task.ID, ann.Type, len(match.List)-len(pending), len(match.List))
 	// TODO
 	// remove the directory
 }
@@ -459,6 +470,9 @@ func (m *manager) processResponse(response *model.Response) {
 }
 
 func (m *manager) logTransfer(order, message string, targets ...string) {
+	if len(targets) == 0 {
+		return
+	}
 	logs := make([]storage.Log, len(targets))
 	for i := range targets {
 		// the error message
@@ -480,6 +494,9 @@ func (m *manager) logTransfer(order, message string, targets ...string) {
 
 func (m *manager) logTransferFatal(order, message string, targets ...string) {
 	log.Println("Fatal order error:", message)
+	if len(targets) == 0 {
+		return
+	}
 	logs := make([]storage.Log, 0, len(targets)*2)
 	for i := range targets {
 		// the error message
