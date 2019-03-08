@@ -30,25 +30,35 @@ func (r *runner) run(commands []string, taskID string, debug bool) {
 	}
 
 	log.Printf("runner: Running task: %s", taskID)
-	r.sendLog(taskID, model.StageStart, false, model.UnixTime(), debug)
-	defer func() { r.sendLog(taskID, model.StageEnd, false, model.UnixTime(), debug) }()
+	r.sendLog(taskID, model.StageStart, false, debug)
 
+	errCh := make(chan bool, len(commands))
 	// run in parallel and wait for them to finish
 	for i, command := range commands {
 		r.executors[i] = newExecutor(taskID, model.StageRun, r.logger, debug)
 		r.wg.Add(1)
 		go func(c string, e *executor) {
 			defer r.wg.Done()
-			e.execute(c)
+			errCh <- e.execute(c)
 		}(command, r.executors[i])
 	}
 	r.wg.Wait()
+	close(errCh)
 
+	var endErr bool
+	for err := range errCh {
+		if err {
+			endErr = true
+			break
+		}
+	}
+
+	r.sendLog(taskID, model.StageEnd, endErr, debug)
 	log.Println("runner: All processes are ended.")
 }
 
-func (r *runner) sendLog(task, output string, error bool, time model.UnixTimeType, debug bool) {
-	r.logger.Send(&model.Log{task, model.StageRun, model.CommandByAgent, output, error, time, debug})
+func (r *runner) sendLog(task, output string, error bool, debug bool) {
+	r.logger.Send(&model.Log{task, model.StageRun, model.CommandByAgent, output, error, model.UnixTime(), debug})
 }
 
 func (r *runner) stop() bool {

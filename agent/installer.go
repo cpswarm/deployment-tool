@@ -18,12 +18,12 @@ func newInstaller(logger Logger) installer {
 }
 
 func (i *installer) install(commands []string, mode, taskID string, debug bool) bool {
-	i.sendLog(mode, taskID, model.StageStart, false, debug)
+	//i.sendLog(mode, taskID, model.StageStart, false, debug)
 
 	// nothing to execute
 	if len(commands) == 0 {
 		log.Printf("installer: Nothing to execute.")
-		i.sendLog(mode, taskID, model.StageEnd, false, debug)
+		//i.sendLog(mode, taskID, model.StageEnd, false, debug)
 		return true
 	}
 
@@ -40,7 +40,9 @@ func (i *installer) install(commands []string, mode, taskID string, debug bool) 
 	}
 
 	log.Printf("installer: Install ended.")
-	i.sendLog(mode, taskID, model.StageEnd, false, debug)
+	if mode == model.StageInstall {
+		i.sendLog(mode, taskID, model.StageEnd, false, debug)
+	}
 	return true
 }
 

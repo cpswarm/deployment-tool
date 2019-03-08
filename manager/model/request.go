@@ -8,10 +8,9 @@ const (
 	RequestTargetID  = "ID"
 	RequestTargetTag = "TAG"
 	// Stage types
-	StageBuild    = "build"
-	StageTransfer = "transfer"
-	StageInstall  = "install"
-	StageRun      = "run"
+	StageBuild   = "build"
+	StageInstall = "install"
+	StageRun     = "run"
 	// Topic consts
 	PrefixSeparator = "-"
 	// Task types

@@ -14,19 +14,19 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func (a *agent) sendLog(task, output string, error bool, debug bool) {
-	a.logger.Send(&model.Log{task, model.StageTransfer, model.CommandByAgent, output, error, model.UnixTime(), debug})
+func (a *agent) sendLog(task, stage, output string, error bool, debug bool) {
+	a.logger.Send(&model.Log{task, stage, model.CommandByAgent, output, error, model.UnixTime(), debug})
 }
 
-func (a *agent) sendLogFatal(task, output string) {
+func (a *agent) sendLogFatal(task, stage, output string) {
 	log.Printf("transfer: %s", output)
 	if output != "" {
-		a.sendLog(task, output, true, true)
+		a.sendLog(task, stage, output, true, true)
 	}
-	a.sendLog(task, model.StageEnd, true, true)
+	a.sendLog(task, stage, model.StageEnd, true, true)
 }
 
-func (a *agent) saveArtifacts(artifacts []byte, taskID string, debug bool) error {
+func (a *agent) saveArtifacts(artifacts []byte, taskID, stage string, debug bool) error {
 	defer func() {
 		artifacts = nil // release memory
 	}()
@@ -57,7 +57,7 @@ func (a *agent) saveArtifacts(artifacts []byte, taskID string, debug bool) error
 	if err != nil {
 		return fmt.Errorf("error reading archive: %s", err)
 	}
-	a.sendLog(taskID, fmt.Sprintf("decompressed archive of %d bytes", len(artifacts)), false, debug)
+	a.sendLog(taskID, stage, fmt.Sprintf("decompressed archive of %d bytes", len(artifacts)), false, debug)
 
 	return nil
 }

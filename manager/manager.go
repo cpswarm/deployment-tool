@@ -197,53 +197,60 @@ func (m *manager) processPackage(p *model.Package) {
 	*/
 	defer recovery()
 	log.Println("processPackage", p.Task, p.Assembler, len(p.Payload))
-	m.logTransfer(p.Task, fmt.Sprintf("received package sized %d bytes", len(p.Payload)), p.Assembler)
+	m.storeLog(p.Task, model.StageBuild, fmt.Sprintf("received package sized %d bytes", len(p.Payload)), false, p.Assembler)
 
-	err := model.DecompressFiles(p.Payload, fmt.Sprintf("%s/%s/%s", source.OrdersDir, p.Task, source.PackageDir))
+	err := m.decompressPackage(p.Task, p.Payload)
 	if err != nil {
-		m.logTransferFatal(p.Task, "error decompressing assembled package", p.Assembler)
+		m.storeLogFatal(p.Task, model.StageBuild, "error decompressing assembled package", p.Assembler)
 		return
 	}
 
 	order, err := m.storage.GetOrder(p.Task)
 	if err != nil {
-		m.logTransferFatal(p.Task, fmt.Sprintf("error querying order: %s", err), p.Assembler)
+		m.storeLogFatal(p.Task, model.StageBuild, fmt.Sprintf("error querying order: %s", err), p.Assembler)
 		return
 	}
 
 	if order.Deploy == nil {
-		m.logTransfer(p.Task, fmt.Sprintf("no deployment instructions for package"), p.Assembler)
+		m.storeLogFatal(p.Task, model.StageBuild, fmt.Sprintf("no deployment instructions for package"), p.Assembler)
 		log.Println("No deployment instructions for package.")
 		return
 	}
+
+	m.storeLog(p.Task, model.StageBuild, model.StageEnd, false, p.Assembler)
 
 	order.Build = nil
 	m.composeTask(order)
 }
 
-func (m *manager) compressSource(orderID string, receivers ...string) ([]byte, error) {
+func (m *manager) compressSource(orderID string) ([]byte, error) {
 	if path := m.sourcePath(orderID); path != "" {
 		compressedArchive, err := model.CompressFiles(path)
 		if err != nil {
 			return nil, err
 		}
-		m.logTransfer(orderID, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), receivers...)
 		return compressedArchive, nil
 	}
-	m.logTransfer(orderID, "no source files to transfer", receivers...)
 	return nil, nil
+}
+
+func (m *manager) decompressPackage(orderID string, archive []byte) error {
+	return model.DecompressFiles(archive, fmt.Sprintf("%s/%s/%s", source.OrdersDir, orderID, source.PackageDir))
 }
 
 func (m *manager) composeTask(order *storage.Order) {
 	defer recovery()
 	// a single order can result in two tasks: build and deploy
 	if order.Build != nil {
-		m.logTransfer(order.ID, model.StageStart, order.Build.Host)
+		m.storeLog(order.ID, model.StageBuild, model.StageStart, false, order.Build.Host)
 
-		compressedArchive, err := m.compressSource(order.ID, order.Build.Host)
+		compressedArchive, err := m.compressSource(order.ID)
 		if err != nil {
-			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), order.Build.Host)
+			m.storeLogFatal(order.ID, model.StageBuild, fmt.Sprintf("error compressing files: %s", err), order.Build.Host)
 			return
+		}
+		if len(compressedArchive) > 0 {
+			m.storeLog(order.ID, model.StageBuild, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), false, order.Build.Host)
 		}
 
 		task := model.Task{
@@ -253,18 +260,21 @@ func (m *manager) composeTask(order *storage.Order) {
 		}
 		err = task.Validate()
 		if err != nil {
-			m.logTransferFatal(order.ID, fmt.Sprintf("invalid task: %s", err), order.Build.Host)
+			m.storeLogFatal(order.ID, model.StageBuild, fmt.Sprintf("invalid task: %s", err), order.Build.Host)
 			return
 		}
 
 		match := storage.Match{IDs: []string{order.Build.Host}, List: []string{order.Build.Host}} // just one device
 		m.sendTask(&task, match)
 	} else {
-		m.logTransfer(order.ID, model.StageStart, order.Deploy.Match.List...)
+		m.storeLog(order.ID, model.StageInstall, model.StageStart, false, order.Deploy.Match.List...)
 
-		compressedArchive, err := m.compressSource(order.ID, order.Deploy.Match.List...)
+		compressedArchive, err := m.compressSource(order.ID)
 		if err != nil {
-			m.logTransferFatal(order.ID, fmt.Sprintf("error compressing files: %s", err), order.Deploy.Match.List...)
+			m.storeLogFatal(order.ID, model.StageInstall, fmt.Sprintf("error compressing files: %s", err), order.Deploy.Match.List...)
+		}
+		if len(compressedArchive) > 0 {
+			m.storeLog(order.ID, model.StageInstall, fmt.Sprintf("compressed to %d bytes", len(compressedArchive)), false, order.Deploy.Match.List...)
 		}
 
 		task := model.Task{
@@ -274,7 +284,7 @@ func (m *manager) composeTask(order *storage.Order) {
 		}
 		err = task.Validate()
 		if err != nil {
-			m.logTransferFatal(order.ID, fmt.Sprintf("invalid task: %s", err), order.Deploy.Match.List...)
+			m.storeLogFatal(order.ID, model.StageInstall, fmt.Sprintf("invalid task: %s", err), order.Deploy.Match.List...)
 			return
 		}
 
@@ -292,20 +302,23 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 		Size:   len(task.Artifacts),
 	}
 
+	var stage string
 	if task.Build != nil {
 		ann.Type = model.TaskTypeBuild
+		stage = model.StageBuild
 	} else {
 		ann.Type = model.TaskTypeDeploy
+		stage = model.StageInstall
 	}
 
 	backOff := 0
 	const maxAttempt = 3
 	pending := make([]string, len(match.List))
 	copy(pending, match.List)
-	m.logTransfer(task.ID, "sending task", match.List...)
+	m.storeLog(task.ID, stage, "sending task", false, match.List...)
 
 	for attempt := 1; attempt <= maxAttempt; attempt++ {
-		log.Printf("Sending task %s/%d to %s Attempt %d/%d", task.ID, ann.Type, receiverTopics, attempt, maxAttempt)
+		//log.Printf("Sending task %s/%d to %s Attempt %d/%d", task.ID, ann.Type, receiverTopics, attempt, maxAttempt)
 
 		// send announcement
 		w := model.RequestWrapper{Announcement: &ann}
@@ -320,7 +333,7 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 		// send actual task
 		b, err := json.Marshal(&task)
 		if err != nil {
-			m.logTransferFatal(task.ID, fmt.Sprintf("error serializing task: %s", err), match.List...)
+			m.storeLogFatal(task.ID, stage, fmt.Sprintf("error serializing task: %s", err), match.List...)
 			return
 		}
 		m.pipe.RequestCh <- model.Message{task.ID, b}
@@ -332,24 +345,26 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 
 		var pendingTemp []string
 		for _, target := range pending {
+			// TODO this doesn't check which part of the task was delivered!!
 			delivered, err := m.storage.DeliveredTask(target, task.ID)
 			if err != nil {
-				m.logTransferFatal(task.ID, fmt.Sprintf("error searching for delivered task: %s", err), target)
+				m.storeLogFatal(task.ID, stage, fmt.Sprintf("error searching for delivered task: %s", err), target)
 				break
 			}
 			if !delivered {
-				log.Printf("Task %s/%d not delivered to %s", task.ID, ann.Type, target)
+				log.Printf("send attempt %d/%d: Unable to deliver %s/%d to %s", attempt, maxAttempt, task.ID, ann.Type, target)
 				pendingTemp = append(pendingTemp, target)
 			}
 		}
-		if len(pendingTemp) == 0 {
+		pending = pendingTemp
+
+		if len(pending) == 0 {
 			break
 		}
-		m.logTransfer(task.ID, fmt.Sprintf("not delivered. Attempt %d/%d", attempt, maxAttempt), pendingTemp...)
-		pending = pendingTemp
+		m.storeLog(task.ID, stage, fmt.Sprintf("not delivered. Attempt %d/%d", attempt, maxAttempt), false, pending...)
 	}
 	if len(pending) > 0 {
-		m.logTransferFatal(task.ID, "unable to deliver", pending...)
+		m.storeLogFatal(task.ID, stage, "unable to deliver", pending...)
 	}
 	log.Printf("Task %s/%d received by %d/%d.", task.ID, ann.Type, len(match.List)-len(pending), len(match.List))
 	// TODO
@@ -465,15 +480,17 @@ func (m *manager) processResponse(response *model.Response) {
 	m.publishEvent(EventLogs, logs)
 }
 
-func (m *manager) logTransfer(order, message string, targets ...string) {
+func (m *manager) storeLog(order, stage, message string, error bool, targets ...string) {
 	logs := make([]storage.Log, len(targets))
+	time := model.UnixTime()
 	for i := range targets {
 		logs[i] = storage.Log{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  message,
 			Task:    order,
-			Stage:   model.StageTransfer,
-			Time:    model.UnixTime(),
+			Stage:   stage,
+			Error:   error,
+			Time:    time,
 		}, Target: targets[i]}
 	}
 	err := m.storage.AddLogs(logs)
@@ -484,35 +501,10 @@ func (m *manager) logTransfer(order, message string, targets ...string) {
 	m.publishEvent(EventLogs, logs)
 }
 
-func (m *manager) logTransferFatal(order, message string, targets ...string) {
+func (m *manager) storeLogFatal(order, stage, message string, targets ...string) {
 	log.Println("Fatal order error:", message)
-	logs := make([]storage.Log, 0, len(targets)*2)
-	for i := range targets {
-		// the error message
-		logs = append(logs, storage.Log{Log: model.Log{
-			Command: model.CommandByManager,
-			Output:  message,
-			Task:    order,
-			Stage:   model.StageTransfer,
-			Time:    model.UnixTime(),
-			Error:   true,
-		}, Target: targets[i]})
-		// end flag
-		logs = append(logs, storage.Log{Log: model.Log{
-			Command: model.CommandByManager,
-			Output:  model.StageEnd,
-			Task:    order,
-			Stage:   model.StageTransfer,
-			Time:    model.UnixTime(),
-			Error:   true,
-		}, Target: targets[i]})
-	}
-	err := m.storage.AddLogs(logs)
-	if err != nil {
-		log.Printf("Error storing logs: %s", err)
-		return
-	}
-	m.publishEvent(EventLogs, logs)
+	m.storeLog(order, stage, message, true, targets...)
+	m.storeLog(order, stage, model.StageEnd, true, targets...)
 }
 
 func (m *manager) publishEvent(topic string, payload interface{}) {

@@ -157,19 +157,26 @@ func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 		return
 	}
 
+	var stage string
+	if taskA.Type == model.TaskTypeBuild {
+		stage = model.StageBuild
+	} else {
+		stage = model.StageInstall
+	}
+
 	log.Printf("Received announcement %s/%d", taskA.ID, taskA.Type)
 	a.target.TaskHistory[taskA.ID] = taskA.Type
 	a.saveState()
 
-	a.sendLog(taskA.ID, model.StageStart, false, taskA.Debug)
-	a.sendLog(taskA.ID, "received announcement", false, taskA.Debug)
+	//a.sendLog(taskA.ID, stage, model.StageStart, false, taskA.Debug)
+	a.sendLog(taskA.ID, stage, "received announcement", false, taskA.Debug)
 
 	if a.assessAnnouncement(taskA) {
 		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
-		a.sendLog(taskA.ID, "subscribed to task", false, taskA.Debug)
+		a.sendLog(taskA.ID, stage, "subscribed to task", false, taskA.Debug)
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
-		a.sendLogFatal(taskA.ID, "not enough memory")
+		a.sendLogFatal(taskA.ID, stage, "not enough memory")
 		return
 	}
 }
@@ -189,14 +196,21 @@ func (a *agent) handleTask(payload []byte) {
 	payload = nil // to release memory
 	//runtime.GC() ?
 
+	var stage string
+	if task.Build != nil {
+		stage = model.StageBuild
+	} else {
+		stage = model.StageInstall
+	}
+
 	log.Printf("Received task: %s", task.ID)
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendLog(task.ID, "received task and unsubscribed", false, task.Debug)
+	a.sendLog(task.ID, stage, "received task and unsubscribed", false, task.Debug)
 
-	err = a.saveArtifacts(task.Artifacts, task.ID, task.Debug)
+	err = a.saveArtifacts(task.Artifacts, task.ID, stage, task.Debug)
 	if err != nil {
-		a.sendLogFatal(task.ID, err.Error())
+		a.sendLogFatal(task.ID, stage, err.Error())
 		return
 	}
 
@@ -204,12 +218,12 @@ func (a *agent) handleTask(payload []byte) {
 		a.build(task.Build, task.ID, task.Debug)
 		return
 	}
-	a.sendLog(task.ID, model.StageEnd, false, task.Debug)
+	//a.sendLog(task.ID, model.StageEnd, false, task.Debug)
 
 	success := a.installer.install(task.Deploy.Install.Commands, model.StageInstall, task.ID, task.Debug)
 	if success {
-		a.runner.stop()             // stop runner for old task
-		a.removeOtherTasks(task.ID) // remove old task files
+		a.runner.stop()              // stop runner for old task
+		a.removeOtherTasks(task.ID)  // remove old task files
 		a.target.TaskRun = task.Deploy.Run.Commands
 		a.target.TaskRunAutoRestart = task.Deploy.Run.AutoRestart
 		a.target.TaskID = task.ID
@@ -234,19 +248,19 @@ func (a *agent) build(build *model.Build, taskID string, debug bool) {
 		}
 		compressed, err := model.CompressFiles(paths...)
 		if err != nil {
-			a.sendLogFatal(taskID, fmt.Sprintf("error compressing package: %s", err))
+			a.sendLogFatal(taskID, model.StageBuild, fmt.Sprintf("error compressing package: %s", err))
 			return
 		}
-		a.sendLog(taskID, fmt.Sprintf("compressed built package to %d bytes", len(compressed)), false, debug)
+		a.sendLog(taskID, model.StageBuild, fmt.Sprintf("compressed built package to %d bytes", len(compressed)), false, debug)
 
 		b, err := json.Marshal(model.Package{a.target.ID, taskID, compressed})
 		if err != nil {
-			a.sendLogFatal(taskID, fmt.Sprintf("error serializing package: %s", err))
+			a.sendLogFatal(taskID, model.StageBuild, fmt.Sprintf("error serializing package: %s", err))
 			return
 		}
 		a.pipe.ResponseCh <- model.Message{model.ResponsePackage, b}
-		a.sendLog(taskID, fmt.Sprintf("sent built package"), false, debug)
-		a.sendLog(taskID, model.StageEnd, false, debug)
+		a.sendLog(taskID, model.StageBuild, fmt.Sprintf("sent built package"), false, debug)
+		//a.sendLog(taskID, model.StageBuild, model.StageEnd, false, debug)
 		// TODO add guaranty of delivery
 	}
 }
