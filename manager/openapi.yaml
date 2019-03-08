@@ -42,7 +42,7 @@ paths:
     get:
       tags:
         - orders
-      summary: retrieves list of orders
+      summary: retrieves list of orders sorted descendingly by creation time
       parameters:
         - $ref: "#/components/parameters/page"
         - $ref: "#/components/parameters/perPage"
@@ -382,5 +382,5 @@ components:
       schema:
         type: string
         enum: [asc, desc]
-        default: asc
+        default: desc
       description: The sorting order
