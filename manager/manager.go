@@ -330,7 +330,7 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 		backOff += 10
 		time.Sleep(time.Duration(backOff) * time.Second)
 
-		var pendingTemp, deliveredTemp []string
+		var pendingTemp []string
 		for _, target := range pending {
 			delivered, err := m.storage.DeliveredTask(target, task.ID)
 			if err != nil {
@@ -341,7 +341,7 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 			if delivered {
 				log.Printf("Task %s/%d delivered to %s", task.ID, ann.Type, target)
 				// this can also be done at log reception but at the cost of checking every log
-				deliveredTemp = append(deliveredTemp, target)
+				//deliveredTemp = append(deliveredTemp, target)
 			} else {
 
 				pendingTemp = append(pendingTemp, target)
@@ -350,10 +350,10 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 		pending = pendingTemp
 
 		// log the statuses
-		if len(deliveredTemp) > 0 {
-			m.logTransfer(task.ID, "delivered", deliveredTemp...)
-			m.logTransfer(task.ID, model.StageEnd, deliveredTemp...)
-		}
+		//if len(deliveredTemp) > 0 {
+		//	m.logTransfer(task.ID, "delivered", deliveredTemp...)
+		//	m.logTransfer(task.ID, model.StageEnd, deliveredTemp...)
+		//}
 		if len(pendingTemp) > 0 {
 			m.logTransfer(task.ID, fmt.Sprintf("not delivered. Attempt %d/%d", attempt, maxAttempt), pendingTemp...)
 		}
@@ -478,7 +478,6 @@ func (m *manager) processResponse(response *model.Response) {
 func (m *manager) logTransfer(order, message string, targets ...string) {
 	logs := make([]storage.Log, len(targets))
 	for i := range targets {
-		// the error message
 		logs[i] = storage.Log{Log: model.Log{
 			Command: model.CommandByManager,
 			Output:  message,
