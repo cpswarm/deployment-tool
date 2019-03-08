@@ -304,7 +304,7 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 	copy(pending, match.List)
 	m.logTransfer(task.ID, "sending task", match.List...)
 
-	for attempt := 1; attempt <= maxAttempt && len(pending) > 0; attempt++ {
+	for attempt := 1; attempt <= maxAttempt; attempt++ {
 		log.Printf("Sending task %s/%d to %s Attempt %d/%d", task.ID, ann.Type, receiverTopics, attempt, maxAttempt)
 
 		// send announcement
@@ -337,26 +337,16 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 				m.logTransferFatal(task.ID, fmt.Sprintf("error searching for delivered task: %s", err), target)
 				break
 			}
-
-			if delivered {
-				log.Printf("Task %s/%d delivered to %s", task.ID, ann.Type, target)
-				// this can also be done at log reception but at the cost of checking every log
-				//deliveredTemp = append(deliveredTemp, target)
-			} else {
-
+			if !delivered {
+				log.Printf("Task %s/%d not delivered to %s", task.ID, ann.Type, target)
 				pendingTemp = append(pendingTemp, target)
 			}
 		}
-		pending = pendingTemp
-
-		// log the statuses
-		//if len(deliveredTemp) > 0 {
-		//	m.logTransfer(task.ID, "delivered", deliveredTemp...)
-		//	m.logTransfer(task.ID, model.StageEnd, deliveredTemp...)
-		//}
-		if len(pendingTemp) > 0 {
-			m.logTransfer(task.ID, fmt.Sprintf("not delivered. Attempt %d/%d", attempt, maxAttempt), pendingTemp...)
+		if len(pendingTemp) == 0 {
+			break
 		}
+		m.logTransfer(task.ID, fmt.Sprintf("not delivered. Attempt %d/%d", attempt, maxAttempt), pendingTemp...)
+		pending = pendingTemp
 	}
 	if len(pending) > 0 {
 		m.logTransferFatal(task.ID, "unable to deliver", pending...)
