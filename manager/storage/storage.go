@@ -386,7 +386,7 @@ func (s *storage) AddOrder(order *Order) error {
 
 func (s *storage) GetOrders(from, size int) ([]Order, int64, error) {
 	searchResult, err := s.client.Search().Index(indexOrder).Type(typeFixed).
-		Sort("id", true).From(from).Size(size).Do(s.ctx)
+		Sort("createdAt", false).From(from).Size(size).Do(s.ctx)
 	if err != nil {
 		return nil, 0, err
 	}

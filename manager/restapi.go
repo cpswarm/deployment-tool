@@ -22,23 +22,24 @@ import (
 
 const (
 	// query parameter key/values
-	_page          = "page"
-	_perPage       = "perPage"
-	_sortBy        = "sortBy"
-	_sortOrder     = "sortOrder"
-	_asc           = "asc"
-	_desc          = "desc"
-	_time          = "time"
-	_target        = "target"
-	_task          = "task"
-	_stage         = "stage"
-	_command       = "command"
-	_output        = "output"
-	_error         = "error"
-	_tags          = "tags"
-	_topics        = "topics"
-	defaultPage    = 1
-	defaultPerPage = 100
+	_page            = "page"
+	_perPage         = "perPage"
+	_sortBy          = "sortBy"
+	_sortOrder       = "sortOrder"
+	_asc             = "asc"
+	_desc            = "desc"
+	_time            = "time"
+	_target          = "target"
+	_task            = "task"
+	_stage           = "stage"
+	_command         = "command"
+	_output          = "output"
+	_error           = "error"
+	_tags            = "tags"
+	_topics          = "topics"
+	defaultPage      = 1
+	defaultPerPage   = 100
+	defaultSortOrder = _desc
 )
 
 type restAPI struct {
@@ -427,7 +428,10 @@ func parsePagingAttributes(query url.Values) (page int, perPage int, err error) 
 
 func parseSortingParameters(query url.Values) (sortBy string, ascending bool, err error) {
 	sortBy, order := query.Get(_sortBy), query.Get(_sortOrder)
-	if order == "" || order == _asc {
+	if order == "" {
+		order = defaultSortOrder
+	}
+	if order == _asc {
 		return sortBy, true, nil
 	} else if order == _desc {
 		return sortBy, false, nil
