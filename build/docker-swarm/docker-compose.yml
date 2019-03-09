@@ -1,9 +1,0 @@
-version: '3'
-
-services:
-  agent:
-    image: agent-sa
-    env_file:
-      - config.env
-    deploy:
-      replicas: 2
