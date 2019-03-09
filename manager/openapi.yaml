@@ -2,7 +2,7 @@ openapi: 3.0.0
 
 info:
   description: The API of Deployment Tool (Manager)
-  version: "0.6.1"
+  version: "0.6.2"
   title: Deployment Tool REST API
   contact:
     name: Source Code
@@ -42,8 +42,9 @@ paths:
     get:
       tags:
         - orders
-      summary: retrieves list of orders sorted descendingly by creation time
+      summary: retrieves list of orders sorted by creation time
       parameters:
+        - $ref: "#/components/parameters/sortOrder"
         - $ref: "#/components/parameters/page"
         - $ref: "#/components/parameters/perPage"
       responses:
@@ -382,5 +383,5 @@ components:
       schema:
         type: string
         enum: [asc, desc]
-        default: desc
+        default: asc
       description: The sorting order

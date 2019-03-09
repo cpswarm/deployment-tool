@@ -39,7 +39,7 @@ const (
 	_topics          = "topics"
 	defaultPage      = 1
 	defaultPerPage   = 100
-	defaultSortOrder = _desc
+	defaultSortOrder = _asc
 )
 
 type restAPI struct {
@@ -172,7 +172,13 @@ func (a *restAPI) getOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, total, err := a.manager.getOrders(page, perPage)
+	_, ascending, err := parseSortingParameters(query)
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	orders, total, err := a.manager.getOrders(ascending, page, perPage)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return

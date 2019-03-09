@@ -13,7 +13,7 @@ import (
 )
 
 type Storage interface {
-	GetOrders(from, size int) ([]Order, int64, error)
+	GetOrders(sortAsc bool, from, size int) ([]Order, int64, error)
 	AddOrder(*Order) error
 	GetOrder(string) (*Order, error)
 	//DeleteOrder(string) error
@@ -384,9 +384,9 @@ func (s *storage) AddOrder(order *Order) error {
 	return nil
 }
 
-func (s *storage) GetOrders(from, size int) ([]Order, int64, error) {
+func (s *storage) GetOrders(sortAsc bool, from, size int) ([]Order, int64, error) {
 	searchResult, err := s.client.Search().Index(indexOrder).Type(typeFixed).
-		Sort("createdAt", false).From(from).Size(size).Do(s.ctx)
+		Sort("createdAt", sortAsc).From(from).Size(size).Do(s.ctx)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -120,8 +120,8 @@ func (m *manager) newTaskID() string {
 	return uuid.NewV4().String()
 }
 
-func (m *manager) getOrders(page, perPage int) ([]storage.Order, int64, error) {
-	orders, total, err := m.storage.GetOrders(int((page-1)*perPage), perPage)
+func (m *manager) getOrders(sortAsc bool, page, perPage int) ([]storage.Order, int64, error) {
+	orders, total, err := m.storage.GetOrders(sortAsc, int((page-1)*perPage), perPage)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying orders: %s", err)
 	}
