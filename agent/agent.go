@@ -206,7 +206,7 @@ func (a *agent) handleTask(payload []byte) {
 	log.Printf("Received task: %s", task.ID)
 
 	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
-	a.sendLog(task.ID, stage, "received task and unsubscribed", false, task.Debug)
+	a.sendLog(task.ID, stage, "received task", false, true)
 
 	err = a.saveArtifacts(task.Artifacts, task.ID, stage, task.Debug)
 	if err != nil {
@@ -222,8 +222,8 @@ func (a *agent) handleTask(payload []byte) {
 
 	success := a.installer.install(task.Deploy.Install.Commands, model.StageInstall, task.ID, task.Debug)
 	if success {
-		a.runner.stop()              // stop runner for old task
-		a.removeOtherTasks(task.ID)  // remove old task files
+		a.runner.stop()             // stop runner for old task
+		a.removeOtherTasks(task.ID) // remove old task files
 		a.target.TaskRun = task.Deploy.Run.Commands
 		a.target.TaskRunAutoRestart = task.Deploy.Run.AutoRestart
 		a.target.TaskID = task.ID
