@@ -310,6 +310,22 @@ func (a *restAPI) getLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Get("Accept") == "text/plain" {
+		_, err = w.Write([]byte(fmt.Sprintf("page: %d, perPage: %d, total: %d\n", page, perPage, total)))
+		if err != nil {
+			HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		for _, l := range logs {
+			_, err = w.Write([]byte(fmt.Sprintln(l.Time, l.Target, l.Task, l.Stage, l.Command, l.Output, l.Error)))
+			if err != nil {
+				HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+		return
+	}
+
 	b, err := json.Marshal(&list{total, logs, page, perPage})
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
