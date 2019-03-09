@@ -41,12 +41,18 @@ type Log struct {
 	Debug   bool         `json:"-"`
 }
 
+type Location struct {
+	Lat float64 `json:"lat"`
+	Lon float64 `json:"lon"`
+}
+
 type TargetBase struct {
 	// omitempty for all fields to allow patch updates
-	ID   string   `json:"id,omitempty"`
-	Tags []string `json:"tags,omitempty"`
-	//Location?
+	ID       string    `json:"id,omitempty"`
+	Tags     []string  `json:"tags,omitempty"`
+	Location *Location `json:"location,omitempty"`
 }
+
 type Target struct {
 	TargetBase
 	AutoGenID string `json:"autoID,omitempty"`

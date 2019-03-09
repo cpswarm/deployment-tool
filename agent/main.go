@@ -46,7 +46,10 @@ func main() {
 	WorkDir, _ = os.Getwd()
 	log.Printf("Workdir: %s", WorkDir)
 
-	agent := startAgent()
+	agent, err := startAgent()
+	if err != nil {
+		log.Fatalf("Error starting agent: %s", err)
+	}
 	defer agent.close()
 
 	subEndpoint, pubEndpoint := endpoints()

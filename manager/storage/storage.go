@@ -59,16 +59,17 @@ type mappingProp struct {
 }
 
 const (
-	envElasticDebug = "DEBUG_ELASTIC"
-	indexTarget     = "target"
-	indexOrder      = "order"
-	indexLog        = "log"
-	typeFixed       = "_doc"
-	mappingStrict   = "strict"
-	propTypeKeyword = "keyword"
-	propTypeDate    = "date"
-	propTypeText    = "text"
-	propTypeBool    = "boolean"
+	envElasticDebug  = "DEBUG_ELASTIC"
+	indexTarget      = "target"
+	indexOrder       = "order"
+	indexLog         = "log"
+	typeFixed        = "_doc"
+	mappingStrict    = "strict"
+	propTypeKeyword  = "keyword"
+	propTypeDate     = "date"
+	propTypeText     = "text"
+	propTypeBool     = "boolean"
+	propTypeGeoPoint = "geo_point"
 )
 
 func NewElasticStorage(url string) (Storage, error) {
@@ -107,6 +108,7 @@ func NewElasticStorage(url string) (Storage, error) {
 	m.Mappings.Doc.Prop = map[string]mappingProp{
 		"id":           {Type: propTypeKeyword},
 		"tags":         {Type: propTypeKeyword}, // array
+		"location":     {Type: propTypeGeoPoint},
 		"updatedAt":    {Type: propTypeDate},
 		"logRequestAt": {Type: propTypeDate},
 	}

@@ -33,14 +33,17 @@ type agent struct {
 // 	make two objects to hold active and pending tasks along with their resources
 // 	active task should be persisted for recovery
 
-func startAgent() *agent {
+func startAgent() (*agent, error) {
 
 	a := &agent{
 		pipe:         model.NewPipe(),
 		disconnected: make(chan bool),
 	}
 	a.target.TaskHistory = make(map[string]uint8)
-	a.loadConf()
+	err := a.loadConf()
+	if err != nil {
+		return nil, fmt.Errorf("error loading conf: %s", err)
+	}
 
 	a.logger = NewLogger(a.target.ID, a.target.TaskDebug, a.pipe.ResponseCh)
 	a.runner = newRunner(a.logger)
@@ -52,7 +55,7 @@ func startAgent() *agent {
 	}
 
 	go a.startWorker()
-	return a
+	return a, nil
 }
 
 func (a *agent) startWorker() {
@@ -119,10 +122,11 @@ func (a *agent) connected() {
 
 func (a *agent) sendAdvertisement() {
 	t := model.TargetBase{
-		ID:   a.target.ID,
-		Tags: a.target.Tags,
+		ID:       a.target.ID,
+		Tags:     a.target.Tags,
+		Location: a.target.Location,
 	}
-	log.Println("Sent adv:", t.ID, t.Tags)
+	log.Println("Sent adv:", t.ID, t.Tags, t.Location)
 	b, _ := json.Marshal(t)
 	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 }

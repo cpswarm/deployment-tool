@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
@@ -90,7 +91,7 @@ func (*agent) removeOtherTasks(taskID string) {
 	}
 }
 
-func (a *agent) loadConf() {
+func (a *agent) loadConf() error {
 	err := a.loadState()
 	if err != nil {
 		log.Printf("Error loading state file: %s. Starting fresh.", DefaultStateFile)
@@ -128,9 +129,30 @@ func (a *agent) loadConf() {
 		changed = true
 	}
 
+	latString := os.Getenv("LOCATION_LAT")
+	lonString := os.Getenv("LOCATION_LON")
+	var location model.Location
+	if latString != "" && lonString != "" {
+		lat, err := strconv.ParseFloat(latString, 64)
+		if err != nil {
+			return fmt.Errorf("error parsing lat: %s", err)
+		}
+		location.Lat = lat
+		lon, err := strconv.ParseFloat(lonString, 64)
+		if err != nil {
+			return fmt.Errorf("error parsing lon: %s", err)
+		}
+		location.Lon = lon
+	}
+	if a.target.Location == nil || *a.target.Location != location {
+		a.target.Location = &location
+		changed = true
+	}
+
 	if changed {
 		a.saveState()
 	}
+	return nil
 }
 
 func (a *agent) loadState() error {
