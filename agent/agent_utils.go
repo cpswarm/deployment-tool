@@ -131,21 +131,30 @@ func (a *agent) loadConf() error {
 
 	latString := os.Getenv("LOCATION_LAT")
 	lonString := os.Getenv("LOCATION_LON")
-	var location model.Location
 	if latString != "" && lonString != "" {
 		lat, err := strconv.ParseFloat(latString, 64)
 		if err != nil {
 			return fmt.Errorf("error parsing lat: %s", err)
 		}
-		location.Lat = lat
 		lon, err := strconv.ParseFloat(lonString, 64)
 		if err != nil {
 			return fmt.Errorf("error parsing lon: %s", err)
 		}
-		location.Lon = lon
-	}
-	if a.target.Location == nil || *a.target.Location != location {
-		a.target.Location = &location
+		if a.target.Location == nil {
+			a.target.Location = &model.Location{Lat: lat, Lon: lon}
+			changed = true
+		} else {
+			if a.target.Location.Lat != lat {
+				a.target.Location.Lat = lat
+				changed = true
+			}
+			if a.target.Location.Lon != lon {
+				a.target.Location.Lon = lon
+				changed = true
+			}
+		}
+	} else if a.target.Location != nil {
+		a.target.Location = nil
 		changed = true
 	}
 

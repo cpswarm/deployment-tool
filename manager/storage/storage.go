@@ -22,7 +22,7 @@ type Storage interface {
 	PatchTarget(id string, target *Target) (bool, error)
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
 	SearchTargets(map[string]interface{}) ([]Target, int64, error)
-	AddTarget(*Target) error
+	AddTarget(*Target) (bool, error)
 	GetTarget(string) (*Target, error)
 	//DeleteTarget(string) error
 	//
@@ -211,17 +211,22 @@ func (s *storage) createIndex(index string, mapping mapping) error {
 	return nil
 }
 
-func (s *storage) AddTarget(target *Target) error {
+// AddTarget adds a target and returns true
+// 	or updates an existing one and returns false
+func (s *storage) AddTarget(target *Target) (bool, error) {
 	res, err := s.client.Index().Index(indexTarget).Type(typeFixed).
 		Id(target.ID).BodyJson(target).Do(s.ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	log.Printf("Indexed %s/%s v%d", res.Index, res.Id, res.Version)
-	return nil
+	if res.Result != "created" && res.Result != "updated" {
+		return false, fmt.Errorf("elastic resonse has an unknown result value: %s", res.Result)
+	}
+	return res.Result == "created", nil
 }
 
-// PathTarget updates fields that are not omitted, returns false if target is not found
+// PatchTarget updates fields that are not omitted, returns false if target is not found
 func (s *storage) PatchTarget(id string, target *Target) (bool, error) {
 	res, err := s.client.Update().Index(indexTarget).Type(typeFixed).Id(id).Doc(target).Do(s.ctx)
 	if err != nil {

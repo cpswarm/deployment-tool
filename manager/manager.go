@@ -431,23 +431,21 @@ func (m *manager) manageResponses() {
 
 func (m *manager) processTarget(target *storage.Target) {
 	defer recovery()
-	log.Printf("Discovered target: %s: %v", target.ID, target.Tags)
+	log.Println("Discovered target:", target.ID, target.Tags, target.Location)
 
 	target.UpdatedAt = model.UnixTime()
-	found, err := m.storage.PatchTarget(target.ID, target)
+
+	created, err := m.storage.AddTarget(target)
 	if err != nil {
-		log.Printf("Error updating target: %s", err)
+		log.Printf("Error adding target: %s", err)
 		return
 	}
-	if !found {
-		err := m.storage.AddTarget(target)
-		if err != nil {
-			log.Printf("Error adding target: %s", err)
-			return
-		}
+	if created {
 		m.publishEvent(EventTargetAdded, target)
+		return
 	}
 	m.publishEvent(EventTargetUpdated, target)
+
 }
 
 func (m *manager) processResponse(response *model.Response) {
