@@ -58,8 +58,10 @@ func (i *installer) sendLogFatal(mode, task, output string) {
 	i.sendLog(mode, task, model.StageEnd, true, true)
 }
 
-func (r *installer) stop() bool {
+func (i *installer) stop() (success bool) {
 	log.Println("installer: Shutting down...")
-	success := r.executor.stop()
-	return success
+	if i.executor != nil {
+		return i.executor.stop()
+	}
+	return true
 }

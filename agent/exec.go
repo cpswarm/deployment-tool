@@ -108,7 +108,7 @@ func (e *executor) sendLogFatal(command, output string) {
 	e.sendLog(command, model.ExecEnd, true)
 }
 
-func (e *executor) stop() bool {
+func (e *executor) stop() (success bool) {
 	if e.cmd == nil || e.cmd.Process == nil {
 		return true
 	}

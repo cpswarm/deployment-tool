@@ -11,13 +11,11 @@ type runner struct {
 	logger    Logger
 	executors []*executor
 	wg        sync.WaitGroup
-	//shutdown  chan bool
 }
 
 func newRunner(logger Logger) runner {
 	return runner{
 		logger: logger,
-		//shutdown: make(chan bool, 1),
 	}
 }
 
@@ -61,17 +59,17 @@ func (r *runner) sendLog(task, output string, error bool, debug bool) {
 	r.logger.Send(&model.Log{task, model.StageRun, model.CommandByAgent, output, error, model.UnixTime(), debug})
 }
 
-func (r *runner) stop() bool {
+func (r *runner) stop() (success bool) {
 	if len(r.executors) == 0 {
 		return true
 	}
 	log.Println("runner: Shutting down the runner...")
-	var success bool
-	for i := 0; i < len(r.executors); i++ {
-		success = r.executors[i].stop()
+	success = true
+	for i := range r.executors {
+		if !r.executors[i].stop() {
+			success = false
+		}
 	}
-
-	//<-r.shutdown // wait for all logs
-	log.Println("runner: Success:", success)
+	log.Println("runner: Shutdown success:", success)
 	return success
 }

@@ -148,6 +148,8 @@ func (a *agent) handleRequest(payload []byte) {
 		a.reportLogs(w.LogRequest)
 	case w.Command != nil:
 		// TODO execute a single command and send the logs
+	case w.StopAll != nil:
+		a.stopAll()
 	default:
 		log.Printf("Invalid request: %s->%v", string(payload), w) // TODO send to manager
 	}
@@ -274,7 +276,14 @@ func (a *agent) reportLogs(request *model.LogRequest) {
 	a.logger.Report(request)
 }
 
+func (a *agent) stopAll() {
+	log.Println("Received stop all request")
+	a.installer.stop()
+	a.runner.stop()
+}
+
 func (a *agent) close() {
+	a.installer.stop()
 	a.runner.stop()
 	a.saveState()
 }

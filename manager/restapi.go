@@ -86,6 +86,7 @@ func (a *restAPI) setupRouter() {
 	// tasks
 	r.HandleFunc("/orders", a.getOrders).Methods(http.MethodGet)
 	r.HandleFunc("/orders/{id}", a.getOrder).Methods(http.MethodGet)
+	r.HandleFunc("/orders/{id}/stop", a.stopOrder).Methods(http.MethodPut)
 	r.HandleFunc("/orders", a.addOrder).Methods(http.MethodPost)
 	// logs
 	r.HandleFunc("/logs", a.getLogs).Methods(http.MethodGet)
@@ -161,6 +162,23 @@ func (a *restAPI) getOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	HTTPResponse(w, http.StatusOK, b)
+	return
+}
+
+func (a *restAPI) stopOrder(w http.ResponseWriter, r *http.Request) {
+
+	id := mux.Vars(r)["id"]
+
+	found, err := a.manager.stopOrder(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !found {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
 	return
 }
 

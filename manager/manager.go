@@ -137,6 +137,35 @@ func (m *manager) getOrder(id string) (*storage.Order, error) {
 	return order, nil
 }
 
+func (m *manager) stopOrder(id string) (found bool, err error) {
+	order, err := m.storage.GetOrder(id)
+	if err != nil {
+		return false, fmt.Errorf("error querying order: %s", err)
+	}
+	if order == nil {
+		return false, nil
+	}
+	var list []string
+	if order.Deploy != nil {
+		list = append(list, order.Deploy.Match.List...)
+	}
+	if order.Build != nil {
+		var exist bool
+		for i := range list {
+			if order.Build.Host == list[i] {
+				exist = true
+			}
+		}
+		if !exist {
+			list = append(list, order.Build.Host)
+		}
+	}
+	for i := range list {
+		m.requestStopAll(list[i])
+	}
+	return true, nil
+}
+
 func (m *manager) getTargets(tags []string, page, perPage int) ([]storage.Target, int64, error) {
 	targets, total, err := m.storage.GetTargets(tags, int((page-1)*perPage), perPage)
 	if err != nil {
@@ -393,6 +422,12 @@ func (m *manager) requestLogs(targetID string) error {
 	b, _ := json.Marshal(&w)
 	m.pipe.RequestCh <- model.Message{model.FormatTopicID(targetID), b}
 	return nil
+}
+
+func (m *manager) requestStopAll(targetID string) {
+	stopAll := true
+	b, _ := json.Marshal(&model.RequestWrapper{StopAll: &stopAll})
+	m.pipe.RequestCh <- model.Message{model.FormatTopicID(targetID), b}
 }
 
 func (m *manager) manageResponses() {

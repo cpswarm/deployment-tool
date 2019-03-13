@@ -71,6 +71,7 @@ type RequestWrapper struct {
 	Announcement *Announcement `json:"a,omitempty"`
 	LogRequest   *LogRequest   `json:"l,omitempty"`
 	Command      *string       `json:"c,omitempty"`
+	StopAll      *bool         `json:"s,omitempty"`
 }
 
 func FormatTopicID(id string) string {
