@@ -78,18 +78,18 @@ func startRESTAPI(bindAddr string, manager *manager) {
 func (a *restAPI) setupRouter() {
 	r := mux.NewRouter()
 
-	r.HandleFunc("/", a.index).Methods("GET")
+	r.HandleFunc("/", a.index).Methods(http.MethodGet)
 	// targets
-	r.HandleFunc("/targets", a.getTargets).Methods("GET")
-	r.HandleFunc("/targets/{id}", a.getTarget).Methods("GET")
-	r.HandleFunc("/targets/{id}/logs", a.requestTargetLogs).Methods("PUT")
+	r.HandleFunc("/targets", a.getTargets).Methods(http.MethodGet)
+	r.HandleFunc("/targets/{id}", a.getTarget).Methods(http.MethodGet)
+	r.HandleFunc("/targets/{id}/logs", a.requestTargetLogs).Methods(http.MethodPut)
 	// tasks
-	r.HandleFunc("/orders", a.getOrders).Methods("GET")
-	r.HandleFunc("/orders/{id}", a.getOrder).Methods("GET")
-	r.HandleFunc("/orders", a.addOrder).Methods("POST")
+	r.HandleFunc("/orders", a.getOrders).Methods(http.MethodGet)
+	r.HandleFunc("/orders/{id}", a.getOrder).Methods(http.MethodGet)
+	r.HandleFunc("/orders", a.addOrder).Methods(http.MethodPost)
 	// logs
-	r.HandleFunc("/logs", a.getLogs).Methods("GET")
-	r.HandleFunc("/logs/search", a.searchLogs).Methods("GET")
+	r.HandleFunc("/logs", a.getLogs).Methods(http.MethodGet)
+	r.HandleFunc("/logs/search", a.searchLogs).Methods(http.MethodGet)
 
 	// static
 	ui := http.Dir(WorkDir + "/ui")
