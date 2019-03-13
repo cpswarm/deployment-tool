@@ -53,10 +53,11 @@ func (m *manager) addOrder(order *storage.Order) error {
 	order.Created = model.UnixTime()
 
 	// cleanup
-	if len(order.Build.Commands)+len(order.Build.Artifacts)+len(order.Build.Host) == 0 {
+
+	if order.Build != nil && len(order.Build.Commands)+len(order.Build.Artifacts)+len(order.Build.Host) == 0 {
 		order.Build = nil
 	}
-	if len(order.Deploy.Install.Commands)+len(order.Deploy.Run.Commands) == 0 {
+	if order.Deploy != nil && len(order.Deploy.Install.Commands)+len(order.Deploy.Run.Commands) == 0 {
 		order.Deploy = nil
 	}
 
