@@ -271,6 +271,8 @@ func (m *manager) searchLogs(search map[string]interface{}) ([]storage.Log, int6
 
 func (m *manager) fetchSource(orderID string, src *source.Source) error {
 	switch {
+	case src == nil:
+		return nil
 	case src.Paths != nil:
 		return src.Paths.Copy(orderID)
 	case src.Zip != nil:
