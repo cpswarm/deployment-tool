@@ -86,7 +86,9 @@ func (a *restAPI) setupRouter() {
 	// tasks
 	r.HandleFunc("/orders", a.getOrders).Methods(http.MethodGet)
 	r.HandleFunc("/orders/{id}", a.getOrder).Methods(http.MethodGet)
+	r.HandleFunc("/orders/{id}", a.deleteOrder).Methods(http.MethodDelete)
 	r.HandleFunc("/orders/{id}/stop", a.stopOrder).Methods(http.MethodPut)
+	r.HandleFunc("/orders/{id}/status", a.getOrderStatus).Methods(http.MethodGet)
 	r.HandleFunc("/orders", a.addOrder).Methods(http.MethodPost)
 	// logs
 	r.HandleFunc("/logs", a.getLogs).Methods(http.MethodGet)
@@ -165,11 +167,11 @@ func (a *restAPI) getOrder(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) stopOrder(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) deleteOrder(w http.ResponseWriter, r *http.Request) {
 
 	id := mux.Vars(r)["id"]
 
-	found, err := a.manager.stopOrder(id)
+	found, err := a.manager.deleteOrder(id)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -179,6 +181,47 @@ func (a *restAPI) stopOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	return
+}
+
+func (a *restAPI) stopOrder(w http.ResponseWriter, r *http.Request) {
+
+	id := mux.Vars(r)["id"]
+
+	found, list, err := a.manager.stopOrder(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !found {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	HTTPResponseSuccess(w, http.StatusOK, "Sent stop signal to ", list)
+	return
+}
+
+func (a *restAPI) getOrderStatus(w http.ResponseWriter, r *http.Request) {
+
+	id := mux.Vars(r)["id"]
+
+	found, targets, err := a.manager.getOrderStatus(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !found {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	b, err := json.Marshal(targets)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	HTTPResponse(w, http.StatusOK, b)
 	return
 }
 

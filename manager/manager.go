@@ -53,7 +53,6 @@ func (m *manager) addOrder(order *storage.Order) error {
 	order.Created = model.UnixTime()
 
 	// cleanup
-
 	if order.Build != nil && len(order.Build.Commands)+len(order.Build.Artifacts)+len(order.Build.Host) == 0 {
 		order.Build = nil
 	}
@@ -99,8 +98,6 @@ func (m *manager) addOrder(order *storage.Order) error {
 		return fmt.Errorf("error storing order: %s", err)
 	}
 	log.Println("Added order:", order.ID)
-	// sent update notification
-	//m.update.Broadcast() // TODO this only sends targets
 
 	go m.composeTask(order)
 	return nil
@@ -137,13 +134,83 @@ func (m *manager) getOrder(id string) (*storage.Order, error) {
 	return order, nil
 }
 
-func (m *manager) stopOrder(id string) (found bool, err error) {
-	order, err := m.storage.GetOrder(id)
+func (m *manager) deleteOrder(id string) (found bool, err error) {
+	// check if order is complete
+	found, targets, err := m.getOrderStatus(id)
+	if err != nil {
+		return false, fmt.Errorf("error getting order status: %s", err)
+	}
+	if !found {
+		return false, nil
+	}
+	for id := range targets {
+		for stage, status := range targets[id] {
+			if status != model.StageEnd {
+				return false, fmt.Errorf("unable to delete unfinished order. Target %s pending end of %s", id, stage)
+			}
+		}
+	}
+	// remove logs
+	err = m.storage.DeleteLogs("", id)
+	if err != nil {
+		return false, fmt.Errorf("error deleting logs: %s", err)
+	}
+	// delete the order
+	found, err = m.storage.DeleteOrder(id)
 	if err != nil {
 		return false, fmt.Errorf("error querying order: %s", err)
 	}
+	return found, nil
+}
+
+func (m *manager) getOrderStatus(id string) (found bool, targets map[string]map[string]string, err error) {
+	order, list, err := m.getTargetList(id)
+	if err != nil {
+		return false, nil, fmt.Errorf("error querying order: %s", err)
+	}
 	if order == nil {
-		return false, nil
+		return false, nil, nil
+	}
+
+	targets = make(map[string]map[string]string)
+	for i := range list {
+		targets[list[i]] = make(map[string]string)
+	}
+	const searchKeyword, stages, outputsPerStage = "stage", 3, 2
+	logs, _, err := m.storage.GetLogs("", id, "", "", searchKeyword, "", _time, true, 0, stages*outputsPerStage*len(targets))
+	if err != nil {
+		return false, nil, fmt.Errorf("error querying logs: %s", err)
+	}
+
+	for i := range logs {
+		if targets[logs[i].Target][logs[i].Stage] != model.StageEnd {
+			targets[logs[i].Target][logs[i].Stage] = logs[i].Output
+		}
+	}
+	return true, targets, nil
+}
+
+func (m *manager) stopOrder(id string) (found bool, list []string, err error) {
+	order, list, err := m.getTargetList(id)
+	if err != nil {
+		return false, nil, fmt.Errorf("error querying order: %s", err)
+	}
+	if order == nil {
+		return false, nil, nil
+	}
+	for i := range list {
+		m.requestStopAll(list[i])
+	}
+	return true, list, nil
+}
+
+func (m *manager) getTargetList(orderID string) (*storage.Order, []string, error) {
+	order, err := m.storage.GetOrder(orderID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error querying order: %s", err)
+	}
+	if order == nil {
+		return nil, nil, nil
 	}
 	var list []string
 	if order.Deploy != nil {
@@ -160,10 +227,7 @@ func (m *manager) stopOrder(id string) (found bool, err error) {
 			list = append(list, order.Build.Host)
 		}
 	}
-	for i := range list {
-		m.requestStopAll(list[i])
-	}
-	return true, nil
+	return order, list, nil
 }
 
 func (m *manager) getTargets(tags []string, page, perPage int) ([]storage.Target, int64, error) {

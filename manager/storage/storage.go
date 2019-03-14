@@ -15,23 +15,23 @@ import (
 type Storage interface {
 	GetOrders(sortAsc bool, from, size int) ([]Order, int64, error)
 	AddOrder(*Order) error
-	GetOrder(string) (*Order, error)
-	//DeleteOrder(string) error
+	GetOrder(id string) (*Order, error)
+	DeleteOrder(id string) (found bool, err error)
 	//
 	GetTargets(tags []string, from, size int) ([]Target, int64, error)
-	PatchTarget(id string, target *Target) (bool, error)
+	PatchTarget(id string, target *Target) (found bool, err error)
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
 	SearchTargets(map[string]interface{}) ([]Target, int64, error)
-	AddTarget(*Target) (bool, error)
-	GetTarget(string) (*Target, error)
-	//DeleteTarget(string) error
+	AddTarget(*Target) (added bool, err error)
+	GetTarget(id string) (*Target, error)
+	DeleteTarget(id string) (found bool, err error)
 	//
 	GetLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, from, size int) ([]Log, int64, error)
 	SearchLogs(map[string]interface{}) ([]Log, int64, error)
 	AddLog(*Log) error
 	AddLogs(logs []Log) error
-	//DeleteLogs(target string) error
-	DeliveredTask(target, task string) (bool, error)
+	DeleteLogs(target, task string) error
+	DeliveredTask(target, task string) (delivered bool, err error)
 }
 
 type storage struct {
@@ -366,19 +366,34 @@ func (s *storage) GetTarget(id string) (*Target, error) {
 	res, err := s.client.Get().Index(indexTarget).Type(typeFixed).
 		Id(id).Do(s.ctx)
 	if err != nil {
+		e := err.(*elastic.Error)
+		if e.Status == http.StatusNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
-	if res.Found {
-		//log.Printf("Got document %s/%s v%d", res.Index, res.Id, res.Version)
-		var target Target
-		err = json.Unmarshal(*res.Source, &target)
-		if err != nil {
-			return nil, err
-		}
-		return &target, nil
+
+	//log.Printf("Got document %s/%s v%d", res.Index, res.Id, res.Version)
+	var target Target
+	err = json.Unmarshal(*res.Source, &target)
+	if err != nil {
+		return nil, err
 	}
-	log.Printf("Target not found: %s", id)
-	return nil, nil
+	return &target, nil
+}
+
+func (s *storage) DeleteTarget(id string) (found bool, err error) {
+	res, err := s.client.Delete().Index(indexTarget).Type(typeFixed).
+		Id(id).Do(s.ctx)
+	if err != nil {
+		e := err.(*elastic.Error)
+		if e.Status == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	log.Printf("Deleted %s/%s v%d", res.Index, res.Id, res.Version)
+	return true, nil
 }
 
 func (s *storage) AddOrder(order *Order) error {
@@ -420,19 +435,34 @@ func (s *storage) GetOrder(id string) (*Order, error) {
 	res, err := s.client.Get().Index(indexOrder).Type(typeFixed).
 		Id(id).Do(s.ctx)
 	if err != nil {
+		e := err.(*elastic.Error)
+		if e.Status == http.StatusNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
-	if res.Found {
-		//log.Printf("Got document %s/%s v%d", res.Index, res.Id, res.Version)
-		var order Order
-		err = json.Unmarshal(*res.Source, &order)
-		if err != nil {
-			return nil, err
-		}
-		return &order, nil
+
+	//log.Printf("Got document %s/%s v%d", res.Index, res.Id, res.Version)
+	var order Order
+	err = json.Unmarshal(*res.Source, &order)
+	if err != nil {
+		return nil, err
 	}
-	log.Printf("Order not found: %s", id)
-	return nil, nil
+	return &order, nil
+}
+
+func (s *storage) DeleteOrder(id string) (found bool, err error) {
+	res, err := s.client.Delete().Index(indexOrder).Type(typeFixed).
+		Id(id).Do(s.ctx)
+	if err != nil {
+		e := err.(*elastic.Error)
+		if e.Status == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	log.Printf("Deleted %s/%s v%d", res.Index, res.Id, res.Version)
+	return true, nil
 }
 
 func (s *storage) GetLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, from, size int) ([]Log, int64, error) {
@@ -529,9 +559,25 @@ func (s *storage) AddLogs(logs []Log) error {
 	return nil
 }
 
+func (s *storage) DeleteLogs(target, task string) error {
+	query := elastic.NewBoolQuery()
+	if target != "" {
+		query.Must(elastic.NewMatchQuery("target", target))
+	}
+	if task != "" {
+		query.Must(elastic.NewMatchQuery("task", task))
+	}
+
+	_, err := s.client.DeleteByQuery(indexLog).Query(query).Do(s.ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // DeliveredTask returns true if the task is received by the target
 //	i.e. there is any log from the target for the task
-func (s *storage) DeliveredTask(target, task string) (bool, error) {
+func (s *storage) DeliveredTask(target, task string) (delivered bool, err error) {
 
 	query := elastic.NewBoolQuery().
 		Must(elastic.NewMatchQuery("target", target)).
