@@ -20,9 +20,10 @@ type Storage interface {
 	//
 	GetTargets(tags []string, from, size int) ([]Target, int64, error)
 	PatchTarget(id string, target *Target) (found bool, err error)
+	IndexTarget(id string, target *Target) (found bool, err error)
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
 	SearchTargets(map[string]interface{}) ([]Target, int64, error)
-	AddTarget(*Target) (added bool, err error)
+	AddTarget(*Target) error
 	GetTarget(id string) (*Target, error)
 	DeleteTarget(id string) (found bool, err error)
 	//
@@ -109,6 +110,7 @@ func NewElasticStorage(url string) (Storage, error) {
 		"id":           {Type: propTypeKeyword},
 		"tags":         {Type: propTypeKeyword}, // array
 		"location":     {Type: propTypeGeoPoint},
+		"createdAt":    {Type: propTypeDate},
 		"updatedAt":    {Type: propTypeDate},
 		"logRequestAt": {Type: propTypeDate},
 	}
@@ -211,23 +213,18 @@ func (s *storage) createIndex(index string, mapping mapping) error {
 	return nil
 }
 
-// AddTarget adds a target and returns true
-// 	or updates an existing one and returns false
-func (s *storage) AddTarget(target *Target) (bool, error) {
+func (s *storage) AddTarget(target *Target) error {
 	res, err := s.client.Index().Index(indexTarget).Type(typeFixed).
-		Id(target.ID).BodyJson(target).Do(s.ctx)
+		Id(target.ID).OpType("create").BodyJson(target).Do(s.ctx)
 	if err != nil {
-		return false, err
+		return err
 	}
-	log.Printf("Indexed %s/%s v%d", res.Index, res.Id, res.Version)
-	if res.Result != "created" && res.Result != "updated" {
-		return false, fmt.Errorf("elastic resonse has an unknown result value: %s", res.Result)
-	}
-	return res.Result == "created", nil
+	log.Printf("Created %s/%s v%d", res.Index, res.Id, res.Version)
+	return nil
 }
 
 // PatchTarget updates fields that are not omitted, returns false if target is not found
-func (s *storage) PatchTarget(id string, target *Target) (bool, error) {
+func (s *storage) PatchTarget(id string, target *Target) (found bool, err error) {
 	res, err := s.client.Update().Index(indexTarget).Type(typeFixed).Id(id).Doc(target).Do(s.ctx)
 	if err != nil {
 		e := err.(*elastic.Error)
@@ -236,7 +233,18 @@ func (s *storage) PatchTarget(id string, target *Target) (bool, error) {
 		}
 		return false, err
 	}
-	log.Printf("Updated %s/%s v%d", res.Index, res.Id, res.Version)
+	log.Printf("Patched %s/%s v%d", res.Index, res.Id, res.Version)
+	return true, nil
+}
+
+// IndexTarget adds or updates the target
+func (s *storage) IndexTarget(id string, target *Target) (found bool, err error) {
+	res, err := s.client.Index().Index(indexTarget).Type(typeFixed).
+		Id(target.ID).BodyJson(target).Do(s.ctx)
+	if err != nil {
+		return false, err
+	}
+	log.Printf("Indexed %s/%s v%d", res.Index, res.Id, res.Version)
 	return true, nil
 }
 

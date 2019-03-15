@@ -82,6 +82,7 @@ func (a *restAPI) setupRouter() {
 	// targets
 	r.HandleFunc("/targets", a.getTargets).Methods(http.MethodGet)
 	r.HandleFunc("/targets/{id}", a.getTarget).Methods(http.MethodGet)
+	r.HandleFunc("/targets/{id}", a.updateTarget).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/logs", a.requestTargetLogs).Methods(http.MethodPut)
 	// tasks
 	r.HandleFunc("/orders", a.getOrders).Methods(http.MethodGet)
@@ -306,6 +307,33 @@ func (a *restAPI) getTarget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	HTTPResponse(w, http.StatusOK, b)
+	return
+}
+
+func (a *restAPI) updateTarget(w http.ResponseWriter, r *http.Request) {
+
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+
+	var target storage.Target
+	err := decoder.Decode(&target)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+	found, err := a.manager.updateTarget(id, &target)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !found {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 	return
 }
 

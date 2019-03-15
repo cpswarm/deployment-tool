@@ -246,6 +246,27 @@ func (m *manager) getTarget(id string) (*storage.Target, error) {
 	return target, nil
 }
 
+func (m *manager) updateTarget(id string, target *storage.Target) (found bool, err error) {
+	t, err := m.storage.GetTarget(id)
+	if err != nil {
+		return false, fmt.Errorf("error getting target for update: %s", err)
+	}
+	if t == nil {
+		return false, nil
+	}
+	// read-only fields remain the same
+	target.ID = t.ID
+	target.LogRequestAt = t.LogRequestAt
+	target.CreatedAt = t.CreatedAt
+
+	target.UpdatedAt = model.UnixTime()
+	found, err = m.storage.IndexTarget(id, target)
+	if err != nil {
+		return false, fmt.Errorf("error patching target: %s", err)
+	}
+	return true, nil
+}
+
 func (m *manager) getLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, page, perPage int) ([]storage.Log, int64, error) {
 	logs, total, err := m.storage.GetLogs(
 		target,
@@ -535,19 +556,14 @@ func (m *manager) processTarget(target *storage.Target) {
 	defer recovery()
 	log.Println("Discovered target:", target.ID, target.Tags, target.Location)
 
-	target.UpdatedAt = model.UnixTime()
-
-	created, err := m.storage.AddTarget(target)
+	target.CreatedAt = model.UnixTime()
+	target.UpdatedAt = target.CreatedAt
+	err := m.storage.AddTarget(target)
 	if err != nil {
 		log.Printf("Error adding target: %s", err)
 		return
 	}
-	if created {
-		m.publishEvent(EventTargetAdded, target)
-		return
-	}
-	m.publishEvent(EventTargetUpdated, target)
-
+	m.publishEvent(EventTargetAdded, target)
 }
 
 func (m *manager) processResponse(response *model.Response) {

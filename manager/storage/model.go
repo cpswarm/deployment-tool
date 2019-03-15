@@ -80,6 +80,7 @@ func (o Order) Validate() error {
 //
 type Target struct {
 	model.TargetBase
+	CreatedAt    model.UnixTimeType `json:"createdAt,omitempty"`
 	UpdatedAt    model.UnixTimeType `json:"updatedAt,omitempty"`
 	LogRequestAt model.UnixTimeType `json:"logRequestAt,omitempty"`
 }
