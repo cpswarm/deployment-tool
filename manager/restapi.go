@@ -82,7 +82,9 @@ func (a *restAPI) setupRouter() {
 	// targets
 	r.HandleFunc("/targets", a.getTargets).Methods(http.MethodGet)
 	r.HandleFunc("/targets/{id}", a.getTarget).Methods(http.MethodGet)
+	r.HandleFunc("/targets/{id}", a.deleteTarget).Methods(http.MethodDelete)
 	r.HandleFunc("/targets/{id}", a.updateTarget).Methods(http.MethodPut)
+	r.HandleFunc("/targets/{id}/stop", a.stopTargetOrders).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/logs", a.requestTargetLogs).Methods(http.MethodPut)
 	// tasks
 	r.HandleFunc("/orders", a.getOrders).Methods(http.MethodGet)
@@ -182,6 +184,24 @@ func (a *restAPI) deleteOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	return
+}
+
+func (a *restAPI) stopTargetOrders(w http.ResponseWriter, r *http.Request) {
+
+	id := mux.Vars(r)["id"]
+
+	found, err := a.manager.stopTargetOrders(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !found {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	HTTPResponseSuccess(w, http.StatusOK, "Sent stop signal to ", id)
 	return
 }
 
@@ -307,6 +327,23 @@ func (a *restAPI) getTarget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	HTTPResponse(w, http.StatusOK, b)
+	return
+}
+
+func (a *restAPI) deleteTarget(w http.ResponseWriter, r *http.Request) {
+
+	id := mux.Vars(r)["id"]
+
+	found, err := a.manager.deleteTarget(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !found {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
 	return
 }
 

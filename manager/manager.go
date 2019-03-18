@@ -164,7 +164,7 @@ func (m *manager) deleteOrder(id string) (found bool, err error) {
 }
 
 func (m *manager) getOrderStatus(id string) (found bool, targets map[string]map[string]string, err error) {
-	order, list, err := m.getTargetList(id)
+	order, err := m.storage.GetOrder(id)
 	if err != nil {
 		return false, nil, fmt.Errorf("error querying order: %s", err)
 	}
@@ -172,6 +172,7 @@ func (m *manager) getOrderStatus(id string) (found bool, targets map[string]map[
 		return false, nil, nil
 	}
 
+	list := m.getTargetList(order)
 	targets = make(map[string]map[string]string)
 	for i := range list {
 		targets[list[i]] = make(map[string]string)
@@ -191,27 +192,21 @@ func (m *manager) getOrderStatus(id string) (found bool, targets map[string]map[
 }
 
 func (m *manager) stopOrder(id string) (found bool, list []string, err error) {
-	order, list, err := m.getTargetList(id)
+	order, err := m.storage.GetOrder(id)
 	if err != nil {
 		return false, nil, fmt.Errorf("error querying order: %s", err)
 	}
 	if order == nil {
 		return false, nil, nil
 	}
-	for i := range list {
+
+	for i := range m.getTargetList(order) {
 		m.requestStopAll(list[i])
 	}
 	return true, list, nil
 }
 
-func (m *manager) getTargetList(orderID string) (*storage.Order, []string, error) {
-	order, err := m.storage.GetOrder(orderID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error querying order: %s", err)
-	}
-	if order == nil {
-		return nil, nil, nil
-	}
+func (m *manager) getTargetList(order *storage.Order) []string {
 	var list []string
 	if order.Deploy != nil {
 		list = append(list, order.Deploy.Match.List...)
@@ -227,7 +222,7 @@ func (m *manager) getTargetList(orderID string) (*storage.Order, []string, error
 			list = append(list, order.Build.Host)
 		}
 	}
-	return order, list, nil
+	return list
 }
 
 func (m *manager) getTargets(tags []string, page, perPage int) ([]storage.Target, int64, error) {
@@ -244,6 +239,75 @@ func (m *manager) getTarget(id string) (*storage.Target, error) {
 		return nil, fmt.Errorf("error querying target: %s", err)
 	}
 	return target, nil
+}
+
+func (m *manager) deleteTarget(id string) (found bool, err error) {
+	// send running tasks
+	found, err = m.stopTargetOrders(id)
+	if err != nil {
+		return false, fmt.Errorf("error stopping order to delete target: %s", err)
+	}
+	if !found {
+		return false, nil
+	}
+	time.Sleep(time.Second) // wait for possible responses
+	// log the event
+	orders, err := m.getOrderList(id)
+	if err != nil {
+		return false, fmt.Errorf("error getting orders to delete target: %s", err)
+	}
+	for i := range orders {
+		_, targets, err := m.getOrderStatus(orders[i])
+		if err != nil {
+			return false, fmt.Errorf("error getting order status to delete target: %s", err)
+		}
+		for stage, status := range targets[id] {
+			if status != model.StageEnd {
+				m.storeLogFatal(orders[i], stage, "target has been deleted", id)
+			}
+		}
+	}
+	// delete
+	found, err = m.storage.DeleteTarget(id)
+	if err != nil {
+		return false, fmt.Errorf("error deleting target: %s", err)
+	}
+	return found, nil
+}
+
+func (m *manager) getOrderList(targetID string) (orders []string, err error) {
+	for from := 0; ; from += 100 {
+		ordersInPage, total, err := m.storage.GetOrders(true, from, 100)
+		if err != nil {
+			return nil, err
+		}
+		for i := range ordersInPage {
+			for _, id := range m.getTargetList(&ordersInPage[i]) {
+				if id == targetID {
+					orders = append(orders, ordersInPage[i].ID)
+					break
+				}
+			}
+		}
+		if int64(from+len(ordersInPage)) == total {
+			break
+		}
+	}
+	return orders, nil
+}
+
+func (m *manager) stopTargetOrders(targetID string) (found bool, err error) {
+	// make sure it is found
+	target, err := m.storage.GetTarget(targetID)
+	if err != nil {
+		return false, fmt.Errorf("error getting target for stop signal: %s", err)
+	}
+	if target == nil {
+		return false, nil
+	}
+	// send stop signal
+	m.requestStopAll(targetID)
+	return true, nil
 }
 
 func (m *manager) updateTarget(id string, target *storage.Target) (found bool, err error) {
