@@ -1,10 +1,6 @@
 #!/bin/sh
 
-if [ `dirname "$0"` != "." ]; then
-    echo "Dirname:" `dirname "$0"`
-    echo "Error: This script should be executed from the same directory."
-    exit 1
-fi
+# This script should be executed from the same directory
 
 # cleanup old things
 rm -fr temp bin
