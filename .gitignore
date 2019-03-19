@@ -1,4 +1,5 @@
 bin/
+pkg/
 temp/
 playground/
 volumes/
