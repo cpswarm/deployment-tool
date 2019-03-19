@@ -34,20 +34,15 @@ sudo apt install ./deployment-agent-linux-arm.deb
 ```
 
 ## Compile from source
-### Get the codes
-```
-git clone <repo-address> deployment-tool/src/code.linksmart.eu/dt/deployment-tool
-```
 
 ### Build
+Within the root of the repository:
 ```
-export GOPATH=$(pwd)
-go install code.linksmart.eu/dt/deployment-tool/manager
-go install code.linksmart.eu/dt/deployment-tool/agent
+go build -o bin/manager ./manager
+go build -o bin/agent  ./agent
 ```
 
-#### Build with static linked dependencies (armv7)
+#### Build with static linking
 ```
-sudo sh build/zeromq/install-armv7.sh
-CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lsodium -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a code.linksmart.eu/dt/deployment-tool/agent
+CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a -o bin/agent ./agent
 ```

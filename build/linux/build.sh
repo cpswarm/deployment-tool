@@ -1,19 +1,29 @@
 #!/bin/sh
 
+if [ `dirname "$0"` != "." ]; then
+    echo "Dirname:" `dirname "$0"`
+    echo "Error: This script should be executed from the same directory."
+    exit 1
+fi
+
 # cleanup old things
-rm -fr temp
+rm -fr temp bin
 
 set -e
 
+ROOT=../..
+
 echo "Copying the code..."
-package=code.linksmart.eu/dt/deployment-tool
-mkdir -p temp/$package bin
-cp -rv ../../manager temp/$package
-cp -rv ../../agent temp/$package
-cp -r ../../vendor temp/$package
+mkdir -p temp bin
+cp $ROOT/go.mod $ROOT/go.sum temp
+cp -rv $ROOT/manager temp
+cp -rv $ROOT/agent temp
+cp -r  $ROOT/vendor temp
+cp static-build.sh temp
 
 echo "Compiling... (IF HUNG, KILL THE CONTAINER!)"
-docker run --rm -v $(pwd)/temp:/home/src -v $(pwd)/bin:/home/bin -v $(pwd)/static-build.sh:/home/cmd.sh farshidtz/zeromq:golang-linux-amd64-stretch sh cmd.sh
+docker run --rm -v $(pwd)/temp:/home -v $(pwd)/bin:/home/bin \
+    farshidtz/zeromq:golang-linux-amd64-stretch sh static-build.sh
 
 echo "Cleaning up..."
 rm -fr temp
