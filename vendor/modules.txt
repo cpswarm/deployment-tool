@@ -1,0 +1,56 @@
+# github.com/cskr/pubsub v1.0.2
+github.com/cskr/pubsub
+# github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76
+github.com/dsnet/compress/bzip2
+github.com/dsnet/compress/bzip2/internal/sais
+github.com/dsnet/compress/internal
+github.com/dsnet/compress/internal/errors
+github.com/dsnet/compress/internal/prefix
+github.com/dsnet/compress
+# github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
+github.com/golang/snappy
+# github.com/gorilla/context v1.1.1
+github.com/gorilla/context
+# github.com/gorilla/mux v1.6.2
+github.com/gorilla/mux
+# github.com/gorilla/websocket v1.2.0
+github.com/gorilla/websocket
+# github.com/joho/godotenv v1.2.0
+github.com/joho/godotenv
+# github.com/justinas/alice v0.0.0-20171023064455-03f45bd4b7da
+github.com/justinas/alice
+# github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
+github.com/mailru/easyjson
+github.com/mailru/easyjson/jlexer
+github.com/mailru/easyjson/jwriter
+github.com/mailru/easyjson/buffer
+# github.com/mholt/archiver v2.1.0+incompatible
+github.com/mholt/archiver
+# github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae
+github.com/nwaples/rardecode
+# github.com/olivere/elastic v6.2.16+incompatible
+github.com/olivere/elastic
+github.com/olivere/elastic/config
+github.com/olivere/elastic/uritemplates
+# github.com/otiai10/copy v1.0.1
+github.com/otiai10/copy
+# github.com/pbnjay/memory v0.0.0-20180430190442-16f8386fc07f
+github.com/pbnjay/memory
+# github.com/pebbe/zmq4 v1.0.0
+github.com/pebbe/zmq4
+# github.com/pierrec/lz4 v0.0.0-20181005164709-635575b42742
+github.com/pierrec/lz4
+github.com/pierrec/lz4/internal/xxh32
+# github.com/pkg/errors v0.8.1
+github.com/pkg/errors
+# github.com/rs/cors v1.6.0
+github.com/rs/cors
+# github.com/satori/go.uuid v1.2.0
+github.com/satori/go.uuid
+# github.com/ulikunitz/xz v0.5.5
+github.com/ulikunitz/xz
+github.com/ulikunitz/xz/internal/xlog
+github.com/ulikunitz/xz/lzma
+github.com/ulikunitz/xz/internal/hash
+# gopkg.in/yaml.v2 v2.2.1
+gopkg.in/yaml.v2
