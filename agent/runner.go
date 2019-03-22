@@ -30,22 +30,22 @@ func (r *runner) run(commands []string, taskID string, debug bool) {
 	log.Printf("runner: Running task: %s", taskID)
 	r.sendLog(taskID, model.StageStart, false, debug)
 
-	errCh := make(chan bool, len(commands))
+	successCh := make(chan bool, len(commands))
 	// run in parallel and wait for them to finish
 	for i, command := range commands {
 		r.executors[i] = newExecutor(taskID, model.StageRun, r.logger, debug)
 		r.wg.Add(1)
 		go func(c string, e *executor) {
 			defer r.wg.Done()
-			errCh <- e.execute(c)
+			successCh <- e.execute(c)
 		}(command, r.executors[i])
 	}
 	r.wg.Wait()
-	close(errCh)
+	close(successCh)
 
 	var endErr bool
-	for err := range errCh {
-		if err {
+	for success := range successCh {
+		if !success {
 			endErr = true
 			break
 		}

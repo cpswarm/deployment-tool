@@ -38,7 +38,7 @@ func newExecutor(task, stage string, logger Logger, debug bool) *executor {
 }
 
 // execute executes a command
-func (e *executor) execute(command string) bool {
+func (e *executor) execute(command string) (success bool) {
 	e.sendLog(command, model.ExecStart, false)
 
 	bashCommand := []string{"/bin/sh", "-c", command}
