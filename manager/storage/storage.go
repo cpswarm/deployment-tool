@@ -13,7 +13,7 @@ import (
 )
 
 type Storage interface {
-	GetOrders(sortAsc bool, from, size int) ([]Order, int64, error)
+	GetOrders(descr string, sortAsc bool, from, size int) ([]Order, int64, error)
 	AddOrder(*Order) error
 	GetOrder(id string) (*Order, error)
 	DeleteOrder(id string) (found bool, err error)
@@ -125,9 +125,10 @@ func NewElasticStorage(url string) (Storage, error) {
 	m.Settings.RefreshInterval = "1s"
 	m.Mappings.Doc.Dynamic = mappingStrict
 	m.Mappings.Doc.Prop = map[string]mappingProp{
-		"id":        {Type: propTypeKeyword},
-		"debug":     {Type: propTypeBool},
-		"createdAt": {Type: propTypeDate},
+		"id":          {Type: propTypeKeyword},
+		"debug":       {Type: propTypeBool},
+		"description": {Type: propTypeText},
+		"createdAt":   {Type: propTypeDate},
 		"build": {
 			Properties: map[string]mappingProp{
 				"commands":  {Type: propTypeKeyword}, // array
@@ -414,9 +415,14 @@ func (s *storage) AddOrder(order *Order) error {
 	return nil
 }
 
-func (s *storage) GetOrders(sortAsc bool, from, size int) ([]Order, int64, error) {
+func (s *storage) GetOrders(descr string, sortAsc bool, from, size int) ([]Order, int64, error) {
+	query := elastic.NewBoolQuery()
+	if descr != "" { // description has text type
+		query.Must(elastic.NewMatchQuery("description", descr).Operator("and"))
+	}
+
 	searchResult, err := s.client.Search().Index(indexOrder).Type(typeFixed).
-		Sort("createdAt", sortAsc).From(from).Size(size).Do(s.ctx)
+		Query(query).Sort("createdAt", sortAsc).From(from).Size(size).Do(s.ctx)
 	if err != nil {
 		return nil, 0, err
 	}

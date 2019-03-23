@@ -118,8 +118,8 @@ func (m *manager) newTaskID() string {
 	return uuid.NewV4().String()
 }
 
-func (m *manager) getOrders(sortAsc bool, page, perPage int) ([]storage.Order, int64, error) {
-	orders, total, err := m.storage.GetOrders(sortAsc, int((page-1)*perPage), perPage)
+func (m *manager) getOrders(descr string, sortAsc bool, page, perPage int) ([]storage.Order, int64, error) {
+	orders, total, err := m.storage.GetOrders(descr, sortAsc, int((page-1)*perPage), perPage)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying orders: %s", err)
 	}
@@ -277,7 +277,7 @@ func (m *manager) deleteTarget(id string) (found bool, err error) {
 
 func (m *manager) getOrderList(targetID string) (orders []string, err error) {
 	for from := 0; ; from += 100 {
-		ordersInPage, total, err := m.storage.GetOrders(true, from, 100)
+		ordersInPage, total, err := m.storage.GetOrders("", true, from, 100)
 		if err != nil {
 			return nil, err
 		}

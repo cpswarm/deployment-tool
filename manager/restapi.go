@@ -37,6 +37,7 @@ const (
 	_error           = "error"
 	_tags            = "tags"
 	_topics          = "topics"
+	_description     = "description"
 	defaultPage      = 1
 	defaultPerPage   = 100
 	defaultSortOrder = _asc
@@ -260,7 +261,9 @@ func (a *restAPI) getOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, total, err := a.manager.getOrders(ascending, page, perPage)
+	descr := query.Get(_description)
+
+	orders, total, err := a.manager.getOrders(descr, ascending, page, perPage)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return

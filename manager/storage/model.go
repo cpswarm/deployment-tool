@@ -13,9 +13,11 @@ import (
 //
 type Order struct {
 	model.Header `yaml:",inline"`
-	Source       *source.Source `json:"source,omitempty"`
-	Build        *build         `json:"build"`
-	Deploy       *deploy        `json:"deploy"`
+	Description  string             `json:"description,omitempty"`
+	Created      model.UnixTimeType `json:"createdAt"`
+	Source       *source.Source     `json:"source,omitempty"`
+	Build        *build             `json:"build"`
+	Deploy       *deploy            `json:"deploy"`
 }
 
 type build struct {

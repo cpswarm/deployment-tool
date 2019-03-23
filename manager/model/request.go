@@ -35,9 +35,8 @@ type Deploy struct {
 
 // Header contains information that is common among task related structs
 type Header struct {
-	ID      string       `json:"id"`
-	Debug   bool         `json:"debug,omitempty"`
-	Created UnixTimeType `json:"createdAt"`
+	ID    string `json:"id"`
+	Debug bool   `json:"debug,omitempty"`
 }
 
 // Announcement carries information about a task
