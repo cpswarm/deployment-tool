@@ -1,0 +1,15 @@
+
+
+deploy:
+  install:
+    commands:
+      - for i in {1..30}; do echo "Installing $i"; sleep 1; done
+  run:
+    commands:
+      - for i in {1..300}; do echo "Running $i"; sleep 1; done
+  target:
+    ids:
+      - my-laptop
+
+
+debug: true
