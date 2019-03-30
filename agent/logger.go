@@ -28,8 +28,6 @@ type logger struct {
 	responseCh chan<- model.Message
 }
 
-type logQueuer func(*model.Log)
-
 func newLogger(targetID string, debug bool, responseCh chan<- model.Message) *logger {
 	l := &logger{
 		targetID:   targetID,
@@ -43,31 +41,6 @@ func newLogger(targetID string, debug bool, responseCh chan<- model.Message) *lo
 	go l.startTicker()
 
 	return l
-}
-
-func (l *logger) report(request *model.LogRequest) {
-	logs := l.buffer.Collect()
-	// send logs since request.IfModifiedSince
-	for i := range logs {
-		if logs[i].Time >= request.IfModifiedSince {
-			l.send(logs[i:], true)
-			return
-		}
-	}
-	log.Println("No logs since", request.IfModifiedSince)
-}
-
-func (l *logger) enqueue(logM *model.Log) {
-	l.queue <- *logM
-}
-
-func (l *logger) stop() {
-	log.Println("logger: Shutting down...")
-	if l.ticker != nil {
-		l.ticker.Stop()
-		close(l.tickerQuit)
-	}
-	log.Println("logger: Stopped")
 }
 
 func (l *logger) startTicker() {
@@ -108,6 +81,13 @@ func (l *logger) startTicker() {
 	}
 }
 
+// logQueuer is the type of enqueue function
+type logQueuer func(*model.Log)
+
+func (l *logger) enqueue(logM *model.Log) {
+	l.queue <- *logM
+}
+
 func (l *logger) send(logs []model.Log, onRequest bool) {
 	log.Printf("logger: Sending %d entries.", len(logs))
 	b, _ := json.Marshal(model.Response{
@@ -116,4 +96,25 @@ func (l *logger) send(logs []model.Log, onRequest bool) {
 		OnRequest: onRequest,
 	})
 	l.responseCh <- model.Message{string(model.ResponseLog), b}
+}
+
+func (l *logger) report(request *model.LogRequest) {
+	logs := l.buffer.Collect()
+	// send logs since request.IfModifiedSince
+	for i := range logs {
+		if logs[i].Time >= request.IfModifiedSince {
+			l.send(logs[i:], true)
+			return
+		}
+	}
+	log.Println("No logs since", request.IfModifiedSince)
+}
+
+func (l *logger) stop() {
+	log.Println("logger: Shutting down...")
+	if l.ticker != nil {
+		l.ticker.Stop()
+		close(l.tickerQuit)
+	}
+	log.Println("logger: Stopped")
 }
