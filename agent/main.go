@@ -46,22 +46,24 @@ func main() {
 	WorkDir, _ = os.Getwd()
 	log.Printf("Workdir: %s", WorkDir)
 
+	// TODO switch the start order of zmq and agent to facilitate deferred closing in the correct order
 	agent, err := startAgent()
 	if err != nil {
 		log.Fatalf("Error starting agent: %s", err)
 	}
-	defer agent.close()
 
 	subEndpoint, pubEndpoint := endpoints()
 	zmqClient, err := startZMQClient(subEndpoint, pubEndpoint, agent.pipe)
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
-	defer zmqClient.close()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 	<-sig
+
+	agent.close()
+	zmqClient.close()
 }
 
 func endpoints() (string, string) {

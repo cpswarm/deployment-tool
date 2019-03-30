@@ -16,7 +16,7 @@ import (
 )
 
 func (a *agent) sendLog(task, stage, output string, error bool, debug bool) {
-	a.logger.Send(&model.Log{task, stage, model.CommandByAgent, output, error, model.UnixTime(), debug})
+	a.logger.enqueue(&model.Log{task, stage, model.CommandByAgent, output, error, model.UnixTime(), debug})
 }
 
 func (a *agent) sendLogFatal(task, stage, output string) {

@@ -7,13 +7,13 @@ import (
 )
 
 type installer struct {
-	logger   Logger
-	executor *executor
+	logEnqueue logQueuer
+	executor   *executor
 }
 
-func newInstaller(logger Logger) installer {
+func newInstaller(logEnqueue logQueuer) installer {
 	return installer{
-		logger: logger,
+		logEnqueue: logEnqueue,
 	}
 }
 
@@ -30,7 +30,7 @@ func (i *installer) install(commands []string, mode, taskID string, debug bool) 
 	log.Printf("installer: Installing task: %s", taskID)
 
 	// execute sequentially, return if one fails
-	i.executor = newExecutor(taskID, mode, i.logger, debug)
+	i.executor = newExecutor(taskID, mode, i.logEnqueue, debug)
 	for _, command := range commands {
 		success := i.executor.execute(command)
 		if !success {
@@ -47,7 +47,7 @@ func (i *installer) install(commands []string, mode, taskID string, debug bool) 
 }
 
 func (i *installer) sendLog(mode, task, output string, error bool, debug bool) {
-	i.logger.Send(&model.Log{task, mode, model.CommandByAgent, output, error, model.UnixTime(), debug})
+	i.logEnqueue(&model.Log{task, mode, model.CommandByAgent, output, error, model.UnixTime(), debug})
 }
 
 func (i *installer) sendLogFatal(mode, task, output string) {

@@ -8,14 +8,14 @@ import (
 )
 
 type runner struct {
-	logger    Logger
+	logEnqueue    logQueuer
 	executors []*executor
 	wg        sync.WaitGroup
 }
 
-func newRunner(logger Logger) runner {
+func newRunner(logEnqueue logQueuer) runner {
 	return runner{
-		logger: logger,
+		logEnqueue: logEnqueue,
 	}
 }
 
@@ -33,7 +33,7 @@ func (r *runner) run(commands []string, taskID string, debug bool) {
 	successCh := make(chan bool, len(commands))
 	// run in parallel and wait for them to finish
 	for i, command := range commands {
-		r.executors[i] = newExecutor(taskID, model.StageRun, r.logger, debug)
+		r.executors[i] = newExecutor(taskID, model.StageRun, r.logEnqueue, debug)
 		r.wg.Add(1)
 		go func(c string, e *executor) {
 			defer r.wg.Done()
@@ -56,14 +56,14 @@ func (r *runner) run(commands []string, taskID string, debug bool) {
 }
 
 func (r *runner) sendLog(task, output string, error bool, debug bool) {
-	r.logger.Send(&model.Log{task, model.StageRun, model.CommandByAgent, output, error, model.UnixTime(), debug})
+	r.logEnqueue(&model.Log{task, model.StageRun, model.CommandByAgent, output, error, model.UnixTime(), debug})
 }
 
 func (r *runner) stop() (success bool) {
 	if len(r.executors) == 0 {
 		return true
 	}
-	log.Println("runner: Shutting down the runner...")
+	log.Println("runner: Shutting down...")
 	success = true
 	for i := range r.executors {
 		if !r.executors[i].stop() {

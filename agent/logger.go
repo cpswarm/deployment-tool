@@ -14,11 +14,6 @@ const (
 	LogInterval    = 5 * time.Second
 )
 
-type Logger interface {
-	Report(*model.LogRequest)
-	Send(*model.Log)
-}
-
 type logger struct {
 	// options
 	targetID string
@@ -33,7 +28,9 @@ type logger struct {
 	responseCh chan<- model.Message
 }
 
-func NewLogger(targetID string, debug bool, responseCh chan<- model.Message) Logger {
+type logQueuer func(*model.Log)
+
+func newLogger(targetID string, debug bool, responseCh chan<- model.Message) *logger {
 	l := &logger{
 		targetID:   targetID,
 		debug:      debug,
@@ -48,7 +45,7 @@ func NewLogger(targetID string, debug bool, responseCh chan<- model.Message) Log
 	return l
 }
 
-func (l *logger) Report(request *model.LogRequest) {
+func (l *logger) report(request *model.LogRequest) {
 	logs := l.buffer.Collect()
 	// send logs since request.IfModifiedSince
 	for i := range logs {
@@ -60,23 +57,23 @@ func (l *logger) Report(request *model.LogRequest) {
 	log.Println("No logs since", request.IfModifiedSince)
 }
 
-func (l *logger) Send(logM *model.Log) {
+func (l *logger) enqueue(logM *model.Log) {
 	l.queue <- *logM
 }
 
-func (l *logger) Stop() {
+func (l *logger) stop() {
+	log.Println("logger: Shutting down...")
 	if l.ticker != nil {
 		l.ticker.Stop()
 		close(l.tickerQuit)
-		l.tickerQuit = make(chan struct{})
 	}
+	log.Println("logger: Stopped")
 }
 
 func (l *logger) startTicker() {
 	l.ticker = time.NewTicker(LogInterval)
 	var tickBuffer []model.Log
 	for {
-
 		select {
 		case logM := <-l.queue:
 			if evalEnv(EnvDebug) {
@@ -106,7 +103,6 @@ func (l *logger) startTicker() {
 				l.send(tickBuffer, false)
 				tickBuffer = nil
 			}
-			log.Println("logger: Quit ticker")
 			return
 		}
 	}

@@ -24,7 +24,7 @@ type agent struct {
 
 	pipe         model.Pipe
 	disconnected chan bool
-	logger       Logger
+	logger       *logger
 	installer    installer
 	runner       runner
 }
@@ -45,9 +45,9 @@ func startAgent() (*agent, error) {
 		return nil, fmt.Errorf("error loading conf: %s", err)
 	}
 
-	a.logger = NewLogger(a.target.ID, a.target.TaskDebug, a.pipe.ResponseCh)
-	a.runner = newRunner(a.logger)
-	a.installer = newInstaller(a.logger)
+	a.logger = newLogger(a.target.ID, a.target.TaskDebug, a.pipe.ResponseCh)
+	a.runner = newRunner(a.logger.enqueue)
+	a.installer = newInstaller(a.logger.enqueue)
 
 	// autostart
 	if len(a.target.TaskRun) > 0 {
@@ -273,7 +273,7 @@ func (a *agent) build(build *model.Build, taskID string, debug bool) {
 
 func (a *agent) reportLogs(request *model.LogRequest) {
 	log.Println("Received log request since", request.IfModifiedSince)
-	a.logger.Report(request)
+	a.logger.report(request)
 }
 
 func (a *agent) stopAll() {
@@ -285,5 +285,9 @@ func (a *agent) stopAll() {
 func (a *agent) close() {
 	a.installer.stop()
 	a.runner.stop()
+	// takes time until processes log exit signal
+	// TODO return executor.stop from execute and log exit signal when e.cmd.Process.Release() returns
+	time.Sleep(time.Second)
+	a.logger.stop()
 	a.saveState()
 }

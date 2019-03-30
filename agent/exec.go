@@ -14,26 +14,26 @@ import (
 )
 
 type executor struct {
-	workDir string
-	task    string
-	stage   string
-	logger  Logger
-	cmd     *exec.Cmd
-	debug   bool
+	workDir    string
+	task       string
+	stage      string
+	logEnqueue logQueuer
+	cmd        *exec.Cmd
+	debug      bool
 }
 
-func newExecutor(task, stage string, logger Logger, debug bool) *executor {
+func newExecutor(task, stage string, logEnqueue logQueuer, debug bool) *executor {
 	wd := fmt.Sprintf("%s/tasks/%s", WorkDir, task)
 
 	// force Python std streams to be unbuffered
 	os.Setenv("PYTHONUNBUFFERED", "1")
 
 	return &executor{
-		workDir: fmt.Sprintf("%s/%s", wd, source.ExecDir(wd)),
-		task:    task,
-		stage:   stage,
-		logger:  logger,
-		debug:   debug,
+		workDir:    fmt.Sprintf("%s/%s", wd, source.ExecDir(wd)),
+		task:       task,
+		stage:      stage,
+		logEnqueue: logEnqueue,
+		debug:      debug,
 	}
 }
 
@@ -99,7 +99,7 @@ func (e *executor) execute(command string) (success bool) {
 }
 
 func (e *executor) sendLog(command, output string, error bool) {
-	e.logger.Send(&model.Log{e.task, e.stage, command, output, error, model.UnixTime(), e.debug})
+	e.logEnqueue(&model.Log{e.task, e.stage, command, output, error, model.UnixTime(), e.debug})
 }
 
 func (e *executor) sendLogFatal(command, output string) {
