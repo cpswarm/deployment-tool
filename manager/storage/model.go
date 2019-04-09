@@ -70,7 +70,7 @@ func (o Order) Validate() error {
 	// validate deploy
 	if o.Deploy != nil && len(o.Deploy.Install.Commands)+len(o.Deploy.Run.Commands)+len(o.Deploy.Target.IDs)+len(o.Deploy.Target.Tags) > 0 {
 		if len(o.Deploy.Target.IDs)+len(o.Deploy.Target.Tags) == 0 {
-			return fmt.Errorf("both deploy.target.ids and deploy.target.ids are empty")
+			return fmt.Errorf("both deploy.target.ids and deploy.target.tags are empty")
 		}
 		if len(o.Deploy.Install.Commands)+len(o.Deploy.Run.Commands) == 0 {
 			return fmt.Errorf("both deploy.install.commands and deploy.run.commands are empty")
