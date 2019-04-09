@@ -47,6 +47,9 @@ func (o Order) Validate() error {
 
 	// validate build
 	if o.Build != nil && len(o.Build.Commands)+len(o.Build.Artifacts)+len(o.Build.Host) > 0 {
+		if o.Source.Order != nil {
+			return fmt.Errorf("source.order is set to take artifacts from a previous order.build. build should be omitted")
+		}
 		if len(o.Build.Commands) == 0 {
 			return fmt.Errorf("build.commands empty")
 		}

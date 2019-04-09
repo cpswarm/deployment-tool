@@ -15,8 +15,7 @@ const (
 type Source struct {
 	Paths *Paths `json:"paths"`
 	Zip   *Zip   `json:"zip"`
-	//Git   *Git   `json:"git"`
-	//Order *Order `json:"order"`
+	Order *Order `json:"order"`
 }
 
 func ExecDir(workDir string) string {
