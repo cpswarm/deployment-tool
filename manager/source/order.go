@@ -9,11 +9,11 @@ import (
 
 type Order string
 
-// fetches files from a previous order into workdir/id/<name>
-func (order Order) Fetch(orderID string) error {
-	prevOrder := fmt.Sprintf("%s/%s/%s", OrdersDir, order, PackageDir)
-	log.Println("Copying from prev order...")
-	err := copier.Copy(prevOrder, fmt.Sprintf("%s/%s/%s", OrdersDir, orderID, SourceDir))
+// Fetch copies artifacts from source into destination order
+func (sourceID Order) Fetch(destID string) error {
+	prevOrder := fmt.Sprintf("%s/%s/%s", OrdersDir, sourceID, PackageDir)
+	log.Printf("Fetching artifacts from %s to %s", sourceID, destID)
+	err := copier.Copy(prevOrder, fmt.Sprintf("%s/%s/%s", OrdersDir, destID, PackageDir))
 	if err != nil {
 		return err
 	}
