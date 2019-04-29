@@ -567,9 +567,20 @@ func (m *manager) requestLogs(targetID string) error {
 	if err != nil {
 		return fmt.Errorf("error querying target: %s", err)
 	}
-	w := model.RequestWrapper{LogRequest: &model.LogRequest{
-		IfModifiedSince: target.LogRequestAt,
-	}}
+	w := model.RequestWrapper{
+		Time:       model.UnixTime(),
+		LogRequest: &model.LogRequest{IfModifiedSince: target.LogRequestAt},
+	}
+	b, _ := json.Marshal(&w)
+	m.pipe.RequestCh <- model.Message{model.FormatTopicID(targetID), b}
+	return nil
+}
+
+func (m *manager) terminalCommand(targetID, command string) error {
+	w := model.RequestWrapper{
+		Time:    model.UnixTime(),
+		Command: &command,
+	}
 	b, _ := json.Marshal(&w)
 	m.pipe.RequestCh <- model.Message{model.FormatTopicID(targetID), b}
 	return nil

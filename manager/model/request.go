@@ -16,6 +16,9 @@ const (
 	// Task types
 	TaskTypeBuild  = 1
 	TaskTypeDeploy = 2
+	TaskTerminal   = "terminal"
+
+	TerminalStop = "TERM-STOP"
 )
 
 type Build struct {
@@ -67,6 +70,7 @@ type LogRequest struct {
 
 // RequestWrapper is the struct of messages sent to request topics
 type RequestWrapper struct {
+	Time         UnixTimeType  `json:"t"` // to detect redundant messages
 	Announcement *Announcement `json:"a,omitempty"`
 	LogRequest   *LogRequest   `json:"l,omitempty"`
 	Command      *string       `json:"c,omitempty"`

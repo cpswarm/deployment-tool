@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/storage"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -87,6 +88,8 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/targets/{id}", a.updateTarget).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/stop", a.stopTargetOrders).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/logs", a.requestTargetLogs).Methods(http.MethodPut)
+	r.HandleFunc("/targets/{id}/command", a.executeCommand).Methods(http.MethodPut)
+	r.HandleFunc("/targets/{id}/command", a.stopCommand).Methods(http.MethodDelete)
 	// tasks
 	r.HandleFunc("/orders", a.getOrders).Methods(http.MethodGet)
 	r.HandleFunc("/orders/{id}", a.getOrder).Methods(http.MethodGet)
@@ -397,6 +400,72 @@ func (a *restAPI) requestTargetLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	HTTPResponseSuccess(w, http.StatusOK, "Requested logs for ", id)
+	return
+}
+
+func (a *restAPI) executeCommand(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	target, err := a.manager.getTarget(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if target == nil {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	b, err := ioutil.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	body := make(map[string]string)
+	err = json.Unmarshal(b, &body)
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if body["command"] == "" {
+		HTTPResponseError(w, http.StatusBadRequest, "command not given")
+		return
+	}
+
+	err = a.manager.terminalCommand(id, body["command"])
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	HTTPResponseSuccess(w, http.StatusOK, "Sent command to ", id)
+	return
+}
+
+func (a *restAPI) stopCommand(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	target, err := a.manager.getTarget(id)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if target == nil {
+		HTTPResponseError(w, http.StatusNotFound, id+" is not found!")
+		return
+	}
+
+	err = a.manager.terminalCommand(id, model.TerminalStop)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	return
 }
 

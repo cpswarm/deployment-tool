@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 const (
 	AdvInterval = 60 * time.Second
+	TerminalDir = "terminal"
 )
 
 type agent struct {
@@ -27,6 +29,7 @@ type agent struct {
 	logger       *logger
 	installer    installer
 	runner       runner
+	terminal     *executor
 }
 
 // TODO
@@ -49,6 +52,11 @@ func startAgent() (*agent, error) {
 	a.runner = newRunner(a.logger.enqueue)
 	a.installer = newInstaller(a.logger.enqueue)
 
+	err = a.setupTerminal()
+	if err != nil {
+		return nil, fmt.Errorf("error setting up terminal: %s", err)
+	}
+
 	// autostart
 	if len(a.target.TaskRun) > 0 {
 		go a.runner.run(a.target.TaskRun, a.target.TaskID, a.target.TaskDebug)
@@ -58,13 +66,22 @@ func startAgent() (*agent, error) {
 	return a, nil
 }
 
+func (a *agent) setupTerminal() error {
+	err := os.MkdirAll(fmt.Sprintf("%s/%s", WorkDir, TerminalDir), 0755)
+	if err != nil {
+		return fmt.Errorf("error creating terminal directory: %s", err)
+	}
+	a.terminal = newExecutor(model.TaskTerminal, "", a.logger.enqueue, true)
+	return nil
+}
+
 func (a *agent) startWorker() {
 	topics := a.subscribe()
 
-	log.Println("Waiting for connection and requests...")
+	log.Println("worker: Waiting for connection and requests...")
 	var latestMessageChecksum [16]byte
 	for request := range a.pipe.RequestCh {
-		log.Println("Request topic:", request.Topic)
+		log.Println("worker: Request topic:", request.Topic)
 		switch {
 		case request.Topic == model.PipeConnected:
 			go a.connected()
@@ -76,6 +93,8 @@ func (a *agent) startWorker() {
 			if latestMessageChecksum != sum {
 				go a.handleRequest(request.Payload)
 				latestMessageChecksum = sum
+			} else {
+				log.Println("worker: Discarded redundant request")
 			}
 		default:
 			// topic is the task id
@@ -147,7 +166,7 @@ func (a *agent) handleRequest(payload []byte) {
 	case w.LogRequest != nil:
 		a.reportLogs(w.LogRequest)
 	case w.Command != nil:
-		// TODO execute a single command and send the logs
+		a.executeCommand(w.Command)
 	case w.StopAll != nil:
 		a.stopAll()
 	default:
@@ -274,6 +293,25 @@ func (a *agent) build(build *model.Build, taskID string, debug bool) {
 func (a *agent) reportLogs(request *model.LogRequest) {
 	log.Println("Received log request since", request.IfModifiedSince)
 	a.logger.report(request)
+}
+
+func (a *agent) executeCommand(command *string) {
+	log.Printf("Remote command exec: %s", *command)
+
+	switch *command {
+	case model.TerminalStop:
+		if a.terminal.cmd == nil {
+			a.sendLog(model.TaskTerminal, "", "nothing to stop", false, true)
+			return
+		}
+		a.terminal.stop()
+	default:
+		if a.terminal.cmd != nil {
+			a.sendLog(model.TaskTerminal, "", "unable to execute: terminal is busy", true, true)
+			return
+		}
+		a.terminal.execute(*command)
+	}
 }
 
 func (a *agent) stopAll() {

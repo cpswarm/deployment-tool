@@ -23,13 +23,19 @@ type executor struct {
 }
 
 func newExecutor(task, stage string, logEnqueue logQueuer, debug bool) *executor {
-	wd := fmt.Sprintf("%s/tasks/%s", WorkDir, task)
+	var wd string
+	if task == model.TaskTerminal {
+		wd = fmt.Sprintf("%s/%s", WorkDir, TerminalDir)
+	} else {
+		wd = fmt.Sprintf("%s/tasks/%s", WorkDir, task)
+		wd += "/" + source.ExecDir(wd)
+	}
 
 	// force Python std streams to be unbuffered
 	os.Setenv("PYTHONUNBUFFERED", "1")
 
 	return &executor{
-		workDir:    fmt.Sprintf("%s/%s", wd, source.ExecDir(wd)),
+		workDir:    wd,
 		task:       task,
 		stage:      stage,
 		logEnqueue: logEnqueue,
