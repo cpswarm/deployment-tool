@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
@@ -66,32 +67,26 @@ func (e *executor) execute(command string) (success bool) {
 		return false
 	}
 
+	var wg sync.WaitGroup
+
 	// stdout reader
+	wg.Add(1)
 	go func(stream io.ReadCloser) {
 		scanner := bufio.NewScanner(stream)
-
 		for scanner.Scan() {
 			e.sendLog(command, scanner.Text(), false)
 		}
-		if err = scanner.Err(); err != nil {
-			e.sendLog(command, err.Error(), true)
-			log.Println("executor: Error:", err)
-		}
-		stream.Close()
+		wg.Done()
 	}(outStream)
 
 	// stderr reader
+	wg.Add(1)
 	go func(stream io.ReadCloser) {
 		scanner := bufio.NewScanner(stream)
-
 		for scanner.Scan() {
 			e.sendLog(command, scanner.Text(), true)
 		}
-		if err = scanner.Err(); err != nil {
-			e.sendLog(command, err.Error(), true)
-			log.Println("executor: Error:", err)
-		}
-		stream.Close()
+		wg.Done()
 	}(errStream)
 
 	err = e.cmd.Run()
@@ -99,6 +94,7 @@ func (e *executor) execute(command string) (success bool) {
 		e.sendLogFatal(command, err.Error())
 		return false
 	}
+	wg.Wait()
 	e.sendLog(command, model.ExecEnd, false)
 	e.cmd = nil
 	return true
