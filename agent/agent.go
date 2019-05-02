@@ -71,7 +71,7 @@ func (a *agent) setupTerminal() error {
 	if err != nil {
 		return fmt.Errorf("error creating terminal directory: %s", err)
 	}
-	a.terminal = newExecutor(model.TaskTerminal, "", a.logger.enqueue, true)
+	a.terminal = newExecutor(model.TaskTerminal, "", a.logger.priorityEnqueue, true)
 	return nil
 }
 

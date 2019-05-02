@@ -8,12 +8,12 @@ import (
 )
 
 type runner struct {
-	logEnqueue    logQueuer
-	executors []*executor
-	wg        sync.WaitGroup
+	logEnqueue enqueueFunc
+	executors  []*executor
+	wg         sync.WaitGroup
 }
 
-func newRunner(logEnqueue logQueuer) runner {
+func newRunner(logEnqueue enqueueFunc) runner {
 	return runner{
 		logEnqueue: logEnqueue,
 	}

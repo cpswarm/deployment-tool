@@ -81,11 +81,14 @@ func (l *logger) startTicker() {
 	}
 }
 
-// logQueuer is the type of enqueue function
-type logQueuer func(*model.Log)
+type enqueueFunc func(*model.Log)
 
 func (l *logger) enqueue(logM *model.Log) {
 	l.queue <- *logM
+}
+
+func (l *logger) priorityEnqueue(logM *model.Log) {
+	l.send([]model.Log{*logM}, false)
 }
 
 func (l *logger) send(logs []model.Log, onRequest bool) {
@@ -95,7 +98,7 @@ func (l *logger) send(logs []model.Log, onRequest bool) {
 		Logs:      logs,
 		OnRequest: onRequest,
 	})
-	l.responseCh <- model.Message{string(model.ResponseLog), b}
+	l.responseCh <- model.Message{string(model.ResponseLogs), b}
 }
 
 func (l *logger) report(request *model.LogRequest) {

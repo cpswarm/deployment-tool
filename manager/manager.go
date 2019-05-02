@@ -647,6 +647,12 @@ func (m *manager) processResponse(response *model.Response) {
 
 	defer func(start time.Time) { log.Println("Processing response took", time.Since(start)) }(time.Now())
 
+	// terminal response
+	if len(response.Logs) == 1 && response.Logs[0].Task == model.TaskTerminal {
+		m.publishEvent(EventLogs, []storage.Log{{Log: response.Logs[0], Target: response.TargetID}})
+		return
+	}
+
 	// response to log request
 	if response.OnRequest {
 		target := storage.Target{

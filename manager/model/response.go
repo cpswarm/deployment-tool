@@ -4,7 +4,7 @@ import "time"
 
 const (
 	// Response types (topics)
-	ResponseLog           = "LOG" // logs
+	ResponseLogs          = "LOG" // logs
 	ResponseAdvertisement = "ADV" // device advertisement
 	ResponsePackage       = "PKG" // assembled artifacts
 

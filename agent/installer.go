@@ -7,11 +7,11 @@ import (
 )
 
 type installer struct {
-	logEnqueue logQueuer
+	logEnqueue enqueueFunc
 	executor   *executor
 }
 
-func newInstaller(logEnqueue logQueuer) installer {
+func newInstaller(logEnqueue enqueueFunc) installer {
 	return installer{
 		logEnqueue: logEnqueue,
 	}

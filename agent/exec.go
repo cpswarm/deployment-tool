@@ -17,12 +17,12 @@ type executor struct {
 	workDir    string
 	task       string
 	stage      string
-	logEnqueue logQueuer
+	logEnqueue enqueueFunc
 	cmd        *exec.Cmd
 	debug      bool
 }
 
-func newExecutor(task, stage string, logEnqueue logQueuer, debug bool) *executor {
+func newExecutor(task, stage string, logEnqueue enqueueFunc, debug bool) *executor {
 	var wd string
 	if task == model.TaskTerminal {
 		wd = fmt.Sprintf("%s/%s", WorkDir, TerminalDir)
@@ -118,6 +118,8 @@ func (e *executor) stop() (success bool) {
 	if e.cmd == nil || e.cmd.Process == nil {
 		return true
 	}
+	defer func() { e.cmd = nil }()
+
 	pid := e.cmd.Process.Pid
 
 	err := e.cmd.Process.Signal(syscall.SIGTERM)
