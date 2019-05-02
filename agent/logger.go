@@ -15,23 +15,18 @@ const (
 )
 
 type logger struct {
-	// options
-	targetID string
-	//taskID   string
-	debug bool
+	targetID   string
+	responseCh chan<- model.Message
 
 	buffer     buffer.Buffer
 	queue      chan model.Log
 	ticker     *time.Ticker
 	tickerQuit chan struct{}
-
-	responseCh chan<- model.Message
 }
 
-func newLogger(targetID string, debug bool, responseCh chan<- model.Message) *logger {
+func newLogger(targetID string, responseCh chan<- model.Message) *logger {
 	l := &logger{
 		targetID:   targetID,
-		debug:      debug,
 		responseCh: responseCh,
 		buffer:     buffer.NewBuffer(BufferCapacity),
 		tickerQuit: make(chan struct{}),
@@ -44,12 +39,13 @@ func newLogger(targetID string, debug bool, responseCh chan<- model.Message) *lo
 }
 
 func (l *logger) startTicker() {
+	envDebug := evalEnv(EnvDebug)
 	l.ticker = time.NewTicker(LogInterval)
 	var tickBuffer []model.Log
 	for {
 		select {
 		case logM := <-l.queue:
-			if evalEnv(EnvDebug) {
+			if envDebug {
 				if logM.Error {
 					log.Println("logger: Err:", logM.Output)
 				} else {

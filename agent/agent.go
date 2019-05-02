@@ -48,7 +48,7 @@ func startAgent() (*agent, error) {
 		return nil, fmt.Errorf("error loading conf: %s", err)
 	}
 
-	a.logger = newLogger(a.target.ID, a.target.TaskDebug, a.pipe.ResponseCh)
+	a.logger = newLogger(a.target.ID, a.pipe.ResponseCh)
 	a.runner = newRunner(a.logger.enqueue)
 	a.installer = newInstaller(a.logger.enqueue)
 
