@@ -15,15 +15,18 @@ import (
 )
 
 type manager struct {
-	storage storage.Storage
-	pipe    model.Pipe
-	events  *pubsub.PubSub
+	storage        storage.Storage
+	pipe           model.Pipe
+	responseBuffer chan *model.Response
+	events         *pubsub.PubSub
 }
 
 const (
 	EventLogs          = "logs"
 	EventTargetAdded   = "targetAdded"
 	EventTargetUpdated = "targetUpdated"
+	EventChannelCap    = 10
+	ResponseBufferCap  = 100
 )
 
 type event struct {
@@ -38,9 +41,10 @@ func startManager(pipe model.Pipe, storageDSN string) (*manager, error) {
 	}
 
 	m := &manager{
-		storage: s,
-		pipe:    pipe,
-		events:  pubsub.New(10),
+		storage:        s,
+		pipe:           pipe,
+		responseBuffer: make(chan *model.Response, ResponseBufferCap),
+		events:         pubsub.New(EventChannelCap),
 	}
 
 	go m.manageResponses()
@@ -594,6 +598,7 @@ func (m *manager) requestStopAll(targetID string) {
 
 func (m *manager) manageResponses() {
 	defer recovery()
+	go m.responseSorter()
 	for resp := range m.pipe.ResponseCh {
 		switch resp.Topic {
 		case model.ResponseAdvertisement:
@@ -622,7 +627,8 @@ func (m *manager) manageResponses() {
 				log.Printf("payload was: %s", string(resp.Payload))
 				continue
 			}
-			go m.processResponse(&response)
+			//go m.processResponse(&response)
+			m.responseBuffer <- &response // TODO spawn another routine when buffer is full?
 		}
 	}
 }
@@ -639,6 +645,12 @@ func (m *manager) processTarget(target *storage.Target) {
 		return
 	}
 	m.publishEvent(EventTargetAdded, target)
+}
+
+func (m *manager) responseSorter() {
+	for r := range m.responseBuffer {
+		m.processResponse(r)
+	}
 }
 
 func (m *manager) processResponse(response *model.Response) {
