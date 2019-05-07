@@ -39,6 +39,7 @@ const (
 	_tags            = "tags"
 	_topics          = "topics"
 	_description     = "description"
+	_tokenHeader     = "X-Auth-Token"
 	defaultPage      = 1
 	defaultPerPage   = 100
 	defaultSortOrder = _asc
@@ -85,7 +86,8 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/targets", a.getTargets).Methods(http.MethodGet)
 	r.HandleFunc("/targets/{id}", a.getTarget).Methods(http.MethodGet)
 	r.HandleFunc("/targets/{id}", a.deleteTarget).Methods(http.MethodDelete)
-	r.HandleFunc("/targets/{id}", a.updateTarget).Methods(http.MethodPut)
+	r.HandleFunc("/targets/{id}", a.registerTarget).Methods(http.MethodPut)
+	r.HandleFunc("/targets/{id}", a.patchTarget).Methods(http.MethodPatch)
 	r.HandleFunc("/targets/{id}/stop", a.stopTargetOrders).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/logs", a.requestTargetLogs).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/command", a.executeCommand).Methods(http.MethodPut)
@@ -100,6 +102,10 @@ func (a *restAPI) setupRouter() {
 	// logs
 	r.HandleFunc("/logs", a.getLogs).Methods(http.MethodGet)
 	r.HandleFunc("/logs/search", a.searchLogs).Methods(http.MethodGet)
+	// tokens
+	r.HandleFunc("/tokens", a.getTokens).Methods(http.MethodGet)
+	r.HandleFunc("/tokens", a.createToken).Methods(http.MethodPost)
+	r.HandleFunc("/tokens/{token}", a.deleteToken).Methods(http.MethodDelete)
 
 	// static
 	ui := http.Dir(WorkDir + "/ui")
@@ -123,7 +129,7 @@ func (a *restAPI) addOrder(w http.ResponseWriter, r *http.Request) {
 	var order storage.Order
 	err := decoder.Decode(&order)
 	if err != nil {
-		HTTPResponseError(w, http.StatusInternalServerError, err)
+		HTTPResponseError(w, http.StatusBadRequest, err)
 		return
 	}
 	log.Println("Received order:", order)
@@ -353,7 +359,7 @@ func (a *restAPI) deleteTarget(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) updateTarget(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
@@ -361,12 +367,42 @@ func (a *restAPI) updateTarget(w http.ResponseWriter, r *http.Request) {
 	var target storage.Target
 	err := decoder.Decode(&target)
 	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	token := r.Header.Get(_tokenHeader)
+	if token == "" {
+		HTTPResponseError(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+	}
+
+	// TODO validate the token
+
+	id := mux.Vars(r)["id"]
+	err = a.manager.addTarget(id, &target)
+	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+func (a *restAPI) patchTarget(w http.ResponseWriter, r *http.Request) {
+
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+
+	var target storage.Target
+	err := decoder.Decode(&target)
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err)
+		return
+	}
+
 	id := mux.Vars(r)["id"]
-	found, err := a.manager.updateTarget(id, &target)
+	found, err := a.manager.patchTarget(id, &target)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -570,6 +606,31 @@ func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	HTTPResponse(w, http.StatusOK, b)
 	return
+}
+
+func (a *restAPI) getTokens(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (a *restAPI) createToken(w http.ResponseWriter, r *http.Request) {
+	token, err := a.manager.createToken()
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	b, err := json.Marshal(token)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	HTTPResponse(w, http.StatusOK, b)
+	return
+
+}
+
+func (a *restAPI) deleteToken(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {

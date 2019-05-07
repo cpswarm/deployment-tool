@@ -27,6 +27,8 @@ const (
 	EventTargetUpdated = "targetUpdated"
 	EventChannelCap    = 10
 	ResponseBufferCap  = 100
+	TokenLength        = 12
+	TokenValidityDays  = 7
 )
 
 type event struct {
@@ -314,10 +316,18 @@ func (m *manager) stopTargetOrders(targetID string) (found bool, err error) {
 	return true, nil
 }
 
-func (m *manager) updateTarget(id string, target *storage.Target) (found bool, err error) {
+func (m *manager) addTarget(id string, target *storage.Target) error {
+	err := m.storage.AddTarget(target)
+	if err != nil {
+		return fmt.Errorf("error adding target: %s", err)
+	}
+	return nil
+}
+
+func (m *manager) patchTarget(id string, target *storage.Target) (found bool, err error) {
 	t, err := m.storage.GetTarget(id)
 	if err != nil {
-		return false, fmt.Errorf("error getting target for update: %s", err)
+		return false, fmt.Errorf("error getting target: %s", err)
 	}
 	if t == nil {
 		return false, nil
@@ -328,7 +338,8 @@ func (m *manager) updateTarget(id string, target *storage.Target) (found bool, e
 	target.CreatedAt = t.CreatedAt
 
 	target.UpdatedAt = model.UnixTime()
-	found, err = m.storage.IndexTarget(id, target)
+
+	found, err = m.storage.PatchTarget(id, target)
 	if err != nil {
 		return false, fmt.Errorf("error patching target: %s", err)
 	}
@@ -356,6 +367,22 @@ func (m *manager) searchLogs(search map[string]interface{}) ([]storage.Log, int6
 		return nil, 0, fmt.Errorf("error querying logs: %s", err)
 	}
 	return logs, total, nil
+}
+
+func (m *manager) createToken() (*storage.Token, error) {
+
+	var token storage.Token
+	var err error
+	token.Keystring, err = GenerateRandomToken(TokenLength)
+	if err != nil {
+		log.Printf("Error creating token: %s", err)
+		return nil, fmt.Errorf("error creating token")
+	}
+	token.ExpiresAt = model.UnixTimeType(time.Now().AddDate(0, 0, TokenValidityDays).Unix() * 1e3)
+
+	// TODO encrypt tokens in database using manager's public key
+
+	return &token, nil
 }
 
 func (m *manager) fetchSource(orderID string, src *source.Source) error {

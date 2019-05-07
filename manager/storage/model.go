@@ -97,3 +97,11 @@ type Log struct {
 	model.Log
 	Target string `json:"target,omitempty"`
 }
+
+//
+// TOKEN
+//
+type Token struct {
+	Keystring string             `json:"keystring"`
+	ExpiresAt model.UnixTimeType `json:"expiresAt"`
+}
