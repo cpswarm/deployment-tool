@@ -103,9 +103,10 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/logs", a.getLogs).Methods(http.MethodGet)
 	r.HandleFunc("/logs/search", a.searchLogs).Methods(http.MethodGet)
 	// tokens
-	r.HandleFunc("/tokens", a.getTokens).Methods(http.MethodGet)
-	r.HandleFunc("/tokens", a.createToken).Methods(http.MethodPost)
-	r.HandleFunc("/tokens/{token}", a.deleteToken).Methods(http.MethodDelete)
+	r.HandleFunc("/token_sets", a.getTokenSets).Methods(http.MethodGet)
+	r.HandleFunc("/token_sets", a.createTokenSet).Methods(http.MethodPost)
+	r.HandleFunc("/token_sets/{name}", a.getTokenSet).Methods(http.MethodGet)
+	r.HandleFunc("/token_sets/{name}", a.deleteTokenSet).Methods(http.MethodDelete)
 
 	// static
 	ui := http.Dir(WorkDir + "/ui")
@@ -608,11 +609,11 @@ func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (a *restAPI) getTokens(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) getTokenSets(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (a *restAPI) createToken(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
 	token, err := a.manager.createToken()
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
@@ -629,7 +630,11 @@ func (a *restAPI) createToken(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (a *restAPI) deleteToken(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) getTokenSet(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (a *restAPI) deleteTokenSet(w http.ResponseWriter, r *http.Request) {
 
 }
 

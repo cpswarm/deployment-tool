@@ -33,6 +33,11 @@ type Storage interface {
 	AddLogs(logs []Log) error
 	DeleteLogs(target, task string) error
 	DeliveredTask(target, task string) (delivered bool, err error)
+	//
+	GetTokens(tag string) ([]Token, error)
+	AddToken(Token) error
+	DeleteToken(hash string) error
+	DeleteTokens(tag string) error
 }
 
 type storage struct {
@@ -64,6 +69,7 @@ const (
 	indexTarget      = "target"
 	indexOrder       = "order"
 	indexLog         = "log"
+	indexToken       = "token"
 	typeFixed        = "_doc"
 	mappingStrict    = "strict"
 	propTypeKeyword  = "keyword"
@@ -185,6 +191,21 @@ func NewElasticStorage(url string) (Storage, error) {
 		"error":   {Type: propTypeBool},
 	}
 	err = s.createIndex(indexLog, m)
+	if err != nil {
+		return nil, err
+	}
+
+	m = mapping{}
+	m.Settings.Shards = 1
+	m.Settings.Replicas = 0
+	m.Settings.RefreshInterval = "1s"
+	m.Mappings.Doc.Dynamic = mappingStrict
+	m.Mappings.Doc.Prop = map[string]mappingProp{
+		"time":   {Type: propTypeDate},
+		"name":   {Type: propTypeKeyword},
+		"tokenH": {Type: propTypeKeyword},
+	}
+	err = s.createIndex(indexToken, m)
 	if err != nil {
 		return nil, err
 	}
@@ -605,4 +626,61 @@ func (s *storage) DeliveredTask(target, task string) (delivered bool, err error)
 	}
 
 	return searchResult.Hits.TotalHits > 0, nil
+}
+
+func (s *storage) GetTokens(tag string) ([]Token, error) {
+	query := elastic.NewBoolQuery()
+	if tag != "" {
+		query.Must(elastic.NewMatchQuery("tag", tag))
+	}
+
+	searchResult, err := s.client.Search().Index(indexTarget).Type(typeFixed).
+		Query(query).Sort("expiresAt", false).Do(s.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var tokens []Token
+	if searchResult.Hits.TotalHits > 0 {
+		tokens = make([]Token, searchResult.Hits.TotalHits)
+		for i, hit := range searchResult.Hits.Hits {
+			err := json.Unmarshal(*hit.Source, &tokens[i])
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		log.Print("Found no entries")
+	}
+	return tokens, nil
+}
+
+func (s *storage) AddToken(token Token) error {
+	res, err := s.client.Index().Index(indexToken).Type(typeFixed).
+		Id(token.Hash).BodyJson(token).Do(s.ctx)
+	if err != nil {
+		return err
+	}
+	log.Printf("Indexed %s/%s v%d", res.Index, res.Id, res.Version)
+	return nil
+}
+
+func (s *storage) DeleteToken(hash string) error {
+	res, err := s.client.Delete().Index(indexToken).Type(typeFixed).
+		Id(hash).Do(s.ctx)
+	if err != nil {
+		return err
+	}
+	log.Printf("Deleted %s/%s v%d", res.Index, res.Id, res.Version)
+	return nil
+}
+
+func (s *storage) DeleteTokens(tag string) error {
+	query := elastic.NewBoolQuery().Must(elastic.NewMatchQuery("tag", tag))
+
+	_, err := s.client.DeleteByQuery(indexToken).Query(query).Do(s.ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
