@@ -37,6 +37,8 @@ const (
 	_output          = "output"
 	_error           = "error"
 	_tags            = "tags"
+	_tag             = "tag"
+	_total           = "total"
 	_topics          = "topics"
 	_description     = "description"
 	_tokenHeader     = "X-Auth-Token"
@@ -105,8 +107,8 @@ func (a *restAPI) setupRouter() {
 	// tokens
 	r.HandleFunc("/token_sets", a.getTokenSets).Methods(http.MethodGet)
 	r.HandleFunc("/token_sets", a.createTokenSet).Methods(http.MethodPost)
-	r.HandleFunc("/token_sets/{name}", a.getTokenSet).Methods(http.MethodGet)
-	r.HandleFunc("/token_sets/{name}", a.deleteTokenSet).Methods(http.MethodDelete)
+	r.HandleFunc("/token_sets/{tag}", a.getTokenSet).Methods(http.MethodGet)
+	r.HandleFunc("/token_sets/{tag}", a.deleteTokenSet).Methods(http.MethodDelete)
 
 	// static
 	ui := http.Dir(WorkDir + "/ui")
@@ -368,7 +370,7 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 	var target storage.Target
 	err := decoder.Decode(&target)
 	if err != nil {
-		HTTPResponseError(w, http.StatusBadRequest, err)
+		HTTPResponseError(w, http.StatusBadRequest, "error parsing body: "+err.Error())
 		return
 	}
 
@@ -377,8 +379,17 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 		HTTPResponseError(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
 	}
 
-	// TODO validate the token
+	valid, err := a.manager.consumeToken(token)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !valid {
+		HTTPResponseError(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+		return
+	}
 
+	// TODO what if this fails???
 	id := mux.Vars(r)["id"]
 	err = a.manager.addTarget(id, &target)
 	if err != nil {
@@ -611,16 +622,48 @@ func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 
 func (a *restAPI) getTokenSets(w http.ResponseWriter, r *http.Request) {
 
-}
-
-func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
-	token, err := a.manager.createToken()
+	sets, err := a.manager.getTokenSets()
 	if err != nil {
-		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	b, err := json.Marshal(token)
+	b, err := json.Marshal(&list{int64(len(sets)), sets, 0, 0})
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	HTTPResponse(w, http.StatusOK, b)
+	return
+}
+
+func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	if query.Get(_total) == "" {
+		HTTPResponseError(w, http.StatusBadRequest, _total+" parameter is not given")
+		return
+	}
+	if query.Get(_tag) == "" {
+		HTTPResponseError(w, http.StatusBadRequest, _tag+" parameter is not given")
+		return
+	}
+
+	total, err := strconv.Atoi(query.Get(_total))
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, fmt.Sprintf("error parsing %s: %s", _total, err))
+		return
+	}
+
+	tokenSet, err := a.manager.createTokenSet(total, query.Get(_tag))
+	if err != nil {
+		log.Printf("Error creating set: %s", err)
+		HTTPResponseError(w, http.StatusInternalServerError, "error creating set") // should be vague
+		return
+	}
+
+	b, err := json.Marshal(tokenSet)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -631,11 +674,33 @@ func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *restAPI) getTokenSet(w http.ResponseWriter, r *http.Request) {
+	tag := mux.Vars(r)[_tag]
 
+	tokenSet, err := a.manager.getTokenSet(tag)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, "error creating set: "+err.Error())
+		return
+	}
+
+	b, err := json.Marshal(tokenSet)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	HTTPResponse(w, http.StatusOK, b)
+	return
 }
 
 func (a *restAPI) deleteTokenSet(w http.ResponseWriter, r *http.Request) {
+	tag := mux.Vars(r)[_tag]
 
+	err := a.manager.deleteTokenSet(tag)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, "error deleting set: "+err.Error())
+		return
+	}
+
+	return
 }
 
 func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {

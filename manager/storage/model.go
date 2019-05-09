@@ -101,15 +101,11 @@ type Log struct {
 //
 // TOKEN
 //
-type TokenSet struct {
-	Name      string             `json:"name"`
-	Total     uint               `json:"total"`
-	Tokens    []string           `json:"tokens,omitempty"`
+type TokenMeta struct {
+	Tag       string             `json:"tag"`
 	ExpiresAt model.UnixTimeType `json:"expiresAt"`
 }
-
-type Token struct {
-	Name      string             `json:"name"`
-	Hash      string             `json:"hash"`
-	ExpiresAt model.UnixTimeType `json:"expiresAt"`
+type TokenHashed struct {
+	TokenMeta
+	Hash string `json:"hash"`
 }

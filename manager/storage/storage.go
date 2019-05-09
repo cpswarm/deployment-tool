@@ -34,9 +34,9 @@ type Storage interface {
 	DeleteLogs(target, task string) error
 	DeliveredTask(target, task string) (delivered bool, err error)
 	//
-	GetTokens(tag string) ([]Token, error)
-	AddToken(Token) error
-	DeleteToken(hash string) error
+	GetTokens(tag string) ([]TokenMeta, error)
+	AddToken(TokenHashed) (duplicate bool, err error)
+	DeleteToken(hash string) (found bool, err error)
 	DeleteTokens(tag string) error
 }
 
@@ -201,9 +201,9 @@ func NewElasticStorage(url string) (Storage, error) {
 	m.Settings.RefreshInterval = "1s"
 	m.Mappings.Doc.Dynamic = mappingStrict
 	m.Mappings.Doc.Prop = map[string]mappingProp{
-		"time":   {Type: propTypeDate},
-		"name":   {Type: propTypeKeyword},
-		"tokenH": {Type: propTypeKeyword},
+		"tag":       {Type: propTypeKeyword},
+		"hash":      {Type: propTypeKeyword},
+		"expiresAt": {Type: propTypeDate},
 	}
 	err = s.createIndex(indexToken, m)
 	if err != nil {
@@ -628,21 +628,21 @@ func (s *storage) DeliveredTask(target, task string) (delivered bool, err error)
 	return searchResult.Hits.TotalHits > 0, nil
 }
 
-func (s *storage) GetTokens(tag string) ([]Token, error) {
+func (s *storage) GetTokens(tag string) ([]TokenMeta, error) {
 	query := elastic.NewBoolQuery()
 	if tag != "" {
 		query.Must(elastic.NewMatchQuery("tag", tag))
 	}
 
-	searchResult, err := s.client.Search().Index(indexTarget).Type(typeFixed).
+	searchResult, err := s.client.Search().Index(indexToken).Type(typeFixed).
 		Query(query).Sort("expiresAt", false).Do(s.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var tokens []Token
+	var tokens []TokenMeta
 	if searchResult.Hits.TotalHits > 0 {
-		tokens = make([]Token, searchResult.Hits.TotalHits)
+		tokens = make([]TokenMeta, searchResult.Hits.TotalHits)
 		for i, hit := range searchResult.Hits.Hits {
 			err := json.Unmarshal(*hit.Source, &tokens[i])
 			if err != nil {
@@ -655,24 +655,32 @@ func (s *storage) GetTokens(tag string) ([]Token, error) {
 	return tokens, nil
 }
 
-func (s *storage) AddToken(token Token) error {
+func (s *storage) AddToken(token TokenHashed) (duplicate bool, err error) {
 	res, err := s.client.Index().Index(indexToken).Type(typeFixed).
-		Id(token.Hash).BodyJson(token).Do(s.ctx)
+		Id(string(token.Hash)).OpType("create").BodyJson(token).Do(s.ctx)
 	if err != nil {
-		return err
+		e := err.(*elastic.Error)
+		if e.Status == http.StatusConflict {
+			return true, nil
+		}
+		return false, err
 	}
 	log.Printf("Indexed %s/%s v%d", res.Index, res.Id, res.Version)
-	return nil
+	return false, nil
 }
 
-func (s *storage) DeleteToken(hash string) error {
+func (s *storage) DeleteToken(hash string) (found bool, err error) {
 	res, err := s.client.Delete().Index(indexToken).Type(typeFixed).
 		Id(hash).Do(s.ctx)
 	if err != nil {
-		return err
+		e := err.(*elastic.Error)
+		if e.Status == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
 	}
 	log.Printf("Deleted %s/%s v%d", res.Index, res.Id, res.Version)
-	return nil
+	return true, nil
 }
 
 func (s *storage) DeleteTokens(tag string) error {

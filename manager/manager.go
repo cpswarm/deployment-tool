@@ -369,20 +369,115 @@ func (m *manager) searchLogs(search map[string]interface{}) ([]storage.Log, int6
 	return logs, total, nil
 }
 
-func (m *manager) createToken() (*storage.Token, error) {
+func (m *manager) createTokenSet(total int, tag string) (set *tokenSetSecret, err error) {
 
-	var token storage.Token
-	var err error
-	token.Keystring, err = GenerateRandomToken(TokenLength)
-	if err != nil {
-		log.Printf("Error creating token: %s", err)
-		return nil, fmt.Errorf("error creating token")
+	set = &tokenSetSecret{
+		Tokens: make([]string, total),
 	}
-	token.ExpiresAt = model.UnixTimeType(time.Now().AddDate(0, 0, TokenValidityDays).Unix() * 1e3)
+	set.ExpiresAt = model.UnixTimeType(time.Now().AddDate(0, 0, TokenValidityDays).Unix() * 1e3)
+	set.Tag = tag
+	set.Available = total
 
-	// TODO encrypt tokens in database using manager's public key
+	var t storage.TokenHashed
+	t.Tag = set.Tag
+	t.ExpiresAt = set.ExpiresAt
 
-	return &token, nil
+	for i := 0; i < total; i++ {
+	retry:
+		set.Tokens[i], t.Hash, err = GenerateRandomToken(TokenLength)
+		if err != nil {
+			return nil, fmt.Errorf("error creating token: %s", err)
+		}
+		duplicate, err := m.storage.AddToken(t)
+		if err != nil {
+			return nil, fmt.Errorf("error storing token: %s", err)
+		}
+		if duplicate {
+			log.Println("Retrying token generation")
+			goto retry
+		}
+	}
+
+	return set, nil
+}
+
+func (m *manager) getTokenSet(tag string) (set *tokenSet, err error) {
+
+	tokenMetas, err := m.storage.GetTokens(tag)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving token info: %s", err)
+	}
+
+	set = &tokenSet{
+		Tag: tag,
+	}
+
+	if len(tokenMetas) > 0 {
+		set.Available = len(tokenMetas)
+		set.ExpiresAt = tokenMetas[0].ExpiresAt
+	}
+
+	return set, nil
+}
+
+func (m *manager) getTokenSets() (sets []*tokenSet, err error) {
+
+	tokenMetas, err := m.storage.GetTokens("")
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving token info: %s", err)
+	}
+	tokenSets := make(map[string]*tokenSet)
+	for _, meta := range tokenMetas {
+		if _, found := tokenSets[meta.Tag]; found {
+			tokenSets[meta.Tag].Available++
+			continue
+		}
+		tokenSets[meta.Tag] = &tokenSet{
+			Tag:       meta.Tag,
+			ExpiresAt: meta.ExpiresAt,
+			Available: 1,
+		}
+	}
+
+	for k := range tokenSets {
+		sets = append(sets, tokenSets[k])
+	}
+	return sets, nil
+}
+
+func (m *manager) deleteTokenSet(tag string) error {
+
+	err := m.storage.DeleteTokens(tag)
+	if err != nil {
+		return fmt.Errorf("error deleting tokens: %s", err)
+	}
+
+	return nil
+}
+
+func (m *manager) consumeToken(secret string) (valid bool, err error) {
+	hash, err := HashToken(secret)
+	if err != nil {
+		return false, err
+	}
+	log.Println("consumeToken", secret, hash)
+	valid, err = m.storage.DeleteToken(hash)
+	if err != nil {
+		return false, fmt.Errorf("error deleting token: %s", err)
+	}
+
+	return valid, nil
+}
+
+type tokenSet struct {
+	Tag       string             `json:"tag"`
+	Available int                `json:"available"`
+	ExpiresAt model.UnixTimeType `json:"expiresAt"`
+}
+
+type tokenSetSecret struct {
+	tokenSet
+	Tokens []string `json:"tokens"`
 }
 
 func (m *manager) fetchSource(orderID string, src *source.Source) error {
