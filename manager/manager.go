@@ -316,15 +316,7 @@ func (m *manager) stopTargetOrders(targetID string) (found bool, err error) {
 	return true, nil
 }
 
-func (m *manager) addTarget(id string, target *storage.Target) error {
-	err := m.storage.AddTarget(target)
-	if err != nil {
-		return fmt.Errorf("error adding target: %s", err)
-	}
-	return nil
-}
-
-func (m *manager) patchTarget(id string, target *storage.Target) (found bool, err error) {
+func (m *manager) updateTarget(id string, target *storage.Target) (found bool, err error) {
 	t, err := m.storage.GetTarget(id)
 	if err != nil {
 		return false, fmt.Errorf("error getting target: %s", err)
@@ -339,11 +331,11 @@ func (m *manager) patchTarget(id string, target *storage.Target) (found bool, er
 
 	target.UpdatedAt = model.UnixTime()
 
-	found, err = m.storage.PatchTarget(id, target)
+	found, err = m.storage.IndexTarget(target)
 	if err != nil {
-		return false, fmt.Errorf("error patching target: %s", err)
+		return false, fmt.Errorf("error updating target: %s", err)
 	}
-	return true, nil
+	return found, nil
 }
 
 func (m *manager) getLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, page, perPage int) ([]storage.Log, int64, error) {
@@ -455,16 +447,35 @@ func (m *manager) deleteTokenSet(tag string) error {
 	return nil
 }
 
-func (m *manager) consumeToken(secret string) (valid bool, err error) {
+func (m *manager) registerTarget(target *storage.Target, secret string) (valid bool, err error) {
 	hash, err := HashToken(secret)
 	if err != nil {
 		return false, err
 	}
-	log.Println("consumeToken", secret, hash)
-	valid, err = m.storage.DeleteToken(hash)
+
+	valid, tokenTrans, err := m.storage.DeleteTokenTrans(hash)
 	if err != nil {
-		return false, fmt.Errorf("error deleting token: %s", err)
+		return false, fmt.Errorf("error validating token: %s", err)
 	}
+	if !valid {
+		return false, nil
+	}
+	defer tokenTrans.Release()
+
+	target.CreatedAt = model.UnixTime()
+	target.UpdatedAt = target.CreatedAt
+	targetTrans, err := m.storage.AddTargetTrans(target)
+	if err != nil {
+		return false, fmt.Errorf("error validating target: %s", err)
+	}
+	defer targetTrans.Release()
+
+	err = m.storage.DoBulk(tokenTrans.Commit, targetTrans.Commit)
+	if err != nil {
+		return false, fmt.Errorf("error performing bulk action: %s", err)
+	}
+
+	m.publishEvent(EventTargetAdded, target)
 
 	return valid, nil
 }
@@ -757,16 +768,18 @@ func (m *manager) manageResponses() {
 
 func (m *manager) processTarget(target *storage.Target) {
 	defer recovery()
-	log.Println("Discovered target:", target.ID, target.Tags, target.Location)
+	log.Println("Target adv:", target.ID, target.Tags, target.Location)
 
-	target.CreatedAt = model.UnixTime()
-	target.UpdatedAt = target.CreatedAt
-	err := m.storage.AddTarget(target)
+	found, err := m.updateTarget(target.ID, target)
 	if err != nil {
-		log.Printf("Error adding target: %s", err)
+		log.Printf("Error updating target: %s", err)
 		return
 	}
-	m.publishEvent(EventTargetAdded, target)
+	if !found {
+		log.Printf("Unable to update %s: not found.", target.ID)
+	}
+
+	m.publishEvent(EventTargetUpdated, target)
 }
 
 func (m *manager) responseSorter() {

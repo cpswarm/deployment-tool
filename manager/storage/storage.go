@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"github.com/olivere/elastic"
@@ -20,10 +21,10 @@ type Storage interface {
 	//
 	GetTargets(tags []string, from, size int) ([]Target, int64, error)
 	PatchTarget(id string, target *Target) (found bool, err error)
-	IndexTarget(id string, target *Target) (found bool, err error)
+	IndexTarget(target *Target) (found bool, err error) // add or update
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
 	SearchTargets(map[string]interface{}) ([]Target, int64, error)
-	AddTarget(*Target) error
+	AddTargetTrans(*Target) (*transaction, error)
 	GetTarget(id string) (*Target, error)
 	DeleteTarget(id string) (found bool, err error)
 	//
@@ -36,13 +37,24 @@ type Storage interface {
 	//
 	GetTokens(tag string) ([]TokenMeta, error)
 	AddToken(TokenHashed) (duplicate bool, err error)
-	DeleteToken(hash string) (found bool, err error)
+	findToken(hash string) (found bool, err error)
+	DeleteTokenTrans(hash string) (found bool, trans *transaction, err error)
 	DeleteTokens(tag string) error
+	//
+	DoBulk(...interface{}) error
+}
+
+type transaction struct {
+	Commit  interface{}
+	Release func()
 }
 
 type storage struct {
 	client *elastic.Client
 	ctx    context.Context
+	// mutex locks
+	targetLocker sync.Mutex
+	tokenLocker  sync.Mutex
 }
 
 type mapping struct {
@@ -235,14 +247,24 @@ func (s *storage) createIndex(index string, mapping mapping) error {
 	return nil
 }
 
-func (s *storage) AddTarget(target *Target) error {
-	res, err := s.client.Index().Index(indexTarget).Type(typeFixed).
-		Id(target.ID).OpType("create").BodyJson(target).Do(s.ctx)
-	if err != nil {
-		return err
+// AddTargetTrans prepares a create operation and returns an object to commit and/or release the transaction
+func (s *storage) AddTargetTrans(target *Target) (trans *transaction, err error) {
+	if target, err := s.GetTarget(target.ID); err != nil {
+		return nil, err
+	} else if target != nil {
+		return nil, fmt.Errorf("target ID is not unique")
 	}
-	log.Printf("Created %s/%s v%d", res.Index, res.Id, res.Version)
-	return nil
+
+	s.targetLocker.Lock()
+	trans = &transaction{
+		Commit: elastic.NewBulkIndexRequest().Index(indexTarget).Type(typeFixed).
+			Id(target.ID).OpType("create").Doc(target),
+		Release: func() {
+			s.targetLocker.Unlock()
+		},
+	}
+
+	return trans, nil
 }
 
 // PatchTarget updates fields that are not omitted, returns false if target is not found
@@ -260,7 +282,7 @@ func (s *storage) PatchTarget(id string, target *Target) (found bool, err error)
 }
 
 // IndexTarget adds or updates the target
-func (s *storage) IndexTarget(id string, target *Target) (found bool, err error) {
+func (s *storage) IndexTarget(target *Target) (found bool, err error) {
 	res, err := s.client.Index().Index(indexTarget).Type(typeFixed).
 		Id(target.ID).BodyJson(target).Do(s.ctx)
 	if err != nil {
@@ -669,8 +691,8 @@ func (s *storage) AddToken(token TokenHashed) (duplicate bool, err error) {
 	return false, nil
 }
 
-func (s *storage) DeleteToken(hash string) (found bool, err error) {
-	res, err := s.client.Delete().Index(indexToken).Type(typeFixed).
+func (s *storage) findToken(hash string) (found bool, err error) {
+	_, err = s.client.Get().Index(indexToken).Type(typeFixed).
 		Id(hash).Do(s.ctx)
 	if err != nil {
 		e := err.(*elastic.Error)
@@ -679,14 +701,45 @@ func (s *storage) DeleteToken(hash string) (found bool, err error) {
 		}
 		return false, err
 	}
-	log.Printf("Deleted %s/%s v%d", res.Index, res.Id, res.Version)
 	return true, nil
+	//log.Printf("Got %s/%s v%d", res.Index, res.Id, res.Version)
+}
+
+// DeleteTokenTrans prepares a delete operation and returns an object to commit and/or release the transaction
+func (s *storage) DeleteTokenTrans(hash string) (found bool, trans *transaction, err error) {
+	found, err = s.findToken(hash)
+	if err != nil || !found {
+		return false, nil, err
+	}
+
+	s.tokenLocker.Lock()
+	trans = &transaction{
+		Commit: elastic.NewBulkDeleteRequest().Index(indexToken).Type(typeFixed).Id(hash),
+		Release: func() {
+			s.tokenLocker.Unlock()
+		},
+	}
+
+	return true, trans, nil
 }
 
 func (s *storage) DeleteTokens(tag string) error {
 	query := elastic.NewBoolQuery().Must(elastic.NewMatchQuery("tag", tag))
 
 	_, err := s.client.DeleteByQuery(indexToken).Query(query).Do(s.ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DoBulk performs elastic.BulkableRequests
+func (s *storage) DoBulk(requests ...interface{}) error {
+	bulk := s.client.Bulk()
+	for i := range requests {
+		bulk.Add(requests[i].(elastic.BulkableRequest))
+	}
+	_, err := bulk.Do(s.ctx)
 	if err != nil {
 		return err
 	}

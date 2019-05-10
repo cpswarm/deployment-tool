@@ -86,10 +86,10 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/", a.index).Methods(http.MethodGet)
 	// targets
 	r.HandleFunc("/targets", a.getTargets).Methods(http.MethodGet)
+	r.HandleFunc("/targets", a.registerTarget).Methods(http.MethodPost)
 	r.HandleFunc("/targets/{id}", a.getTarget).Methods(http.MethodGet)
 	r.HandleFunc("/targets/{id}", a.deleteTarget).Methods(http.MethodDelete)
-	r.HandleFunc("/targets/{id}", a.registerTarget).Methods(http.MethodPut)
-	r.HandleFunc("/targets/{id}", a.patchTarget).Methods(http.MethodPatch)
+	r.HandleFunc("/targets/{id}", a.updateTarget).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/stop", a.stopTargetOrders).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/logs", a.requestTargetLogs).Methods(http.MethodPut)
 	r.HandleFunc("/targets/{id}/command", a.executeCommand).Methods(http.MethodPut)
@@ -379,7 +379,7 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 		HTTPResponseError(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
 	}
 
-	valid, err := a.manager.consumeToken(token)
+	valid, err := a.manager.registerTarget(&target, token)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -389,19 +389,11 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO what if this fails???
-	id := mux.Vars(r)["id"]
-	err = a.manager.addTarget(id, &target)
-	if err != nil {
-		HTTPResponseError(w, http.StatusInternalServerError, err)
-		return
-	}
-
 	w.WriteHeader(http.StatusOK)
 	return
 }
 
-func (a *restAPI) patchTarget(w http.ResponseWriter, r *http.Request) {
+func (a *restAPI) updateTarget(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
@@ -414,7 +406,7 @@ func (a *restAPI) patchTarget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := mux.Vars(r)["id"]
-	found, err := a.manager.patchTarget(id, &target)
+	found, err := a.manager.updateTarget(id, &target)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
