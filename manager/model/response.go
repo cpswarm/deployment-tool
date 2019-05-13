@@ -69,3 +69,13 @@ type Package struct {
 	Task      string `json:"t"`
 	Payload   []byte `json:"p"`
 }
+
+type ZeromqServer struct {
+	PublicKey string `json:"publicKey"`
+	PubPort   uint16 `json:"pubPort"`
+	SubPort   uint16 `json:"subPort"`
+}
+
+type ServerInfo struct {
+	ZeroMQ ZeromqServer `json:"zeromq"`
+}

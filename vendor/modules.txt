@@ -52,5 +52,7 @@ github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/xlog
 github.com/ulikunitz/xz/lzma
 github.com/ulikunitz/xz/internal/hash
+# github.com/urfave/negroni v1.0.0
+github.com/urfave/negroni
 # gopkg.in/yaml.v2 v2.2.1
 gopkg.in/yaml.v2

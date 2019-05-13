@@ -34,7 +34,7 @@ func main() {
 	}
 	defer zmqServer.Close()
 
-	m, err := startManager(zmqServer.Pipe, os.Getenv(EnvStorageDSN))
+	m, err := startManager(zmqServer.Pipe, zmqServer.PublicKey, os.Getenv(EnvStorageDSN))
 	if err != nil {
 		log.Fatal(err)
 	}

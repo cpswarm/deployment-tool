@@ -18,7 +18,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
-	yaml "gopkg.in/yaml.v2"
+	"github.com/urfave/negroni"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -55,8 +56,8 @@ type restAPI struct {
 type list struct {
 	Total   int64       `json:"total"`
 	Items   interface{} `json:"items"` // array of anything
-	Page    int         `json:"page,omitempty"`
-	PerPage int         `json:"perPage,omitempty"`
+	Page    int         `json:"page"`
+	PerPage int         `json:"perPage"`
 }
 
 func startRESTAPI(bindAddr string, manager *manager) {
@@ -109,6 +110,8 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/token_sets", a.createTokenSet).Methods(http.MethodPost)
 	r.HandleFunc("/token_sets/{tag}", a.getTokenSet).Methods(http.MethodGet)
 	r.HandleFunc("/token_sets/{tag}", a.deleteTokenSet).Methods(http.MethodDelete)
+	// health
+	r.HandleFunc("/health", a.getHealth).Methods(http.MethodGet)
 
 	// static
 	ui := http.Dir(WorkDir + "/ui")
@@ -121,7 +124,18 @@ func (a *restAPI) setupRouter() {
 }
 
 func (a *restAPI) index(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome!\n")
+	info, err := a.manager.getServerInfo()
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	b, err := json.Marshal(&info)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	HTTPResponse(w, http.StatusOK, b)
 }
 
 func (a *restAPI) addOrder(w http.ResponseWriter, r *http.Request) {
@@ -603,7 +617,7 @@ func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := json.Marshal(&list{Total: total, Items: logs}) // without paging info
+	b, err := json.Marshal(&list{total, logs, 1, int(total)})
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -620,7 +634,7 @@ func (a *restAPI) getTokenSets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := json.Marshal(&list{int64(len(sets)), sets, 0, 0})
+	b, err := json.Marshal(&list{int64(len(sets)), sets, 1, len(sets)})
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -693,6 +707,10 @@ func (a *restAPI) deleteTokenSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	return
+}
+
+func (a *restAPI) getHealth(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("OK!"))
 }
 
 func (a *restAPI) websocket(w http.ResponseWriter, r *http.Request) {
@@ -823,8 +841,9 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		log.Println(r.Method, r.RequestURI)
-		next.ServeHTTP(w, r)
-		log.Println(r.Method, r.URL, "responded in", time.Since(start))
+		nw := negroni.NewResponseWriter(w)
+		next.ServeHTTP(nw, r)
+		log.Printf("\"%s %s %s\" %d %d %v\n", r.Method, r.URL.String(), r.Proto, nw.Status(), nw.Size(), time.Since(start))
 	})
 }
 
