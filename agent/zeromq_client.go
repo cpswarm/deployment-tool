@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"code.linksmart.eu/dt/deployment-tool/manager/env"
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 	zmq "github.com/pebbe/zmq4"
@@ -41,7 +42,7 @@ func startZMQClient(conf *zeromqServer, clientPublic string, pipe model.Pipe) (*
 
 	// load keys
 	var clientSecret, serverPublic string
-	if evalEnv(EnvDisableAuth) {
+	if env.Eval(EnvDisableAuth) {
 		log.Println("WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
 	} else {
 		zmq.AuthSetVerbose(true)
@@ -68,7 +69,7 @@ func startZMQClient(conf *zeromqServer, clientPublic string, pipe model.Pipe) (*
 	if err != nil {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
-	if !evalEnv(EnvDisableAuth) {
+	if !env.Eval(EnvDisableAuth) {
 		c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	}
 	c.subscriber.SetReconnectIvlMax(MaxReconnectInterval)
@@ -81,7 +82,7 @@ func startZMQClient(conf *zeromqServer, clientPublic string, pipe model.Pipe) (*
 	if err != nil {
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
-	if !evalEnv(EnvDisableAuth) {
+	if !env.Eval(EnvDisableAuth) {
 		c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	}
 	c.publisher.SetReconnectIvlMax(MaxReconnectInterval)
@@ -110,7 +111,7 @@ func (c *zmqClient) startListener() {
 			log.Println("zeromq: Error receiving event:", err)
 			continue
 		}
-		if evalEnv(EnvDebug) {
+		if env.Debug {
 			log.Printf("zeromq: Received %d bytes", len([]byte(msg)))
 		}
 		// split the prefix
@@ -130,7 +131,7 @@ func (c *zmqClient) startResponder() {
 		if err != nil {
 			log.Println("zeromq: Error sending event:", err)
 		}
-		if evalEnv(EnvDebug) {
+		if env.Debug {
 			log.Printf("zeromq: Sent %d bytes", length)
 		}
 	}
@@ -183,7 +184,7 @@ func (c *zmqClient) setupMonitor() (func(), error) {
 				fmt.Printf("zeromq: Error receiving monitor event: %s", err)
 				continue
 			}
-			if evalEnv(EnvDebug) || eventType == zmq.EVENT_CONNECTED || eventType == zmq.EVENT_DISCONNECTED {
+			if env.Debug || eventType == zmq.EVENT_CONNECTED || eventType == zmq.EVENT_DISCONNECTED {
 				log.Printf("zeromq: Event %s %s %d", eventType, eventAddr, eventValue)
 			}
 			go func() {

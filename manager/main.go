@@ -9,15 +9,15 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
+	"code.linksmart.eu/dt/deployment-tool/manager/env"
 	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 )
 
 const (
 	// Environment keys
-	EnvDebug      = "DEBUG"       // print debug messages
-	EnvVerbose    = "VERBOSE"     // print extra information e.g. line number)
-	EnvWorkdir    = "WORKDIR"     // work directory of the manager
-	EnvStorageDSN = "STORAGE_DSN" // Storage DSN i.e. Elasticsearch's URL
+	EnvWorkdir        = "WORKDIR"     // work directory of the manager
+	EnvStorageDSN     = "STORAGE_DSN" // Storage DSN i.e. Elasticsearch's URL
+	DefaultStorageDSN = "http://localhost:9200"
 )
 
 func main() {
@@ -51,12 +51,16 @@ var (
 )
 
 func init() {
-	loggingFlags := log.LstdFlags
-	if evalEnv(EnvVerbose) {
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
-	}
-	log.SetFlags(loggingFlags)
 	log.SetOutput(os.Stdout)
+
+	var logFlags int
+	if env.LogTimestamps {
+		logFlags = log.LstdFlags
+	}
+	if env.Verbose {
+		logFlags = logFlags | log.Lshortfile
+	}
+	log.SetFlags(logFlags)
 
 	WorkDir = os.Getenv(EnvWorkdir)
 	if WorkDir == "" {
@@ -68,13 +72,8 @@ func init() {
 	}
 
 	if os.Getenv(EnvStorageDSN) == "" {
-		os.Setenv(EnvStorageDSN, "http://localhost:9200")
+		os.Setenv(EnvStorageDSN, DefaultStorageDSN)
 	}
-}
-
-// evalEnv returns the boolean value of the env variable with the given key
-func evalEnv(key string) bool {
-	return os.Getenv(key) == "1" || os.Getenv(key) == "true" || os.Getenv(key) == "TRUE"
 }
 
 func parseFlags() bool {

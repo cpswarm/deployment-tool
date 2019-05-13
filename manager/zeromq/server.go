@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"code.linksmart.eu/dt/deployment-tool/manager/env"
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	zmq "github.com/pebbe/zmq4"
 )
@@ -32,7 +33,7 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 
 	var err error
 	var serverSecret string
-	if evalEnv(EnvDisableAuth) {
+	if env.Eval(EnvDisableAuth) {
 		log.Println("zeromq: WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
 	} else {
 		//  Start authentication engine
@@ -65,7 +66,7 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
-	if !evalEnv(EnvDisableAuth) {
+	if !env.Eval(EnvDisableAuth) {
 		c.publisher.ServerAuthCurve(DomainAll, serverSecret)
 	}
 	err = c.publisher.Bind(pubEndpoint)
@@ -78,7 +79,7 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
-	if !evalEnv(EnvDisableAuth) {
+	if !env.Eval(EnvDisableAuth) {
 		c.subscriber.ServerAuthCurve(DomainAll, serverSecret)
 	}
 	err = c.subscriber.Bind(subEndpoint)
@@ -103,7 +104,7 @@ func (c *zmqClient) startPublisher() {
 		if err != nil {
 			log.Printf("zeromq: Error publishing: %s", err)
 		}
-		if evalEnv(EnvDebug) {
+		if env.Debug {
 			log.Printf("zeromq: Sent %d bytes", length)
 		}
 	}
@@ -115,7 +116,7 @@ func (c *zmqClient) startListener() {
 		if err != nil {
 			log.Printf("zeromq: Error receiving event: %s", err)
 		}
-		if evalEnv(EnvDebug) {
+		if env.Debug {
 			log.Printf("zeromq: Received %d bytes", len([]byte(msg)))
 		}
 		// split the prefix
@@ -144,9 +145,4 @@ func (c *zmqClient) Close() error {
 	zmq.AuthStop()
 
 	return nil
-}
-
-// evalEnv returns the boolean value of the env variable with the given key
-func evalEnv(key string) bool {
-	return os.Getenv(key) == "1" || os.Getenv(key) == "true" || os.Getenv(key) == "TRUE"
 }

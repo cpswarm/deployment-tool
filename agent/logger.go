@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/agent/buffer"
+	"code.linksmart.eu/dt/deployment-tool/manager/env"
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 )
 
@@ -39,13 +40,12 @@ func newLogger(targetID string, responseCh chan<- model.Message) *logger {
 }
 
 func (l *logger) startTicker() {
-	envDebug := evalEnv(EnvDebug)
 	l.ticker = time.NewTicker(LogInterval)
 	var tickBuffer []model.Log
 	for {
 		select {
 		case logM := <-l.queue:
-			if envDebug {
+			if env.Debug {
 				if logM.Error {
 					log.Println("logger: Err:", logM.Output)
 				} else {

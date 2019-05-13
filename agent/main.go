@@ -6,20 +6,17 @@ import (
 	"os"
 	"os/signal"
 
+	"code.linksmart.eu/dt/deployment-tool/manager/env"
 	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
-	"github.com/joho/godotenv"
 )
 
 const (
 	// Environment keys
-	EnvDebug          = "DEBUG"            // print debug messages
-	EnvVerbose        = "VERBOSE"          // print extra information e.g. line number)
-	EnvDisableLogTime = "DISABLE_LOG_TIME" // disable timestamp in logs
-	EnvDisableAuth    = "DISABLE_AUTH"     // disable authentication completely
-	EnvPrivateKey     = "PRIVATE_KEY"      // path to private key of agent
-	EnvPublicKey      = "PUBLIC_KEY"       // path to public key of agent
-	EnvManagerAddr    = "MANAGER_ADDR"
-	EnvAuthToken      = "AUTH_TOKEN"
+	EnvDisableAuth = "DISABLE_AUTH" // disable authentication completely
+	EnvPrivateKey  = "PRIVATE_KEY"  // path to private key of agent
+	EnvPublicKey   = "PUBLIC_KEY"   // path to public key of agent
+	EnvManagerAddr = "MANAGER_ADDR"
+	EnvAuthToken   = "AUTH_TOKEN"
 	// Default values
 	DefaultEnvFile        = "./.env"       // path to environment variables file
 	DefaultStateFile      = "./state.json" // path to agent state file
@@ -64,29 +61,19 @@ func main() {
 
 func init() {
 	log.SetOutput(os.Stdout)
-	log.SetFlags(0)
 
 	// load env file
 	wd, _ := os.Getwd()
 	log.Println("Working directory:", wd)
-	err := godotenv.Load(DefaultEnvFile)
-	if err == nil {
-		log.Println("Loaded environment file:", DefaultEnvFile)
-	}
 
-	logFlags := log.LstdFlags
-	if evalEnv(EnvDisableLogTime) {
-		logFlags = 0
+	var logFlags int
+	if env.LogTimestamps {
+		logFlags = log.LstdFlags
 	}
-	if evalEnv(EnvVerbose) {
+	if env.Verbose {
 		logFlags = logFlags | log.Lshortfile
 	}
 	log.SetFlags(logFlags)
-}
-
-// evalEnv returns the boolean value of the env variable with the given key
-func evalEnv(key string) bool {
-	return os.Getenv(key) == "1" || os.Getenv(key) == "true" || os.Getenv(key) == "TRUE"
 }
 
 func parseFlags() {

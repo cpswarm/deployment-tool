@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"log"
 
+	"code.linksmart.eu/dt/deployment-tool/manager/env"
 	"github.com/mholt/archiver"
 )
 
 // CompressFiles reads from given path and compresses in memory
 func CompressFiles(paths ...string) ([]byte, error) {
-	if Env(EnvDebug) {
+	if env.Debug {
 		log.Printf("Compressing: %v", paths)
 	}
 	if len(paths) == 0 {
@@ -26,7 +27,7 @@ func CompressFiles(paths ...string) ([]byte, error) {
 
 // DecompressFiles decompresses from memory and writes to given directory
 func DecompressFiles(b []byte, dir string) error {
-	if Env(EnvDebug) {
+	if env.Debug {
 		log.Printf("Decompressing %d bytes to %s", len(b), dir)
 	}
 	return archiver.Zip.Read(bytes.NewBuffer(b), dir)
