@@ -19,7 +19,8 @@ type zmqClient struct {
 	publisher  *zmq.Socket
 	subscriber *zmq.Socket
 
-	Pipe model.Pipe
+	Pipe      model.Pipe
+	PublicKey string
 }
 
 func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
@@ -38,11 +39,21 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 		zmq.AuthSetVerbose(true)
 		zmq.AuthStart()
 
-		// load keys
-		serverSecret, err = loadServerKey()
+		// load key pair
+		serverSecret, err = ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
 		if err != nil {
 			return nil, err
 		}
+		serverSecret, err = DecodeKey(serverSecret)
+		if err != nil {
+			return nil, err
+		}
+
+		c.PublicKey, err = ReadKeyFile(os.Getenv(EnvPublicKey), DefaultPublicKeyPath)
+		if err != nil {
+			return nil, err
+		}
+
 		err = loadClientKeys()
 		if err != nil {
 			return nil, err

@@ -87,7 +87,6 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/", a.index).Methods(http.MethodGet)
 	// targets
 	r.HandleFunc("/targets", a.getTargets).Methods(http.MethodGet)
-	r.HandleFunc("/targets", a.registerTarget).Methods(http.MethodPost)
 	r.HandleFunc("/targets/{id}", a.getTarget).Methods(http.MethodGet)
 	r.HandleFunc("/targets/{id}", a.deleteTarget).Methods(http.MethodDelete)
 	r.HandleFunc("/targets/{id}", a.updateTarget).Methods(http.MethodPut)
@@ -110,6 +109,7 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/token_sets", a.createTokenSet).Methods(http.MethodPost)
 	r.HandleFunc("/token_sets/{tag}", a.getTokenSet).Methods(http.MethodGet)
 	r.HandleFunc("/token_sets/{tag}", a.deleteTokenSet).Methods(http.MethodDelete)
+	r.HandleFunc("/rpc/register", a.registerTarget).Methods(http.MethodPost)
 	// health
 	r.HandleFunc("/health", a.getHealth).Methods(http.MethodGet)
 
@@ -403,7 +403,19 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	info, err := a.manager.getServerInfo()
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	b, err := json.Marshal(&info)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	HTTPResponse(w, http.StatusCreated, b)
 	return
 }
 

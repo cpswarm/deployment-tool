@@ -48,20 +48,10 @@ type Location struct {
 
 type TargetBase struct {
 	// omitempty for all fields to allow patch updates
-	ID       string    `json:"id,omitempty"`
-	Tags     []string  `json:"tags,omitempty"`
-	Location *Location `json:"location,omitempty"`
-}
-
-type Target struct {
-	TargetBase
-	AutoGenID string `json:"autoID,omitempty"`
-	// active task
-	TaskID             string           `json:"taskID"`
-	TaskDebug          bool             `json:"taskDebug,omitempty"`
-	TaskRun            []string         `json:"taskRun,omitempty"`
-	TaskRunAutoRestart bool             `json:"taskRunAutoRestart,omitempty"`
-	TaskHistory        map[string]uint8 `json:"taskHistory,omitempty"`
+	ID        string    `json:"id,omitempty"`
+	Tags      []string  `json:"tags,omitempty"`
+	Location  *Location `json:"location,omitempty"`
+	PublicKey string    `json:"publicKey,omitempty"`
 }
 
 type Package struct {

@@ -1,6 +1,7 @@
 package zeromq
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -52,30 +53,13 @@ func NewCurveKeypair(privateFile, publicFile string) error {
 
 const (
 	EnvPrivateKey     = "PRIVATE_KEY"
+	EnvPublicKey      = "PUBLIC_KEY"
 	EnvAuthorizedKeys = "AUTHORIZED_KEYS"
 
 	DefaultPrivateKeyPath     = "./manager.key"
+	DefaultPublicKeyPath      = "./manager.pub"
 	DefaultAuthorizedKeysPath = "./authorized_keys"
 )
-
-func loadServerKey() (string, error) {
-	privateKeyPath := os.Getenv(EnvPrivateKey)
-	if privateKeyPath == "" {
-		privateKeyPath = DefaultPrivateKeyPath
-		log.Printf("zeromq: %s not set. Using default path: %s", EnvPrivateKey, DefaultPrivateKeyPath)
-	}
-
-	key, err := ioutil.ReadFile(privateKeyPath)
-	if err != nil {
-		return "", fmt.Errorf("error reading server private key: %s", err)
-	}
-	key, err = base64.StdEncoding.DecodeString(string(key))
-	if err != nil {
-		return "", fmt.Errorf("error decoding server private key: %s", err)
-	}
-	fmt.Println("zeromq: Loaded server key.")
-	return string(key), nil
-}
 
 func loadClientKeys() error {
 	authorizedKeysPath := os.Getenv(EnvAuthorizedKeys)
@@ -138,4 +122,26 @@ func AddClientKey(id, key string) error {
 	}
 
 	return nil
+}
+
+func ReadKeyFile(path, defaultPath string) (string, error) {
+	if path == "" {
+		path = defaultPath
+		log.Printf("%s not set. Using default path: %s", path, defaultPath)
+	}
+
+	key, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("error reading file %s: %s", path, err)
+	}
+
+	return string(bytes.TrimSpace(key)), nil
+}
+
+func DecodeKey(in string) (string, error) {
+	b, err := base64.StdEncoding.DecodeString(in)
+	if err != nil {
+		return "", fmt.Errorf("error decoding string: %s", err)
+	}
+	return string(b), nil
 }

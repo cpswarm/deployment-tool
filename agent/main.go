@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -13,26 +12,19 @@ import (
 
 const (
 	// Environment keys
-	EnvDebug               = "DEBUG"                  // print debug messages
-	EnvVerbose             = "VERBOSE"                // print extra information e.g. line number)
-	EnvDisableLogTime      = "DISABLE_LOG_TIME"       // disable timestamp in logs
-	EnvDisableAuth         = "DISABLE_AUTH"           // disable authentication completely
-	EnvPrivateKey          = "PRIVATE_KEY"            // path to private key of agent
-	EnvPublicKey           = "PUBLIC_KEY"             // path to public key of agent
-	EnvManagerPublicKey    = "MANAGER_PUBLIC_KEY"     // path to public key of manager
-	EnvManagerPublicKeyStr = "MANAGER_PUBLIC_KEY_STR" // public key of manager (overrides file)
-	EnvManagerHost         = "MANAGER_HOST"
-	EnvManagerSubPort      = "MANAGER_SUB_PORT"
-	EnvManagerPubPort      = "MANAGER_PUB_PORT"
+	EnvDebug          = "DEBUG"            // print debug messages
+	EnvVerbose        = "VERBOSE"          // print extra information e.g. line number)
+	EnvDisableLogTime = "DISABLE_LOG_TIME" // disable timestamp in logs
+	EnvDisableAuth    = "DISABLE_AUTH"     // disable authentication completely
+	EnvPrivateKey     = "PRIVATE_KEY"      // path to private key of agent
+	EnvPublicKey      = "PUBLIC_KEY"       // path to public key of agent
+	EnvManagerAddr    = "MANAGER_ADDR"
+	EnvAuthToken      = "AUTH_TOKEN"
 	// Default values
 	DefaultEnvFile        = "./.env"       // path to environment variables file
 	DefaultStateFile      = "./state.json" // path to agent state file
 	DefaultPrivateKeyPath = "./agent.key"
 	DefaultPublicKeyPath  = "./agent.pub"
-	DefaultManagerKeyPath = "./manager.pub"
-	DefaultManagerHost    = "localhost"
-	DefaultManagerSubPort = "5556"
-	DefaultManagerPubPort = "5557"
 )
 
 var WorkDir = "."
@@ -46,16 +38,20 @@ func main() {
 	WorkDir, _ = os.Getwd()
 	log.Printf("Workdir: %s", WorkDir)
 
-	// TODO switch the start order of zmq and agent to facilitate deferred closing in the correct order
-	agent, err := startAgent()
+	target, err := loadConf()
 	if err != nil {
-		log.Fatalf("Error starting agent: %s", err)
+		log.Fatalf("Error loading config: %s.", err)
 	}
 
-	subEndpoint, pubEndpoint := endpoints()
-	zmqClient, err := startZMQClient(subEndpoint, pubEndpoint, agent.pipe)
+	// TODO switch the start order of zmq and agent to facilitate deferred closing in the correct order
+	agent, err := startAgent(target, target.ManagerAddr)
 	if err != nil {
-		log.Fatalf("Error starting ZeroMQ client: %s", err)
+		log.Fatalf("Error starting agent: %s.", err)
+	}
+
+	zmqClient, err := startZMQClient(&target.ZeromqServerConf, target.PublicKey, agent.pipe)
+	if err != nil {
+		log.Fatalf("Error starting ZeroMQ client: %s.", err)
 	}
 
 	sig := make(chan os.Signal, 1)
@@ -64,26 +60,6 @@ func main() {
 
 	agent.close()
 	zmqClient.close()
-}
-
-func endpoints() (string, string) {
-	prot := "tcp"
-	addr := os.Getenv(EnvManagerHost)
-	if addr == "" {
-		addr = DefaultManagerHost
-		log.Printf("%s not set. Using default: %s", EnvManagerHost, DefaultManagerHost)
-	}
-	sub := os.Getenv(EnvManagerSubPort)
-	if sub == "" {
-		sub = DefaultManagerSubPort
-		log.Printf("%s not set. Using default: %s", EnvManagerSubPort, DefaultManagerSubPort)
-	}
-	pub := os.Getenv(EnvManagerPubPort)
-	if pub == "" {
-		pub = DefaultManagerPubPort
-		log.Printf("%s not set. Using default: %s", EnvManagerPubPort, DefaultManagerPubPort)
-	}
-	return fmt.Sprintf("%s://%s:%s", prot, addr, sub), fmt.Sprintf("%s://%s:%s", prot, addr, pub)
 }
 
 func init() {

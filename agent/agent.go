@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -22,7 +25,7 @@ const (
 type agent struct {
 	sync.Mutex
 
-	target model.Target
+	target *target
 
 	pipe         model.Pipe
 	disconnected chan bool
@@ -36,28 +39,39 @@ type agent struct {
 // 	make two objects to hold active and pending tasks along with their resources
 // 	active task should be persisted for recovery
 
-func startAgent() (*agent, error) {
+func startAgent(target *target, managerAddr string) (*agent, error) {
 
 	a := &agent{
 		pipe:         model.NewPipe(),
 		disconnected: make(chan bool),
 	}
-	a.target.TaskHistory = make(map[string]uint8)
-	err := a.loadConf()
-	if err != nil {
-		return nil, fmt.Errorf("error loading conf: %s", err)
+	a.target = target
+
+	if !a.target.Registered && os.Getenv(EnvAuthToken) != "" {
+		zmqConf, err := a.registerTarget(managerAddr, os.Getenv(EnvAuthToken))
+		if err != nil {
+			return nil, fmt.Errorf("error registering target: %s", err)
+		}
+		a.target.Registered = true
+		a.target.ZeromqServerConf.PublicKey = zmqConf.PublicKey
+		a.target.ZeromqServerConf.PubPort = zmqConf.PubPort
+		a.target.ZeromqServerConf.SubPort = zmqConf.SubPort
+		a.target.saveState()
+	} else if !a.target.Registered && os.Getenv(EnvAuthToken) == "" {
+		return nil, fmt.Errorf("target not registered. Provide token for registration")
 	}
 
 	a.logger = newLogger(a.target.ID, a.pipe.ResponseCh)
 	a.runner = newRunner(a.logger.enqueue)
 	a.installer = newInstaller(a.logger.enqueue)
 
-	err = a.setupTerminal()
+	err := a.setupTerminal()
 	if err != nil {
 		return nil, fmt.Errorf("error setting up terminal: %s", err)
 	}
 
 	// autostart
+	// TODO check autostart settings
 	if len(a.target.TaskRun) > 0 {
 		go a.runner.run(a.target.TaskRun, a.target.TaskID, a.target.TaskDebug)
 	}
@@ -73,6 +87,43 @@ func (a *agent) setupTerminal() error {
 	}
 	a.terminal = newExecutor(model.TaskTerminal, "", a.logger.priorityEnqueue, true)
 	return nil
+}
+
+func (a *agent) registerTarget(addr, token string) (*model.ZeromqServer, error) {
+	log.Println("Registering target...")
+	b, err := json.Marshal(a.target.TargetBase)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling: %s", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, addr+"/rpc/register", bytes.NewBuffer(b))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %s", err)
+	}
+	req.Header.Set("X-Auth-Token", token)
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %s", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %s", err)
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("%s: %s", resp.Status, body)
+	}
+
+	var info model.ServerInfo
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling response: %s", err)
+	}
+
+	return &info.ZeroMQ, nil
 }
 
 func (a *agent) startWorker() {
@@ -141,9 +192,10 @@ func (a *agent) connected() {
 
 func (a *agent) sendAdvertisement() {
 	t := model.TargetBase{
-		ID:       a.target.ID,
-		Tags:     a.target.Tags,
-		Location: a.target.Location,
+		ID:        a.target.ID,
+		Tags:      a.target.Tags,
+		Location:  a.target.Location,
+		PublicKey: a.target.PublicKey,
 	}
 	log.Println("Sent adv:", t.ID, t.Tags, t.Location)
 	b, _ := json.Marshal(t)
@@ -191,7 +243,7 @@ func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 
 	log.Printf("Received announcement %s/%d", taskA.ID, taskA.Type)
 	a.target.TaskHistory[taskA.ID] = taskA.Type
-	a.saveState()
+	a.target.saveState()
 
 	//a.sendLog(taskA.ID, stage, model.StageStart, false, taskA.Debug)
 	a.sendLog(taskA.ID, stage, "received announcement", false, taskA.Debug)
@@ -253,7 +305,7 @@ func (a *agent) handleTask(payload []byte) {
 		a.target.TaskRunAutoRestart = task.Deploy.Run.AutoRestart
 		a.target.TaskID = task.ID
 		a.target.TaskDebug = task.Debug
-		a.saveState()
+		a.target.saveState()
 
 		go a.runner.run(task.Deploy.Run.Commands, task.ID, task.Debug)
 	}
@@ -327,5 +379,5 @@ func (a *agent) close() {
 	// TODO return executor.stop from execute and log exit signal when e.cmd.Process.Release() returns
 	time.Sleep(time.Second)
 	a.logger.stop()
-	a.saveState()
+	a.target.saveState()
 }

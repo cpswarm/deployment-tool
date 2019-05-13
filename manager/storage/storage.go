@@ -128,6 +128,7 @@ func NewElasticStorage(url string) (Storage, error) {
 		"id":           {Type: propTypeKeyword},
 		"tags":         {Type: propTypeKeyword}, // array
 		"location":     {Type: propTypeGeoPoint},
+		"publicKey":    {Type: propTypeKeyword},
 		"createdAt":    {Type: propTypeDate},
 		"updatedAt":    {Type: propTypeDate},
 		"logRequestAt": {Type: propTypeDate},

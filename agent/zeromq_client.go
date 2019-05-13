@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -27,10 +24,14 @@ type zmqClient struct {
 	pipe model.Pipe
 }
 
-func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClient, error) {
+func startZMQClient(conf *zeromqServer, clientPublic string, pipe model.Pipe) (*zmqClient, error) {
 	log.Printf("zeromq: Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
+	subEndpoint := fmt.Sprintf("%s:%d", conf.host, conf.SubPort)
+	pubEndpoint := fmt.Sprintf("%s:%d", conf.host, conf.PubPort)
 	log.Println("zeromq: Sub endpoint:", subEndpoint)
 	log.Println("zeromq: Pub endpoint:", pubEndpoint)
+	log.Println("zeromq: Server public key:", conf.PublicKey)
+	log.Println("zeromq: Client public key:", clientPublic)
 
 	c := &zmqClient{
 		pipe: pipe,
@@ -39,12 +40,25 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 	var err error
 
 	// load keys
-	var serverPublic, clientSecret, clientPublic string
+	var clientSecret, serverPublic string
 	if evalEnv(EnvDisableAuth) {
 		log.Println("WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
 	} else {
 		zmq.AuthSetVerbose(true)
-		serverPublic, clientSecret, clientPublic, err = c.loadKeys()
+		clientSecret, err = zeromq.ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
+		if err != nil {
+			return nil, err
+		}
+		// decode
+		clientSecret, err = zeromq.DecodeKey(clientSecret)
+		if err != nil {
+			return nil, err
+		}
+		clientPublic, err = zeromq.DecodeKey(clientPublic)
+		if err != nil {
+			return nil, err
+		}
+		serverPublic, err = zeromq.DecodeKey(conf.PublicKey)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +72,7 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 		c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	}
 	c.subscriber.SetReconnectIvlMax(MaxReconnectInterval)
-	err = c.subscriber.Connect(subEndpoint)
+	err = c.subscriber.Connect(pubEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
 	}
@@ -71,7 +85,7 @@ func startZMQClient(subEndpoint, pubEndpoint string, pipe model.Pipe) (*zmqClien
 		c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 	}
 	c.publisher.SetReconnectIvlMax(MaxReconnectInterval)
-	err = c.publisher.Connect(pubEndpoint)
+	err = c.publisher.Connect(subEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)
 	}
@@ -215,64 +229,6 @@ func (c *zmqClient) close() {
 		log.Printf("zeromq: Error closing pub socket: %s", err)
 	}
 
-}
-
-func (c *zmqClient) loadKeys() (string, string, string, error) {
-	privateKeyPath := os.Getenv(EnvPrivateKey)
-	publicKeyPath := os.Getenv(EnvPublicKey)
-	managerKeyPath := os.Getenv(EnvManagerPublicKey)
-	managerKeyStr := os.Getenv(EnvManagerPublicKeyStr)
-
-	if privateKeyPath == "" {
-		privateKeyPath = DefaultPrivateKeyPath
-		log.Printf("zeromq: %s not set. Using default path: %s", EnvPrivateKey, DefaultPrivateKeyPath)
-	}
-	if publicKeyPath == "" {
-		publicKeyPath = DefaultPublicKeyPath
-		log.Printf("zeromq: %s not set. Using default path: %s", EnvPublicKey, DefaultPublicKeyPath)
-	}
-	if managerKeyPath == "" {
-		managerKeyPath = DefaultManagerKeyPath
-		log.Printf("zeromq: %s not set. Using default path: %s", EnvManagerPublicKey, DefaultManagerKeyPath)
-	}
-
-	clientSecret, err := ioutil.ReadFile(privateKeyPath)
-	if err != nil {
-		return "", "", "", fmt.Errorf("error reading client private key: %s", err)
-	}
-	clientSecret, err = base64.StdEncoding.DecodeString(string(clientSecret))
-	if err != nil {
-		return "", "", "", fmt.Errorf("error decoding client private key: %s", err)
-	}
-
-	clientPublic, err := ioutil.ReadFile(publicKeyPath)
-	if err != nil {
-		return "", "", "", fmt.Errorf("error reading client public key: %s", err)
-	}
-	log.Println("zeromq: Public key ->", string(bytes.TrimSpace(clientPublic)))
-	clientPublic, err = base64.StdEncoding.DecodeString(string(clientPublic))
-	if err != nil {
-		return "", "", "", fmt.Errorf("error decoding client public key: %s", err)
-	}
-
-	var serverPublic []byte
-	if managerKeyStr == "" {
-		serverPublic, err = ioutil.ReadFile(managerKeyPath)
-		if err != nil {
-			return "", "", "", fmt.Errorf("error reading server public key: %s", err)
-		}
-	} else {
-		// take key directly from variable
-		log.Printf("zeromq: Read manager public key from env variable.")
-		serverPublic = []byte(managerKeyStr)
-	}
-	log.Printf("zeromq: manager public key: %s", string(serverPublic))
-	serverPublic, err = base64.StdEncoding.DecodeString(string(serverPublic))
-	if err != nil {
-		return "", "", "", fmt.Errorf("error decoding manager public key: %s", err)
-	}
-
-	return string(bytes.TrimSpace(serverPublic)), string(bytes.TrimSpace(clientSecret)), string(bytes.TrimSpace(clientPublic)), nil
 }
 
 func writeNewKeys() error {
