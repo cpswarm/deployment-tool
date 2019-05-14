@@ -70,9 +70,15 @@ func startZMQClient(conf *zeromqServer, clientPublic string, pipe model.Pipe) (*
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
 	if !env.Eval(EnvDisableAuth) {
-		c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+		err = c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+		if err != nil {
+			return nil, fmt.Errorf("error adding auth keys to SUB socket: %s", err)
+		}
 	}
-	c.subscriber.SetReconnectIvlMax(MaxReconnectInterval)
+	err = c.subscriber.SetReconnectIvlMax(MaxReconnectInterval)
+	if err != nil {
+		return nil, fmt.Errorf("error setting reconnect interval for SUB socket: %s", err)
+	}
 	err = c.subscriber.Connect(pubEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
@@ -83,9 +89,15 @@ func startZMQClient(conf *zeromqServer, clientPublic string, pipe model.Pipe) (*
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
 	if !env.Eval(EnvDisableAuth) {
-		c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+		err = c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+		if err != nil {
+			return nil, fmt.Errorf("error adding auth keys to PUB socket: %s", err)
+		}
 	}
-	c.publisher.SetReconnectIvlMax(MaxReconnectInterval)
+	err = c.publisher.SetReconnectIvlMax(MaxReconnectInterval)
+	if err != nil {
+		return nil, fmt.Errorf("error setting reconnect interval for PUB socket: %s", err)
+	}
 	err = c.publisher.Connect(subEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to PUB endpoint: %s", err)

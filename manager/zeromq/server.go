@@ -42,7 +42,10 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	} else {
 		//  Start authentication engine
 		zmq.AuthSetVerbose(true)
-		zmq.AuthStart()
+		err = zmq.AuthStart()
+		if err != nil {
+			return nil, fmt.Errorf("error starting auth: %s", err)
+		}
 
 		// load key pair
 		serverSecret, err = ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
@@ -67,7 +70,10 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
 	if !env.Eval(EnvDisableAuth) {
-		c.publisher.ServerAuthCurve(DomainAll, serverSecret)
+		err = c.publisher.ServerAuthCurve(DomainAll, serverSecret)
+		if err != nil {
+			return nil, fmt.Errorf("error adding server key to PUB socket: %s", err)
+		}
 	}
 	err = c.publisher.Bind(pubEndpoint)
 	if err != nil {
@@ -80,7 +86,10 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
 	if !env.Eval(EnvDisableAuth) {
-		c.subscriber.ServerAuthCurve(DomainAll, serverSecret)
+		err = c.subscriber.ServerAuthCurve(DomainAll, serverSecret)
+		if err != nil {
+			return nil, fmt.Errorf("error adding server key to SUB socket: %s", err)
+		}
 	}
 	err = c.subscriber.Bind(subEndpoint)
 	if err != nil {
