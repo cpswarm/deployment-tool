@@ -165,7 +165,7 @@ func (a *agent) subscribe() map[string]bool {
 	}
 
 	for topic := range topics {
-		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(topic)}
+		a.pipe.OperationCh <- model.Operation{model.OperationSubscribe, topic}
 	}
 	return topics
 }
@@ -249,7 +249,7 @@ func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 	a.sendLog(taskA.ID, stage, "received announcement", false, taskA.Debug)
 
 	if a.assessAnnouncement(taskA) {
-		a.pipe.OperationCh <- model.Message{model.OperationSubscribe, []byte(taskA.ID)}
+		a.pipe.OperationCh <- model.Operation{model.OperationSubscribe, taskA.ID}
 		a.sendLog(taskA.ID, stage, "subscribed to task", false, taskA.Debug)
 	} else {
 		log.Printf("Task is too large to process: %v", taskA.Size)
@@ -282,7 +282,7 @@ func (a *agent) handleTask(payload []byte) {
 
 	log.Printf("Received task: %s", task.ID)
 
-	a.pipe.OperationCh <- model.Message{model.OperationUnsubscribe, []byte(task.ID)}
+	a.pipe.OperationCh <- model.Operation{model.OperationUnsubscribe, task.ID}
 	a.sendLog(task.ID, stage, "received task", false, true)
 
 	err = a.saveArtifacts(task.Artifacts, task.ID, stage, task.Debug)

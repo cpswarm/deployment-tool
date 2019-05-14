@@ -139,17 +139,16 @@ func (c *zmqClient) startResponder() {
 
 func (c *zmqClient) startOperator() {
 	for op := range c.pipe.OperationCh {
-		// on-demand subscription
-		if op.Topic == model.OperationSubscribe {
-			topic := string(op.Payload) + model.TopicSeperator
+		switch op.Type {
+		case model.OperationSubscribe:
+			topic := op.Body.(string) + model.TopicSeperator
 			err := c.subscriber.SetSubscribe(topic)
 			if err != nil {
 				log.Printf("zeromq: Error subscribing: %s", err)
 			}
 			log.Println("zeromq: Subscribed to", topic)
-		}
-		if op.Topic == model.OperationUnsubscribe {
-			topic := string(op.Payload) + model.TopicSeperator
+		case model.OperationUnsubscribe:
+			topic := op.Body.(string) + model.TopicSeperator
 			err := c.subscriber.SetUnsubscribe(topic)
 			if err != nil {
 				log.Printf("zeromq: Error unsubscribing: %s", err)
