@@ -7,6 +7,8 @@ const (
 	// Operation
 	OperationSubscribe = iota
 	OperationUnsubscribe
+	OperationAuthAdd
+	OperationAuthRemove
 )
 
 // Pipe is a bi-directional channel structure

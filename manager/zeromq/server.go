@@ -55,10 +55,6 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 			return nil, err
 		}
 
-		err = loadClientKeys()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	// socket to publish to clients
@@ -89,6 +85,7 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 
 	go c.startPublisher()
 	go c.startListener()
+	go c.startOperator()
 
 	err = c.subscriber.SetSubscribe("")
 	if err != nil {
@@ -126,6 +123,29 @@ func (c *zmqClient) startListener() {
 			continue
 		}
 		c.Pipe.ResponseCh <- model.Message{parts[0], []byte(parts[1])}
+	}
+}
+
+func (c *zmqClient) startOperator() {
+	for op := range c.Pipe.OperationCh {
+		switch op.Type {
+		case model.OperationAuthAdd:
+			var keys []string
+			for k, v := range op.Body.(map[string]string) {
+				decoded, err := DecodeKey(v)
+				if err != nil {
+					log.Printf("zeromq: Unable to decode key from client %s: %s", k, err)
+					continue
+				}
+				keys = append(keys, decoded)
+			}
+			zmq.AuthCurveAdd(DomainAll, keys...)
+			log.Println("zeromq: Added client keys:", len(keys))
+		case model.OperationAuthRemove:
+			key := op.Body.(string)
+			zmq.AuthCurveRemove(DomainAll, key)
+			log.Printf("zeromq: Removed client key.")
+		}
 	}
 }
 

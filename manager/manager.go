@@ -51,6 +51,12 @@ func startManager(pipe model.Pipe, zmqPublicKey, storageDSN string) (*manager, e
 		zmqPublicKey:   zmqPublicKey,
 	}
 
+	keys, err := m.storage.GetTargetKeys()
+	if err != nil {
+		return nil, err
+	}
+	m.pipe.OperationCh <- model.Operation{model.OperationAuthAdd, keys}
+
 	go m.manageResponses()
 	return m, nil
 }
@@ -250,7 +256,7 @@ func (m *manager) getTarget(id string) (*storage.Target, error) {
 }
 
 func (m *manager) deleteTarget(id string) (found bool, err error) {
-	// send running tasks
+	// stop running tasks
 	found, err = m.stopTargetOrders(id)
 	if err != nil {
 		return false, fmt.Errorf("error stopping order to delete target: %s", err)
@@ -276,10 +282,12 @@ func (m *manager) deleteTarget(id string) (found bool, err error) {
 		}
 	}
 	// delete
-	found, err = m.storage.DeleteTarget(id)
+	target, err := m.storage.DeleteTarget(id)
 	if err != nil {
 		return false, fmt.Errorf("error deleting target: %s", err)
 	}
+	// remove key
+	m.pipe.OperationCh <- model.Operation{model.OperationAuthRemove, target.PublicKey}
 	return found, nil
 }
 

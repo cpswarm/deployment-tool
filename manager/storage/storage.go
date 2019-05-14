@@ -20,13 +20,14 @@ type Storage interface {
 	DeleteOrder(id string) (found bool, err error)
 	//
 	GetTargets(tags []string, from, size int) ([]Target, int64, error)
+	GetTargetKeys() (map[string]string, error)
 	PatchTarget(id string, target *Target) (found bool, err error)
 	IndexTarget(target *Target) (found bool, err error) // add or update
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
 	SearchTargets(map[string]interface{}) ([]Target, int64, error)
 	AddTargetTrans(*Target) (*transaction, error)
 	GetTarget(id string) (*Target, error)
-	DeleteTarget(id string) (found bool, err error)
+	DeleteTarget(id string) (*Target, error)
 	//
 	GetLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, from, size int) ([]Log, int64, error)
 	SearchLogs(map[string]interface{}) ([]Log, int64, error)
@@ -324,6 +325,41 @@ func (s *storage) GetTargets(tags []string, from, size int) ([]Target, int64, er
 	return targets, searchResult.Hits.TotalHits, nil
 }
 
+func (s *storage) GetTargetKeys() (map[string]string, error) {
+	fetch := elastic.NewFetchSourceContext(true).Include("publicKey")
+
+	keys := make(map[string]string)
+	size := 100
+	fetched := 0
+	for from := 0; ; from += size {
+		searchResult, err := s.client.Search().Index(indexTarget).Type(typeFixed).
+			FetchSourceContext(fetch).From(from).Size(size).Do(s.ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		if searchResult.Hits.TotalHits > 0 {
+			for _, hit := range searchResult.Hits.Hits {
+				var target Target
+				err := json.Unmarshal(*hit.Source, &target)
+				if err != nil {
+					return nil, err
+				}
+				if target.PublicKey != "" {
+					keys[hit.Id] = target.PublicKey
+				} else {
+					log.Println("Warning: no public key for target:", hit.Id)
+				}
+			}
+			fetched += len(searchResult.Hits.Hits)
+		}
+		if searchResult.Hits.TotalHits <= int64(fetched) {
+			break
+		}
+	}
+	return keys, nil
+}
+
 // MatchTargets searches for targets with IDs and tags and returns a list of tags and ids covering all the matches
 // The search result gives priority to tags (in the given order) and then IDs
 func (s *storage) MatchTargets(ids, tags []string) (allIDs, matchIDs, matchTags []string, err error) {
@@ -435,18 +471,22 @@ func (s *storage) GetTarget(id string) (*Target, error) {
 	return &target, nil
 }
 
-func (s *storage) DeleteTarget(id string) (found bool, err error) {
+func (s *storage) DeleteTarget(id string) (*Target, error) {
+	target, err := s.GetTarget(id)
+	if err != nil {
+		return nil, err
+	}
+	if target == nil {
+		return nil, nil
+	}
+
 	res, err := s.client.Delete().Index(indexTarget).Type(typeFixed).
 		Id(id).Do(s.ctx)
 	if err != nil {
-		e := err.(*elastic.Error)
-		if e.Status == http.StatusNotFound {
-			return false, nil
-		}
-		return false, err
+		return nil, err
 	}
 	log.Printf("Deleted %s/%s v%d", res.Index, res.Id, res.Version)
-	return true, nil
+	return target, nil
 }
 
 func (s *storage) AddOrder(order *Order) error {
@@ -693,7 +733,7 @@ func (s *storage) AddToken(token TokenHashed) (duplicate bool, err error) {
 }
 
 func (s *storage) findToken(hash string) (found bool, err error) {
-	_, err = s.client.Get().Index(indexToken).Type(typeFixed).
+	_, err = s.client.Get().Index(indexToken).Type(typeFixed).FetchSource(false).
 		Id(hash).Do(s.ctx)
 	if err != nil {
 		e := err.(*elastic.Error)
