@@ -83,7 +83,7 @@ func parseFlags() {
 
 	// Generate keypair and exit
 	if *name != "" {
-		err := zeromq.NewCurveKeypair(*name+".key", *name+".pub")
+		err := zeromq.WriteCurveKeypair(*name+".key", *name+".pub")
 		if err != nil {
 			log.Fatalln("Error creating keypair:", err)
 		}

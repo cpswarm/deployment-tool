@@ -48,20 +48,20 @@ func startZMQClient(conf *zeromqServer, clientPublic string, pipe model.Pipe) (*
 		zmq.AuthSetVerbose(true)
 		clientSecret, err = zeromq.ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error reading file: %s", err)
 		}
 		// decode
 		clientSecret, err = zeromq.DecodeKey(clientSecret)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error decoding key: %s", err)
 		}
 		clientPublic, err = zeromq.DecodeKey(clientPublic)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error decoding key: %s", err)
 		}
 		serverPublic, err = zeromq.DecodeKey(conf.PublicKey)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error decoding key: %s", err)
 		}
 	}
 	// socket to receive from server
@@ -244,7 +244,7 @@ func writeNewKeys() error {
 		log.Printf("zeromq: %s not set. Using default path: %s", EnvPublicKey, DefaultPublicKeyPath)
 	}
 
-	err := zeromq.NewCurveKeypair(privateKeyPath, publicKeyPath)
+	err := zeromq.WriteCurveKeypair(privateKeyPath, publicKeyPath)
 	if err != nil {
 		if os.IsExist(err) {
 			log.Printf("zeromq: Key file already exists.")

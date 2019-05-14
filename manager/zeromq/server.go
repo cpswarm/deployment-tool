@@ -12,8 +12,12 @@ import (
 )
 
 const (
-	EnvDebug       = "DEBUG"        // print debug messages
 	EnvDisableAuth = "DISABLE_AUTH" // disable authentication completely
+	EnvPrivateKey  = "PRIVATE_KEY"
+	EnvPublicKey   = "PUBLIC_KEY"
+
+	DefaultPrivateKeyPath = "./manager.key"
+	DefaultPublicKeyPath  = "./manager.pub"
 )
 
 type zmqClient struct {
@@ -43,16 +47,16 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 		// load key pair
 		serverSecret, err = ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error reading file: %s", err)
 		}
 		serverSecret, err = DecodeKey(serverSecret)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error decoding key: %s", err)
 		}
 
 		c.PublicKey, err = ReadKeyFile(os.Getenv(EnvPublicKey), DefaultPublicKeyPath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error reading file: %s", err)
 		}
 
 	}

@@ -80,7 +80,7 @@ func parseFlags() bool {
 	name := flag.String("newkeypair", "", "Generate new Curve keypair with the given name")
 	flag.Parse()
 	if *name != "" {
-		err := zeromq.NewCurveKeypair(*name+".key", *name+".pub")
+		err := zeromq.WriteCurveKeypair(*name+".key", *name+".pub")
 		if err != nil {
 			fmt.Println("Error creating keypair:", err)
 			os.Exit(1)

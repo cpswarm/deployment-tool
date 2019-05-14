@@ -61,7 +61,7 @@ func loadConf() (*target, error) {
 
 	t.PublicKey, err = zeromq.ReadKeyFile(os.Getenv(EnvPublicKey), DefaultPublicKeyPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading file: %s", err)
 	}
 
 	// LOAD AND REPLACE WITH ENV VARIABLES
