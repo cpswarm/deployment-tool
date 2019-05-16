@@ -486,6 +486,8 @@ func (m *manager) registerTarget(target *storage.Target, secret string) (valid b
 		return false, fmt.Errorf("error performing bulk action: %s", err)
 	}
 
+	m.pipe.OperationCh <- model.Operation{model.OperationAuthAdd, secret}
+
 	m.publishEvent(EventTargetAdded, target)
 
 	return valid, nil
