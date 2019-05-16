@@ -175,16 +175,16 @@ func (a *agent) connected() {
 	defer log.Println("Disconnected!")
 
 	// send first adv after a second. Cancel if disconnected
-	first := time.AfterFunc(time.Second, a.sendAdvertisement)
+	//first := time.AfterFunc(time.Second, a.sendAdvertisement)
 
-	t := time.NewTicker(AdvInterval)
+	//t := time.NewTicker(AdvInterval)
 	for {
 		select {
-		case <-t.C:
-			a.sendAdvertisement()
+		//case <-t.C:
+		//	a.sendAdvertisement()
 		case <-a.disconnected:
-			t.Stop()
-			first.Stop()
+			//t.Stop()
+			//first.Stop()
 			return
 		}
 	}
