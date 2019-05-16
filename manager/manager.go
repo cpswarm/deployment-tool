@@ -214,7 +214,8 @@ func (m *manager) stopOrder(id string) (found bool, list []string, err error) {
 		return false, nil, nil
 	}
 
-	for i := range m.getTargetList(order) {
+	list = m.getTargetList(order)
+	for i := range list {
 		m.requestStopAll(list[i])
 	}
 	return true, list, nil
