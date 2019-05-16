@@ -215,7 +215,7 @@ func NewElasticStorage(url string) (Storage, error) {
 	m.Settings.RefreshInterval = "1s"
 	m.Mappings.Doc.Dynamic = mappingStrict
 	m.Mappings.Doc.Prop = map[string]mappingProp{
-		"tag":       {Type: propTypeKeyword},
+		"name":      {Type: propTypeKeyword},
 		"hash":      {Type: propTypeKeyword},
 		"expiresAt": {Type: propTypeDate},
 	}

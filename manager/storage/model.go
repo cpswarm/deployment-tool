@@ -102,7 +102,7 @@ type Log struct {
 // TOKEN
 //
 type TokenMeta struct {
-	Tag       string             `json:"tag"`
+	Name      string             `json:"name"`
 	ExpiresAt model.UnixTimeType `json:"expiresAt"`
 }
 type TokenHashed struct {

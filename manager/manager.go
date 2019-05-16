@@ -372,17 +372,17 @@ func (m *manager) searchLogs(search map[string]interface{}) ([]storage.Log, int6
 	return logs, total, nil
 }
 
-func (m *manager) createTokenSet(total int, tag string) (set *tokenSetSecret, err error) {
+func (m *manager) createTokenSet(total int, name string) (set *tokenSetSecret, err error) {
 
 	set = &tokenSetSecret{
 		Tokens: make([]string, total),
 	}
 	set.ExpiresAt = model.UnixTimeType(time.Now().AddDate(0, 0, TokenValidityDays).Unix() * 1e3)
-	set.Tag = tag
+	set.Name = name
 	set.Available = total
 
 	var t storage.TokenHashed
-	t.Tag = set.Tag
+	t.Name = set.Name
 	t.ExpiresAt = set.ExpiresAt
 
 	for i := 0; i < total; i++ {
@@ -404,15 +404,15 @@ func (m *manager) createTokenSet(total int, tag string) (set *tokenSetSecret, er
 	return set, nil
 }
 
-func (m *manager) getTokenSet(tag string) (set *tokenSet, err error) {
+func (m *manager) getTokenSet(name string) (set *tokenSet, err error) {
 
-	tokenMetas, err := m.storage.GetTokens(tag)
+	tokenMetas, err := m.storage.GetTokens(name)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving token info: %s", err)
 	}
 
 	set = &tokenSet{
-		Tag: tag,
+		Name: name,
 	}
 
 	if len(tokenMetas) > 0 {
@@ -431,12 +431,12 @@ func (m *manager) getTokenSets() (sets []*tokenSet, err error) {
 	}
 	tokenSets := make(map[string]*tokenSet)
 	for _, meta := range tokenMetas {
-		if _, found := tokenSets[meta.Tag]; found {
-			tokenSets[meta.Tag].Available++
+		if _, found := tokenSets[meta.Name]; found {
+			tokenSets[meta.Name].Available++
 			continue
 		}
-		tokenSets[meta.Tag] = &tokenSet{
-			Tag:       meta.Tag,
+		tokenSets[meta.Name] = &tokenSet{
+			Name:      meta.Name,
 			ExpiresAt: meta.ExpiresAt,
 			Available: 1,
 		}
@@ -448,9 +448,9 @@ func (m *manager) getTokenSets() (sets []*tokenSet, err error) {
 	return sets, nil
 }
 
-func (m *manager) deleteTokenSet(tag string) error {
+func (m *manager) deleteTokenSet(name string) error {
 
-	err := m.storage.DeleteTokens(tag)
+	err := m.storage.DeleteTokens(name)
 	if err != nil {
 		return fmt.Errorf("error deleting tokens: %s", err)
 	}
@@ -505,7 +505,7 @@ func (m *manager) getServerInfo() (model.ServerInfo, error) {
 }
 
 type tokenSet struct {
-	Tag       string             `json:"tag"`
+	Name      string             `json:"name"`
 	Available int                `json:"available"`
 	ExpiresAt model.UnixTimeType `json:"expiresAt"`
 }

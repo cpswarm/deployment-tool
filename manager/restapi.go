@@ -41,6 +41,7 @@ const (
 	_tag             = "tag"
 	_total           = "total"
 	_topics          = "topics"
+	_name            = "name"
 	_description     = "description"
 	_tokenHeader     = "X-Auth-Token"
 	defaultPage      = 1
@@ -107,8 +108,8 @@ func (a *restAPI) setupRouter() {
 	// tokens
 	r.HandleFunc("/token_sets", a.getTokenSets).Methods(http.MethodGet)
 	r.HandleFunc("/token_sets", a.createTokenSet).Methods(http.MethodPost)
-	r.HandleFunc("/token_sets/{tag}", a.getTokenSet).Methods(http.MethodGet)
-	r.HandleFunc("/token_sets/{tag}", a.deleteTokenSet).Methods(http.MethodDelete)
+	r.HandleFunc("/token_sets/{name}", a.getTokenSet).Methods(http.MethodGet)
+	r.HandleFunc("/token_sets/{name}", a.deleteTokenSet).Methods(http.MethodDelete)
 	r.HandleFunc("/rpc/register", a.registerTarget).Methods(http.MethodPost)
 	// health
 	r.HandleFunc("/health", a.getHealth).Methods(http.MethodGet)
@@ -663,8 +664,8 @@ func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
 		HTTPResponseError(w, http.StatusBadRequest, _total+" parameter is not given")
 		return
 	}
-	if query.Get(_tag) == "" {
-		HTTPResponseError(w, http.StatusBadRequest, _tag+" parameter is not given")
+	if query.Get(_name) == "" {
+		HTTPResponseError(w, http.StatusBadRequest, _name+" parameter is not given")
 		return
 	}
 
@@ -674,7 +675,7 @@ func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenSet, err := a.manager.createTokenSet(total, query.Get(_tag))
+	tokenSet, err := a.manager.createTokenSet(total, query.Get(_name))
 	if err != nil {
 		log.Printf("Error creating set: %s", err)
 		HTTPResponseError(w, http.StatusInternalServerError, "error creating set") // should be vague
@@ -692,9 +693,7 @@ func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *restAPI) getTokenSet(w http.ResponseWriter, r *http.Request) {
-	tag := mux.Vars(r)[_tag]
-
-	tokenSet, err := a.manager.getTokenSet(tag)
+	tokenSet, err := a.manager.getTokenSet(mux.Vars(r)[_name])
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, "error creating set: "+err.Error())
 		return
@@ -710,9 +709,7 @@ func (a *restAPI) getTokenSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *restAPI) deleteTokenSet(w http.ResponseWriter, r *http.Request) {
-	tag := mux.Vars(r)[_tag]
-
-	err := a.manager.deleteTokenSet(tag)
+	err := a.manager.deleteTokenSet(mux.Vars(r)[_name])
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, "error deleting set: "+err.Error())
 		return
