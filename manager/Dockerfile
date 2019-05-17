@@ -9,7 +9,7 @@ COPY deployment-tool-ui.tar .
 RUN tar xvf deployment-tool-ui.tar
 
 ENV PRIVATE_KEY=/home/keys/manager.key
-ENV AUTHORIZED_KEYS=/home/keys/authorized_keys
+ENV PUBLIC_KEY=/home/keys/manager.pub
 
 VOLUME /home/keys
 EXPOSE 5556 5557 8080
