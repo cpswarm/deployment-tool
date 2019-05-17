@@ -52,8 +52,8 @@ func WriteCurveKeypair(privateFile, publicFile string) error {
 
 func ReadKeyFile(path, defaultPath string) (string, error) {
 	if path == "" {
+		log.Printf("ReadKeyFile: path not given. Using default path: %s", defaultPath)
 		path = defaultPath
-		log.Printf("ReadKeyFile: %s not set. Using default path: %s", path, defaultPath)
 	}
 
 	key, err := ioutil.ReadFile(path)
