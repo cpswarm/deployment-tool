@@ -28,7 +28,7 @@ Runtime: libzmq5, Build: libzmq3-dev
 
 
 ## Install (Debian ARM)
-```
+```bash
 wget https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/Debian-Package/deployment-agent-linux-arm.deb
 sudo apt install ./deployment-agent-linux-arm.deb
 ```
@@ -37,12 +37,19 @@ sudo apt install ./deployment-agent-linux-arm.deb
 
 ### Build
 Within the root of the repository:
-```
+```bash
 go build -o bin/manager ./manager
 go build -o bin/agent  ./agent
 ```
 
-#### Build with static linking
+#### Using Go < 1.11
+```bash
+git clone <repo-addr> src/code.linksmart.eu/dt/deployment-tool
+export GOPATH=$(pwd)
+go build -v code.linksmart.eu/dt/deployment-tool/agent
 ```
+
+#### Build with static linking
+```bash
 CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a -o bin/agent ./agent
 ```
