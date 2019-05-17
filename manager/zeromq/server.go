@@ -50,7 +50,7 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 		// load key pair
 		serverSecret, err = ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
 		if err != nil {
-			return nil, fmt.Errorf("error reading file: %s", err)
+			return nil, fmt.Errorf("error reading private key file: %s", err)
 		}
 		serverSecret, err = DecodeKey(serverSecret)
 		if err != nil {
@@ -59,7 +59,7 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 
 		c.PublicKey, err = ReadKeyFile(os.Getenv(EnvPublicKey), DefaultPublicKeyPath)
 		if err != nil {
-			return nil, fmt.Errorf("error reading file: %s", err)
+			return nil, fmt.Errorf("error reading public key file: %s", err)
 		}
 
 	}
