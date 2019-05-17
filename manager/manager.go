@@ -288,7 +288,7 @@ func (m *manager) deleteTarget(id string) (found bool, err error) {
 		return false, fmt.Errorf("error deleting target: %s", err)
 	}
 	// remove key
-	m.pipe.OperationCh <- model.Operation{model.OperationAuthRemove, target.PublicKey}
+	m.pipe.OperationCh <- model.Operation{model.OperationAuthRemove, map[string]string{target.ID: target.PublicKey}}
 	return found, nil
 }
 
@@ -481,12 +481,13 @@ func (m *manager) registerTarget(target *storage.Target, secret string) (valid b
 	}
 	defer targetTrans.Release()
 
+	// add public key to running server
+	m.pipe.OperationCh <- model.Operation{model.OperationAuthAdd, map[string]string{target.ID: target.PublicKey}}
+
 	err = m.storage.DoBulk(tokenTrans.Commit, targetTrans.Commit)
 	if err != nil {
 		return false, fmt.Errorf("error performing bulk action: %s", err)
 	}
-
-	m.pipe.OperationCh <- model.Operation{model.OperationAuthAdd, secret}
 
 	m.publishEvent(EventTargetAdded, target)
 

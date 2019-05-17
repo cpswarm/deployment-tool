@@ -140,26 +140,43 @@ func (c *zmqClient) startListener() {
 }
 
 func (c *zmqClient) startOperator() {
+operations:
 	for op := range c.Pipe.OperationCh {
 		switch op.Type {
 		case model.OperationAuthAdd:
-			var keys []string
-			for k, v := range op.Body.(map[string]string) {
-				decoded, err := DecodeKey(v)
-				if err != nil {
-					log.Printf("zeromq: Unable to decode key from client %s: %s", k, err)
-					continue
-				}
-				keys = append(keys, decoded)
+			keys, err := c.decodeKeys(op.Body)
+			if err != nil {
+				log.Printf("zeromq: %s", err)
+				continue operations
 			}
 			zmq.AuthCurveAdd(DomainAll, keys...)
 			log.Println("zeromq: Added client keys:", len(keys))
 		case model.OperationAuthRemove:
-			key := op.Body.(string)
-			zmq.AuthCurveRemove(DomainAll, key)
-			log.Printf("zeromq: Removed client key.")
+			keys, err := c.decodeKeys(op.Body)
+			if err != nil {
+				log.Printf("zeromq: %s", err)
+				continue operations
+			}
+			zmq.AuthCurveRemove(DomainAll, keys...)
+			log.Println("zeromq: Removed client keys:", len(keys))
 		}
 	}
+}
+
+func (c *zmqClient) decodeKeys(body interface{}) ([]string, error) {
+	m, ok := body.(map[string]string)
+	if !ok {
+		return nil, fmt.Errorf("interface conversion error: interface {} is not map[string]string")
+	}
+	var keys []string
+	for k, v := range m {
+		decoded, err := DecodeKey(v)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode key (%s) from client %s: %s", v, k, err)
+		}
+		keys = append(keys, decoded)
+	}
+	return keys, nil
 }
 
 func (c *zmqClient) Close() error {
