@@ -57,7 +57,8 @@ func loadConf() (*target, error) {
 	}
 	t.ManagerAddr = addr.String()
 	log.Println("Manager addr:", t.ManagerAddr)
-	t.ZeromqServerConf.host = "tcp://" + addr.Hostname()
+	// t.ZeromqServerConf.host = "tcp://" + addr.Hostname() // this needs Go >=1.8
+	t.ZeromqServerConf.host = "tcp://" + strings.Split(addr.Host, ":")[0]
 
 	t.PublicKey, err = zeromq.ReadKeyFile(os.Getenv(EnvPublicKey), DefaultPublicKeyPath)
 	if err != nil {
