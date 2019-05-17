@@ -36,8 +36,11 @@ func init() {
 	Verbose = Eval(_verbose)
 	LogTimestamps = !Eval(_disableLogTime)
 
-	log.Println("Environment variables:")
-	log.Println(_debug, Debug)
-	log.Println(_verbose, Verbose)
-	log.Println(_disableLogTime, !LogTimestamps)
+	if Debug {
+		log.Printf("All environment variables:\n%s", os.Environ())
+	} else {
+		log.Println(_debug, Debug)
+		log.Println(_verbose, Verbose)
+		log.Println(_disableLogTime, !LogTimestamps)
+	}
 }
