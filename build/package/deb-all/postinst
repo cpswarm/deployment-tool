@@ -1,0 +1,8 @@
+#!/bin/sh -x
+set -e
+
+name=linksmart-deployment-agent
+
+systemctl daemon-reload
+systemctl enable $name
+systemctl restart $name # start or restart (upgrade)

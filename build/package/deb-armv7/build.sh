@@ -34,4 +34,4 @@ cp service $name/lib/systemd/system/$name.service
 mv $name.bin $name/usr/local/bin/$name
 
 dpkg-deb --build $name
-mv $name.deb $exec.deb
+mv $name.deb $exec-armv7.deb
