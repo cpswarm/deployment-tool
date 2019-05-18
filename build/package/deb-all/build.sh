@@ -6,7 +6,9 @@ name=linksmart-deployment-agent
 
 echo $version $name
 
-git clone https://github.com/cpswarm/deployment-tool.git $name/usr/local/src/code.linksmart.eu/dt/deployment-tool
+src=$name/usr/local/src/code.linksmart.eu/dt/deployment-tool
+git clone https://github.com/cpswarm/deployment-tool.git $src
+rm -fr $src/ui $src/.git $src/examples
 
 mkdir -p $name/DEBIAN
 mkdir -p $name/lib/systemd/system

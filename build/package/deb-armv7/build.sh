@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 set -e
 
 exec=$1
@@ -34,4 +34,4 @@ cp service $name/lib/systemd/system/$name.service
 mv $name.bin $name/usr/local/bin/$name
 
 dpkg-deb --build $name
-mv $name.deb $exec-armv7.deb
+mv $name.deb $name-armv7.deb

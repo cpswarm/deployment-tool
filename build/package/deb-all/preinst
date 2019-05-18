@@ -3,7 +3,5 @@ set -e
 
 name=linksmart-deployment-agent
 
-#rm -fr /usr/local/src/code.linksmart.eu
-#git clone https://github.com/cpswarm/deployment-tool.git /usr/local/src/code.linksmart.eu/dt/deployment-tool
 export GOPATH=/usr/local
 go build -v -o /usr/local/bin/$name code.linksmart.eu/dt/deployment-tool/agent
