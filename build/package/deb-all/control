@@ -4,3 +4,4 @@ Architecture: all
 Maintainer: LinkSmart
 Description: LinkSmart Deployment Agent
 Pre-Depends: libzmq3-dev, golang-go, git
+Depends: libzmq5
