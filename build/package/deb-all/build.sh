@@ -14,8 +14,8 @@ mkdir -p $name/DEBIAN
 mkdir -p $name/lib/systemd/system
 mkdir -p $name/var/local/$name
 
-# control file, pre and post scripts
-cp control preinst postinst $name/DEBIAN/
+# control file and post script
+cp control postinst $name/DEBIAN/
 sed -i "s/<ver>/${version}/g" $name/DEBIAN/control
 # service file
 cp service $name/lib/systemd/system/$name.service

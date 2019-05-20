@@ -3,6 +3,9 @@ set -e
 
 name=linksmart-deployment-agent
 
+export GOPATH=/usr/local
+go build -v -o /usr/local/bin/$name code.linksmart.eu/dt/deployment-tool/agent
+
 systemctl daemon-reload
 systemctl enable $name
 systemctl restart $name # start or restart (upgrade)
