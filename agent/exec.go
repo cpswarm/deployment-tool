@@ -50,6 +50,7 @@ func (e *executor) execute(command string) (success bool) {
 
 	bashCommand := []string{"/bin/sh", "-c", command}
 	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
+	defer func() { e.cmd = nil }()
 
 	e.cmd.Dir = e.workDir
 	e.cmd.SysProcAttr = &syscall.SysProcAttr{}
@@ -96,7 +97,6 @@ func (e *executor) execute(command string) (success bool) {
 	}
 	wg.Wait()
 	e.sendLog(command, model.ExecEnd, false)
-	e.cmd = nil
 	return true
 }
 
