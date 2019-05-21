@@ -54,8 +54,9 @@ func (l *logger) startTicker() {
 			}
 			// keep everything in memory (FIFO)
 			l.buffer.Insert(logM)
-			// buffer everything when in debug mode, otherwise just state info
+			// buffer everything when in debug mode, otherwise just errors and state info
 			if logM.Debug ||
+				logM.Error ||
 				logM.Output == model.StageStart || logM.Output == model.StageEnd ||
 				logM.Output == model.ExecStart || logM.Output == model.ExecEnd {
 				tickBuffer = append(tickBuffer, logM)
