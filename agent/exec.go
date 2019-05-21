@@ -29,7 +29,8 @@ func newExecutor(task, stage string, logEnqueue enqueueFunc, debug bool) *execut
 		wd = fmt.Sprintf("%s/%s", WorkDir, TerminalDir)
 	} else {
 		wd = fmt.Sprintf("%s/tasks/%s", WorkDir, task)
-		wd += "/" + source.ExecDir(wd)
+		dir, _ := source.ExecDir(wd)
+		wd += "/" + dir
 	}
 
 	// force Python std streams to be unbuffered

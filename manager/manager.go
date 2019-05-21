@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
@@ -567,7 +566,7 @@ func (m *manager) processPackage(p *model.Package) {
 }
 
 func (m *manager) compressSource(orderID string) ([]byte, error) {
-	if path := m.sourcePath(orderID); path != "" {
+	if path, found := m.sourcePath(orderID); found {
 		compressedArchive, err := model.CompressFiles(path)
 		if err != nil {
 			return nil, err
@@ -714,14 +713,13 @@ func (m *manager) sendTask(task *model.Task, match storage.Match) {
 	// remove the directory
 }
 
-func (m *manager) sourcePath(orderID string) string {
+func (m *manager) sourcePath(orderID string) (string, bool) {
 	wd := fmt.Sprintf("%s/%s", source.OrdersDir, orderID)
-	path := fmt.Sprintf("%s/%s/%s", source.OrdersDir, orderID, source.ExecDir(wd))
-
-	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
-		return ""
+	dir, found := source.ExecDir(wd)
+	if found {
+		return fmt.Sprintf("%s/%s", wd, dir), true
 	}
-	return path
+	return "", false
 }
 
 func (m *manager) requestLogs(targetID string) error {

@@ -18,9 +18,18 @@ type Source struct {
 	Order *Order `json:"order"`
 }
 
-func ExecDir(workDir string) string {
-	if _, err := os.Stat(fmt.Sprintf("%s/%s", workDir, PackageDir)); err != nil && os.IsNotExist(err) {
-		return SourceDir
+func ExecDir(workDir string) (dir string, found bool) {
+	if exists(fmt.Sprintf("%s/%s", workDir, PackageDir)) {
+		return PackageDir, true
+	} else if exists(fmt.Sprintf("%s/%s", workDir, SourceDir)) {
+		return SourceDir, true
 	}
-	return PackageDir
+	return "", false
+}
+
+func exists(path string) bool {
+	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
