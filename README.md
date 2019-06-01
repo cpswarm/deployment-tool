@@ -5,8 +5,9 @@
 
 An over-the-air (OTA) software deployment tool for IoT applications. This project is currently under active development and not ready for production.
 
-## Documentation
-* [Github Wiki](https://github.com/cpswarm/deployment-tool/wiki)
+## Links
+* [Documentation](https://github.com/cpswarm/deployment-tool/wiki)
+* [Development Tool UI](https://github.com/cpswarm/deployment-tool-ui)
 
 ## Development Status
 | Feature                          | Functional |
@@ -17,7 +18,7 @@ An over-the-air (OTA) software deployment tool for IoT applications. This projec
 | Package Installation             | ✔          |
 | Validation Testing               | -          |
 | Package Activation               | ✔          |
-| Certificate Manager              | -          |
+| Key Management                   | ✔          |
 | Package Validation               | -          |
 | Tamper Detection                 | -          |
 
@@ -53,3 +54,4 @@ go build -v code.linksmart.eu/dt/deployment-tool/agent
 ```bash
 CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a -o bin/agent ./agent
 ```
+
