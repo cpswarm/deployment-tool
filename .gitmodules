@@ -1,0 +1,3 @@
+[submodule "deployment-tool-ui"]
+	path = ui
+	url = https://github.com/cpswarm/deployment-tool-ui.git
