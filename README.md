@@ -1,5 +1,4 @@
 # CPSwarm Deployment Tool 
-[![HitCount](http://hits.dwyl.io/cpswarm/deployment-tool.svg)](http://hits.dwyl.io/cpswarm/deployment-tool)
 [![GoDoc](https://godoc.org/github.com/cpswarm/deployment-tool?status.svg)](https://godoc.org/github.com/cpswarm/deployment-tool)
 [![Build Status](https://pipelines.linksmart.eu/plugins/servlet/wittified/build-status/CPSW-DTB)](https://pipelines.linksmart.eu/browse/CPSW-DTB/latest)
 
