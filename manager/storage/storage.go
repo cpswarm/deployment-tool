@@ -36,11 +36,11 @@ type Storage interface {
 	DeleteLogs(target, task string) error
 	DeliveredTask(target, task string) (delivered bool, err error)
 	//
-	GetTokens(tag string) ([]TokenMeta, error)
+	GetTokens(name string) ([]TokenMeta, error)
 	AddToken(TokenHashed) (duplicate bool, err error)
 	findToken(hash string) (found bool, err error)
 	DeleteTokenTrans(hash string) (found bool, trans *transaction, err error)
-	DeleteTokens(tag string) error
+	DeleteTokens(name string) error
 	//
 	DoBulk(...interface{}) error
 }
@@ -691,10 +691,10 @@ func (s *storage) DeliveredTask(target, task string) (delivered bool, err error)
 	return searchResult.Hits.TotalHits > 0, nil
 }
 
-func (s *storage) GetTokens(tag string) ([]TokenMeta, error) {
+func (s *storage) GetTokens(name string) ([]TokenMeta, error) {
 	query := elastic.NewBoolQuery()
-	if tag != "" {
-		query.Must(elastic.NewMatchQuery("tag", tag))
+	if name != "" {
+		query.Must(elastic.NewMatchQuery("name", name))
 	}
 
 	searchResult, err := s.client.Search().Index(indexToken).Type(typeFixed).
@@ -764,8 +764,8 @@ func (s *storage) DeleteTokenTrans(hash string) (found bool, trans *transaction,
 	return true, trans, nil
 }
 
-func (s *storage) DeleteTokens(tag string) error {
-	query := elastic.NewBoolQuery().Must(elastic.NewMatchQuery("tag", tag))
+func (s *storage) DeleteTokens(name string) error {
+	query := elastic.NewBoolQuery().Must(elastic.NewMatchQuery("name", name))
 
 	_, err := s.client.DeleteByQuery(indexToken).Query(query).Do(s.ctx)
 	if err != nil {
