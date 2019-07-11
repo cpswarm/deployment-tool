@@ -697,8 +697,9 @@ func (s *storage) GetTokens(name string) ([]TokenMeta, error) {
 		query.Must(elastic.NewMatchQuery("name", name))
 	}
 
-	searchResult, err := s.client.Search().Index(indexToken).Type(typeFixed).
-		Query(query).Sort("expiresAt", false).Do(s.ctx)
+	// TODO paginate or use the scroll service
+	searchResult, err := s.client.Scroll().Index(indexToken).Type(typeFixed).
+		Query(query).Size(1000).Sort("expiresAt", false).Do(s.ctx)
 	if err != nil {
 		return nil, err
 	}

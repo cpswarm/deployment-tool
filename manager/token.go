@@ -5,7 +5,6 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"fmt"
-	"log"
 )
 
 // GenerateRandomBytes returns securely generated random bytes.
@@ -36,7 +35,6 @@ func GenerateRandomToken(n int) (token, hash string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("error hashing token: %s", err)
 	}
-	log.Println("GenerateRandomToken", token, hash)
 	return token, hash, nil
 }
 
