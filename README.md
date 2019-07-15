@@ -1,5 +1,8 @@
 # CPSwarm Deployment Tool 
 [![GoDoc](https://godoc.org/github.com/cpswarm/deployment-tool?status.svg)](https://godoc.org/github.com/cpswarm/deployment-tool)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cpswarm/deployment-tool)](https://goreportcard.com/report/github.com/cpswarm/deployment-tool)
+[![Docker Pulls](https://img.shields.io/docker/pulls/linksmart/deployment-manager.svg)](https://hub.docker.com/r/linksmart/deployment-manager/tags)
+[![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/cpswarm/deployment-tool.svg)](https://github.com/cpswarm/deployment-tool/tags)  
 [![Build Status](https://pipelines.linksmart.eu/plugins/servlet/wittified/build-status/CPSW-DTB)](https://pipelines.linksmart.eu/browse/CPSW-DTB/latest)
 
 An over-the-air (OTA) software deployment tool for IoT applications. This project is currently under active development and not ready for production.
