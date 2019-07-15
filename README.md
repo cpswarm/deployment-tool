@@ -9,17 +9,12 @@ An over-the-air (OTA) software deployment tool for IoT applications. This projec
 * [Development Tool UI](https://github.com/cpswarm/deployment-tool-ui)
 
 ## Development Status
-| Feature                          | Functional |
-|----------------------------------|:----------:|
-| Deployment Logs                  | ✔          |
-| Package Assembly                 | ✔          |
-| Package Transfer                 | ✔          |
-| Package Installation             | ✔          |
-| Validation Testing               | -          |
-| Package Activation               | ✔          |
-| Key Management                   | ✔          |
-| Package Validation               | -          |
-| Tamper Detection                 | -          |
+- [x] Package Build
+- [x] Package Transfer
+- [x] Package Installation
+- [x] Package Runtime
+- [x] Key Management
+- [ ] Tamper Detection
 
 
 ## Dependencies
