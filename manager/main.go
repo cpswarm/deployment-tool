@@ -10,14 +10,22 @@ import (
 	"runtime/debug"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/env"
+	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 )
 
 const (
 	// Environment keys
-	EnvWorkdir        = "WORKDIR"     // work directory of the manager
-	EnvStorageDSN     = "STORAGE_DSN" // Storage DSN i.e. Elasticsearch's URL
-	DefaultStorageDSN = "http://localhost:9200"
+	EnvWorkdir        = "WORKDIR"         // work directory of the manager
+	EnvStorageDSN     = "STORAGE_DSN"     // Storage DSN i.e. Elasticsearch's URL
+	EnvZeromqPubPort  = "ZEROMQ_PUB_PORT" // Changes are not propagated to existing agents
+	EnvZeromqSubPort  = "ZEROMQ_SUB_PORT" // Changes are not propagated to existing agents
+	EnvHTTPServerPort = "HTTP_SERVER_PORT"
+	// Defaults
+	DefaultStorageDSN     = "http://localhost:9200"
+	DefaultZeromqPubPort  = "5556"
+	DefaultZeromqSubPort  = "5557"
+	DefaultHTTPServerPort = "8080"
 )
 
 func main() {
@@ -28,18 +36,24 @@ func main() {
 	log.Println("Started deployment manager")
 	defer log.Println("bye.")
 
-	zmqServer, err := zeromq.StartServer("tcp://*:5556", "tcp://*:5557")
+	zmqServer, err := zeromq.StartServer("tcp://*:"+os.Getenv(EnvZeromqPubPort), "tcp://*:"+os.Getenv(EnvZeromqSubPort))
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
 	defer zmqServer.Close()
 
-	m, err := startManager(zmqServer.Pipe, zmqServer.PublicKey, os.Getenv(EnvStorageDSN))
+	zmqConf := model.ZeromqServer{
+		PublicKey: zmqServer.PublicKey,
+		PubPort:   os.Getenv(EnvZeromqPubPort),
+		SubPort:   os.Getenv(EnvZeromqSubPort),
+	}
+
+	m, err := startManager(zmqServer.Pipe, zmqConf, os.Getenv(EnvStorageDSN))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	go startRESTAPI(":8080", m)
+	go startRESTAPI(":"+os.Getenv(EnvHTTPServerPort), m)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
@@ -73,6 +87,15 @@ func init() {
 
 	if os.Getenv(EnvStorageDSN) == "" {
 		os.Setenv(EnvStorageDSN, DefaultStorageDSN)
+	}
+	if os.Getenv(EnvZeromqPubPort) == "" {
+		os.Setenv(EnvZeromqPubPort, DefaultZeromqPubPort)
+	}
+	if os.Getenv(EnvZeromqSubPort) == "" {
+		os.Setenv(EnvZeromqSubPort, DefaultZeromqSubPort)
+	}
+	if os.Getenv(EnvHTTPServerPort) == "" {
+		os.Setenv(EnvHTTPServerPort, DefaultHTTPServerPort)
 	}
 }
 

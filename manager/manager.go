@@ -18,7 +18,7 @@ type manager struct {
 	pipe           model.Pipe
 	responseBuffer chan *model.Response
 	events         *pubsub.PubSub
-	zmqPublicKey   string
+	zmqConf        model.ZeromqServer
 }
 
 const (
@@ -36,7 +36,7 @@ type event struct {
 	Payload interface{} `json:"payload"`
 }
 
-func startManager(pipe model.Pipe, zmqPublicKey, storageDSN string) (*manager, error) {
+func startManager(pipe model.Pipe, zmqConf model.ZeromqServer, storageDSN string) (*manager, error) {
 	s, err := storage.NewElasticStorage(storageDSN)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func startManager(pipe model.Pipe, zmqPublicKey, storageDSN string) (*manager, e
 		pipe:           pipe,
 		responseBuffer: make(chan *model.Response, ResponseBufferCap),
 		events:         pubsub.New(EventChannelCap),
-		zmqPublicKey:   zmqPublicKey,
+		zmqConf:        zmqConf,
 	}
 
 	keys, err := m.storage.GetTargetKeys()
@@ -494,13 +494,8 @@ func (m *manager) registerTarget(target *storage.Target, secret string) (valid b
 }
 
 func (m *manager) getServerInfo() (model.ServerInfo, error) {
-	// TODO add other client config, e.g. zmq ports
 	return model.ServerInfo{
-		ZeroMQ: model.ZeromqServer{
-			PublicKey: m.zmqPublicKey,
-			PubPort:   5556,
-			SubPort:   5557,
-		},
+		ZeroMQ: m.zmqConf,
 	}, nil
 }
 

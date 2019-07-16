@@ -62,8 +62,8 @@ type Package struct {
 
 type ZeromqServer struct {
 	PublicKey string `json:"publicKey"`
-	PubPort   uint16 `json:"pubPort"`
-	SubPort   uint16 `json:"subPort"`
+	PubPort   string `json:"pubPort"`
+	SubPort   string `json:"subPort"`
 }
 
 type ServerInfo struct {

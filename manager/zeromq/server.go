@@ -30,6 +30,8 @@ type zmqClient struct {
 
 func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	log.Printf("zeromq: Using v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
+	log.Println("zeromq: Pub endpoint:", pubEndpoint)
+	log.Println("zeromq: Sub endpoint:", subEndpoint)
 
 	c := &zmqClient{
 		Pipe: model.NewPipe(),
