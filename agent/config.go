@@ -20,10 +20,10 @@ import (
 type target struct {
 	mutex sync.Mutex
 	model.TargetBase
-	AutoGenID        string       `json:"autoID,omitempty"`
-	Registered       bool         `json:"registered"`
-	ZeromqServerConf zeromqServer `json:"zeromqServer"`
-	ManagerAddr      string       `json:"-"`
+	AutoGenID        string           `json:"autoID,omitempty"`
+	Registered       bool             `json:"registered"`
+	ZeromqServerConf zeromqServerConf `json:"zeromqServer"`
+	ManagerAddr      string           `json:"-"`
 	// active task
 	TaskID             string           `json:"taskID"`
 	TaskDebug          bool             `json:"taskDebug,omitempty"`
@@ -32,9 +32,9 @@ type target struct {
 	TaskHistory        map[string]uint8 `json:"taskHistory,omitempty"`
 }
 
-type zeromqServer struct {
-	model.ZeromqServer
-	host string
+type zeromqServerConf struct {
+	model.ZeromqServerInfo        // retrieved from manager
+	host                   string // extracted from configured manager addr
 }
 
 func loadConf() (*target, error) {

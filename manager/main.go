@@ -42,7 +42,7 @@ func main() {
 	}
 	defer zmqServer.Close()
 
-	zmqConf := model.ZeromqServer{
+	zmqConf := model.ZeromqServerInfo{
 		PublicKey: zmqServer.PublicKey,
 		PubPort:   os.Getenv(EnvZeromqPubPort),
 		SubPort:   os.Getenv(EnvZeromqSubPort),

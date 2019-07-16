@@ -18,7 +18,7 @@ type manager struct {
 	pipe           model.Pipe
 	responseBuffer chan *model.Response
 	events         *pubsub.PubSub
-	zmqConf        model.ZeromqServer
+	zmqConf        model.ZeromqServerInfo
 }
 
 const (
@@ -36,7 +36,7 @@ type event struct {
 	Payload interface{} `json:"payload"`
 }
 
-func startManager(pipe model.Pipe, zmqConf model.ZeromqServer, storageDSN string) (*manager, error) {
+func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageDSN string) (*manager, error) {
 	s, err := storage.NewElasticStorage(storageDSN)
 	if err != nil {
 		return nil, err

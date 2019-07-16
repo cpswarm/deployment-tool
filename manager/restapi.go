@@ -110,7 +110,8 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/token_sets", a.createTokenSet).Methods(http.MethodPost)
 	r.HandleFunc("/token_sets/{name}", a.getTokenSet).Methods(http.MethodGet)
 	r.HandleFunc("/token_sets/{name}", a.deleteTokenSet).Methods(http.MethodDelete)
-	r.HandleFunc("/rpc/register", a.registerTarget).Methods(http.MethodPost)
+	r.HandleFunc("/rpc/targets", a.registerTarget).Methods(http.MethodPost)
+	r.HandleFunc("/rpc/server_info", a.getServerInfo).Methods(http.MethodGet)
 	// health
 	r.HandleFunc("/health", a.getHealth).Methods(http.MethodGet)
 
@@ -404,6 +405,12 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusCreated)
+	return
+}
+
+func (a *restAPI) getServerInfo(w http.ResponseWriter, r *http.Request) {
+
 	info, err := a.manager.getServerInfo()
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
@@ -416,7 +423,7 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	HTTPResponse(w, http.StatusCreated, b)
+	HTTPResponse(w, http.StatusOK, b)
 	return
 }
 

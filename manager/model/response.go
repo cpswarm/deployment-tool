@@ -60,12 +60,12 @@ type Package struct {
 	Payload   []byte `json:"p"`
 }
 
-type ZeromqServer struct {
+type ZeromqServerInfo struct {
 	PublicKey string `json:"publicKey"`
 	PubPort   string `json:"pubPort"`
 	SubPort   string `json:"subPort"`
 }
 
 type ServerInfo struct {
-	ZeroMQ ZeromqServer `json:"zeromq"`
+	ZeroMQ ZeromqServerInfo `json:"zeromq"`
 }

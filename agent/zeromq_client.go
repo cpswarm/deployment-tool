@@ -25,7 +25,7 @@ type zmqClient struct {
 	pipe model.Pipe
 }
 
-func startZMQClient(conf *zeromqServer, clientPublic string, pipe model.Pipe) (*zmqClient, error) {
+func startZMQClient(conf *zeromqServerConf, clientPublic string, pipe model.Pipe) (*zmqClient, error) {
 	log.Printf("zeromq: Using ZeroMQ v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 	subEndpoint := fmt.Sprintf("%s:%s", conf.host, conf.SubPort)
 	pubEndpoint := fmt.Sprintf("%s:%s", conf.host, conf.PubPort)

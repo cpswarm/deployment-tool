@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -48,17 +47,23 @@ func startAgent(target *target, managerAddr string) (*agent, error) {
 	a.target = target
 
 	if !a.target.Registered && os.Getenv(EnvAuthToken) != "" {
-		zmqConf, err := a.registerTarget(managerAddr, os.Getenv(EnvAuthToken))
+		err := a.registerTarget(managerAddr, os.Getenv(EnvAuthToken))
 		if err != nil {
 			return nil, fmt.Errorf("error registering target: %s", err)
 		}
 		a.target.Registered = true
-		a.target.ZeromqServerConf.PublicKey = zmqConf.PublicKey
-		a.target.ZeromqServerConf.PubPort = zmqConf.PubPort
-		a.target.ZeromqServerConf.SubPort = zmqConf.SubPort
 		a.target.saveState()
 	} else if !a.target.Registered && os.Getenv(EnvAuthToken) == "" {
 		return nil, fmt.Errorf("target not registered. Provide token for registration")
+	}
+
+	if a.target.ZeromqServerConf.PublicKey == "" || a.target.ZeromqServerConf.PubPort == "" || a.target.ZeromqServerConf.SubPort == "" {
+		zmqConf, err := a.getServerInfo(managerAddr)
+		if err != nil {
+			return nil, fmt.Errorf("error getting server info: %s", err)
+		}
+		a.target.ZeromqServerConf.ZeromqServerInfo = *zmqConf
+		a.target.saveState()
 	}
 
 	a.logger = newLogger(a.target.ID, a.pipe.ResponseCh)
@@ -89,38 +94,44 @@ func (a *agent) setupTerminal() error {
 	return nil
 }
 
-func (a *agent) registerTarget(addr, token string) (*model.ZeromqServer, error) {
+func (a *agent) registerTarget(addr, token string) error {
 	log.Println("Registering target...")
 	b, err := json.Marshal(a.target.TargetBase)
 	if err != nil {
-		return nil, fmt.Errorf("error marshalling: %s", err)
+		return fmt.Errorf("error marshalling: %s", err)
 	}
-	req, err := http.NewRequest(http.MethodPost, addr+"/rpc/register", bytes.NewBuffer(b))
+
+	req, err := http.NewRequest(http.MethodPost, addr+"/rpc/targets", bytes.NewBuffer(b))
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %s", err)
+		return fmt.Errorf("error creating request: %s", err)
 	}
 	req.Header.Set("X-Auth-Token", token)
 
 	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		return fmt.Errorf("error making request: %s", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("error registering target: %s", resp.Status)
+	}
+	return nil
+}
+
+func (a *agent) getServerInfo(addr string) (*model.ZeromqServerInfo, error) {
+	resp, err := http.Get(addr + "/rpc/server_info")
+	if err != nil {
 		return nil, fmt.Errorf("error making request: %s", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response: %s", err)
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("%s: %s", resp.Status, body)
-	}
-
+	decoder := json.NewDecoder(resp.Body)
 	var info model.ServerInfo
-	err = json.Unmarshal(body, &info)
+	err = decoder.Decode(&info)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling response: %s", err)
+		return nil, fmt.Errorf("error decoding response: %s", err)
 	}
 
 	return &info.ZeroMQ, nil
