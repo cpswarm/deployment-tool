@@ -25,7 +25,7 @@ type Storage interface {
 	IndexTarget(target *Target) (found bool, err error) // add or update
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
 	SearchTargets(map[string]interface{}) ([]Target, int64, error)
-	AddTargetTrans(*Target) (*transaction, error)
+	AddTargetTrans(*Target) (conflict bool, trans *transaction, err error)
 	GetTarget(id string) (*Target, error)
 	DeleteTarget(id string) (*Target, error)
 	//
@@ -250,11 +250,11 @@ func (s *storage) createIndex(index string, mapping mapping) error {
 }
 
 // AddTargetTrans prepares a create operation and returns an object to commit and/or release the transaction
-func (s *storage) AddTargetTrans(target *Target) (trans *transaction, err error) {
+func (s *storage) AddTargetTrans(target *Target) (conflict bool, trans *transaction, err error) {
 	if target, err := s.GetTarget(target.ID); err != nil {
-		return nil, err
+		return false, nil, err
 	} else if target != nil {
-		return nil, fmt.Errorf("target ID is not unique")
+		return true, nil, nil
 	}
 
 	s.targetLocker.Lock()
@@ -266,7 +266,7 @@ func (s *storage) AddTargetTrans(target *Target) (trans *transaction, err error)
 		},
 	}
 
-	return trans, nil
+	return false, trans, nil
 }
 
 // PatchTarget updates fields that are not omitted, returns false if target is not found

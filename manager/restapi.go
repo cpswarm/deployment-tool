@@ -392,16 +392,19 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 
 	token := r.Header.Get(_tokenHeader)
 	if token == "" {
-		HTTPResponseError(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
-	valid, err := a.manager.registerTarget(&target, token)
+	authorized, conflict, err := a.manager.registerTarget(&target, token)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
-	}
-	if !valid {
-		HTTPResponseError(w, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+	} else if !authorized {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	} else if conflict {
+		w.WriteHeader(http.StatusConflict)
 		return
 	}
 

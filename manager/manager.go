@@ -457,26 +457,29 @@ func (m *manager) deleteTokenSet(name string) error {
 	return nil
 }
 
-func (m *manager) registerTarget(target *storage.Target, secret string) (valid bool, err error) {
+func (m *manager) registerTarget(target *storage.Target, secret string) (authorized, conflict bool, err error) {
 	hash, err := HashToken(secret)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	valid, tokenTrans, err := m.storage.DeleteTokenTrans(hash)
 	if err != nil {
-		return false, fmt.Errorf("error validating token: %s", err)
+		return false, false, fmt.Errorf("error validating token: %s", err)
 	}
 	if !valid {
-		return false, nil
+		return false, false, nil
 	}
 	defer tokenTrans.Release()
 
 	target.CreatedAt = model.UnixTime()
 	target.UpdatedAt = target.CreatedAt
-	targetTrans, err := m.storage.AddTargetTrans(target)
+	conflict, targetTrans, err := m.storage.AddTargetTrans(target)
 	if err != nil {
-		return false, fmt.Errorf("error validating target: %s", err)
+		return true, false, fmt.Errorf("error validating target: %s", err)
+	}
+	if conflict {
+		return true, true, nil
 	}
 	defer targetTrans.Release()
 
@@ -485,12 +488,12 @@ func (m *manager) registerTarget(target *storage.Target, secret string) (valid b
 
 	err = m.storage.DoBulk(tokenTrans.Commit, targetTrans.Commit)
 	if err != nil {
-		return false, fmt.Errorf("error performing bulk action: %s", err)
+		return true, false, fmt.Errorf("error performing bulk action: %s", err)
 	}
 
 	m.publishEvent(EventTargetAdded, target)
 
-	return valid, nil
+	return true, false, nil
 }
 
 func (m *manager) getServerInfo() (model.ServerInfo, error) {
