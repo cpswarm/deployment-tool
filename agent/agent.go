@@ -127,6 +127,10 @@ func (a *agent) getServerInfo(addr string) (*model.ZeromqServerInfo, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("error getting server info: %s", resp.Status)
+	}
+
 	decoder := json.NewDecoder(resp.Body)
 	var info model.ServerInfo
 	err = decoder.Decode(&info)
