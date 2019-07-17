@@ -1,12 +1,20 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/client"
 )
 
 const endpoint = "http://localhost:8080"
@@ -23,6 +31,13 @@ func TestDeploy(t *testing.T) {
 		}
 	})
 	t.Log(token)
+
+	t.Run("Run an agent", func(t *testing.T) {
+		err = runAgent(token)
+		if err != nil {
+			t.Fatalf("%s", err)
+		}
+	})
 
 }
 
@@ -63,4 +78,57 @@ func getToken() (string, error) {
 	}
 
 	return token, nil
+}
+
+func runAgent(token string) error {
+	ctx := context.Background()
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		panic(err)
+	}
+
+	imageName := "linksmart/deployment-agent"
+
+	out, err := cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
+	if err != nil {
+		panic(err)
+	}
+	io.Copy(os.Stdout, out)
+
+	workDir, _ := os.Getwd()
+	mountPoint := workDir + "/agent-vol"
+	err = os.MkdirAll(mountPoint, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	resp, err := cli.ContainerCreate(ctx,
+		&container.Config{
+			Image: imageName,
+			//Env:   []string{"AUTH_TOKEN=" + token, "MANAGER_ADDR=" + endpoint},
+			Cmd: []string{"-newkeypair", "agent"},
+		},
+		&container.HostConfig{
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: mountPoint,
+					Target: "/home/agent",
+				},
+			},
+		}, nil, "test-agent")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		panic(err)
+	}
+
+	time.Sleep(3 * time.Second)
+	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
+		panic(err)
+	}
+
+	fmt.Println(resp.ID)
+	return nil
 }
