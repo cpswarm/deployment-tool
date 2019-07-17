@@ -697,7 +697,7 @@ func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
 		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	HTTPResponse(w, http.StatusOK, b)
+	HTTPResponse(w, http.StatusCreated, b)
 	return
 
 }
