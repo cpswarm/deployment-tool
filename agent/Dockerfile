@@ -1,17 +1,19 @@
-FROM ubuntu:bionic
+FROM alpine
 
 WORKDIR /home
 
 ADD https://pipelines.linksmart.eu/artifact/CPSW-DTB/shared/build-latest/linux-amd64-binary-distributions/deployment-agent-linux-amd64 .
 RUN chmod +x deployment-agent-linux-amd64
 
-ENV PRIVATE_KEY=/home/keys/agent.key
-ENV PUBLIC_KEY=/home/keys/agent.pub
-ENV MANAGER_PUBLIC_KEY=/home/keys/manager.pub
+ENV PRIVATE_KEY=agent.key
+ENV PUBLIC_KEY=agent.pub
 
-VOLUME /home/keys
+WORKDIR /home/agent
+VOLUME /home/agent
 
-ENTRYPOINT ["./deployment-agent-linux-amd64"]
+ENTRYPOINT ["/home/deployment-agent-linux-amd64"]
 
+# Generate key pair:
+# docker run --rm -v $(pwd)/agent:/home/agent linksmart/deployment-agent -newkeypair agent
 # Run:
-# docker run -p 8080:8080 -p 5556-5557:5556-5557 -v $(pwd)/keys:/home/keys --name=deployment-manager --restart=unless-stopped -d farshidtz/deployment-manager
+# docker run -e MANAGER_ADDR=http://manager:8080 -e AUTH_TOKEN=<token> -v $(pwd)/agent:/home/agent linksmart/deployment-agent
