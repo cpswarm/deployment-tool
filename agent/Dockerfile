@@ -1,4 +1,4 @@
-FROM alpine
+FROM ubuntu:bionic
 
 WORKDIR /home
 
