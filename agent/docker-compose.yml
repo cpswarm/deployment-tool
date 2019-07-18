@@ -1,51 +1,42 @@
 version: '2.4'
 
 services:
+
   device1:
     image: linksmart/deployment-agent
-    build:
-      context: .
-    env_file:
-      - config.env
     environment:
       - ID=device1
       - TAGS=swarm,amd64
       - LOCATION_LAT=7.203973
       - LOCATION_LON=50.749548
       - AUTH_TOKEN=<token>
+      - MANAGER_ADRR=http://manager:8080
     volumes:
-      - ./keys/agent.key:/home/agent.key:ro
-      - ./keys/agent.pub:/home/agent.pub:ro
+      - ./volumes/agent:/home/agent
     restart: unless-stopped
+
   device2:
     image: linksmart/deployment-agent
-    build:
-      context: .
-    env_file:
-      - config.env
     environment:
       - ID=device2
       - TAGS=swarm,amd64
       - LOCATION_LAT=7.203556
       - LOCATION_LON=50.749580
       - AUTH_TOKEN=<token>
+      - MANAGER_ADRR=http://manager:8080
     volumes:
-      - ./keys/agent.key:/home/agent.key:ro
-      - ./keys/agent.pub:/home/agent.pub:ro
+      - ./volumes/agent:/home/agent
     restart: unless-stopped
+
   device3:
     image: linksmart/deployment-agent
-    build:
-      context: .
-    env_file:
-      - config.env
     environment:
       - ID=device3
       - TAGS=swarm,amd64
       - LOCATION_LAT=7.203596
       - LOCATION_LON=50.749580
       - AUTH_TOKEN=<token>
+      - MANAGER_ADRR=http://manager:8080
     volumes:
-      - ./keys/agent.key:/home/agent.key:ro
-      - ./keys/agent.pub:/home/agent.pub:ro
+      - ./volumes/agent:/home/agent
     restart: unless-stopped

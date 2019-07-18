@@ -17,4 +17,4 @@ EXPOSE 5556 5557 8080
 CMD ["./deployment-manager-linux-amd64"]
 
 # Run:
-# docker run -p 8080:8080 -p 5556-5557:5556-5557 -v $(pwd)/keys:/home/keys --name=deployment-manager --restart=unless-stopped -d farshidtz/deployment-manager
+# docker run -p 8080:8080 -p 5556-5557:5556-5557 -v $(pwd)/keys:/home/keys --name=deployment-manager --restart=unless-stopped -d linksmart/deployment-manager

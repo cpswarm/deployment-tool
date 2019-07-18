@@ -15,8 +15,8 @@ services:
     ports:
       - 9200:9200
     restart: unless-stopped
-  deployment-manager:
-    image: farshidtz/deployment-manager
+  manager:
+    image: linksmart/deployment-manager
     depends_on:
       - elasticsearch
     environment:
