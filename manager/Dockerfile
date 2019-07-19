@@ -2,11 +2,8 @@ FROM ubuntu:bionic
 
 WORKDIR /home
 
-COPY deployment-manager-linux-amd64 .
+ADD https://pipelines.linksmart.eu/artifact/CPSW-DTB/shared/build-latest/linux-amd64-binary-distributions/deployment-manager-linux-amd64 .
 RUN chmod +x deployment-manager-linux-amd64
-
-COPY deployment-tool-ui.tar .
-RUN tar xvf deployment-tool-ui.tar
 
 ENV PRIVATE_KEY=/home/keys/manager.key
 ENV PUBLIC_KEY=/home/keys/manager.pub
@@ -14,7 +11,9 @@ ENV PUBLIC_KEY=/home/keys/manager.pub
 VOLUME /home/keys
 EXPOSE 5556 5557 8080
 
-CMD ["./deployment-manager-linux-amd64"]
+ENTRYPOINT ["./deployment-manager-linux-amd64"]
 
+# Generate key pair:
+# docker run --rm -v $(pwd)/volumes/keys:/home/keys linksmart/deployment-manager -newkeypair keys/manager
 # Run:
-# docker run -p 8080:8080 -p 5556-5557:5556-5557 -v $(pwd)/keys:/home/keys --name=deployment-manager --restart=unless-stopped -d linksmart/deployment-manager
+# docker run -p 8080:8080 -p 5556-5557:5556-5557 -v $(pwd)/volumes/keys:/home/keys --name=deployment-manager --restart=unless-stopped -d linksmart/deployment-manager
