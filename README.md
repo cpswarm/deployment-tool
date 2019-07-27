@@ -11,7 +11,7 @@ An over-the-air (OTA) software deployment tool for IoT applications. This projec
 
 ## Links
 * Documentation: [wiki](https://github.com/cpswarm/deployment-tool/wiki) | [apidocs](https://app.swaggerhub.com/apis-docs/farshidtz8/deployment-tool) 
-* :star:Bulk Deployment GUI: [source code](ttps://github.com/cpswarm/deployment-tool-ui)
+* :star:Bulk Deployment GUI: [source code](https://github.com/cpswarm/deployment-tool-ui)
 
 
 ## Development Status
