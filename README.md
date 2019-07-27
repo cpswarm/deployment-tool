@@ -7,6 +7,8 @@
 
 An over-the-air (OTA) software deployment tool for IoT applications. This project is currently under active development and not ready for production.
 
+![CPSwarm Deployment Tool - Conceptual Diagram](https://raw.githubusercontent.com/wiki/cpswarm/deployment-tool/figures/deployment-tool-concept-v2.jpg)
+
 ## Links
 * [Documentation](https://github.com/cpswarm/deployment-tool/wiki)
 * [Development Tool UI](https://github.com/cpswarm/deployment-tool-ui)
