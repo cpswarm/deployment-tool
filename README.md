@@ -4,7 +4,7 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/linksmart/deployment-manager.svg)](https://hub.docker.com/r/linksmart/deployment-manager/tags)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/cpswarm/deployment-tool.svg)](https://github.com/cpswarm/deployment-tool/tags)  
 
-An over-the-air (OTA) software deployment tool for IoT applications. This project is currently under active development and not ready for production.
+The CPSwarm Deployment Tool is a lightweight software deployment system for IoT devices. It aims to provide secure, practical, and easy to use utilities for over-the-air (OTA) provisioning of software on single-board computers (e.g. Raspberry Pi). The project is currently under active development.
 
 ![CPSwarm Deployment Tool - Conceptual Diagram](https://raw.githubusercontent.com/wiki/cpswarm/deployment-tool/figures/deployment-tool-concept-v2.jpg)
 
@@ -13,12 +13,14 @@ An over-the-air (OTA) software deployment tool for IoT applications. This projec
 * :star: Deployment GUI: [source code](https://github.com/cpswarm/deployment-tool-ui)
 
 ## Development Status
+- [x] Graphical User Interface ([separate repo](https://github.com/cpswarm/deployment-tool-ui))
 - [x] Package Build
 - [x] Package Transfer
 - [x] Package Installation
-- [x] Package Runtime
+- [x] Package Execution
 - [x] Key Management
 - [ ] Tamper Detection
+
 
 ## Install
 Packages are built continuously [here](https://pipelines.linksmart.eu/browse/CPSW-DTB/latest).
