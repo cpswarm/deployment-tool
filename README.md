@@ -10,7 +10,7 @@ The CPSwarm Deployment Tool is a lightweight software deployment system for IoT 
 
 ## Links
 * Documentation: [wiki](https://github.com/cpswarm/deployment-tool/wiki) | [apidocs](https://app.swaggerhub.com/apis-docs/farshidtz8/deployment-tool)
-* :star: Deployment GUI: [source code](https://github.com/cpswarm/deployment-tool-ui)
+* :star: Deployment GUI: [source code](https://github.com/cpswarm/deployment-tool-ui) | [wiki](https://github.com/cpswarm/deployment-tool-ui/wiki)
 
 ## Development Status
 - [x] Graphical User Interface ([separate repo](https://github.com/cpswarm/deployment-tool-ui))
