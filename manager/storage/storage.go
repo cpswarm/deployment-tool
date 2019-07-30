@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"github.com/olivere/elastic"
@@ -107,12 +108,21 @@ func NewElasticStorage(url string) (Storage, error) {
 		return nil, err
 	}
 
-	// Ping the Elasticsearch server to get e.g. the version number
-	info, code, err := client.Ping(url).Do(ctx)
-	if err != nil {
-		return nil, err
+	// Wait for Elasticsearch server
+	const maxAttempts = 3
+	for attempts := 1; ; attempts++ {
+		info, code, err := client.Ping(url).Do(ctx)
+		if err != nil {
+			log.Printf("Elasticsearch ping error (attempt %d/%d): %s", attempts, maxAttempts, err)
+			if attempts < maxAttempts {
+				time.Sleep(time.Duration(attempts*10) * time.Second)
+				continue
+			}
+			return nil, fmt.Errorf("failed to reach Elasticsearch within %d attempts", maxAttempts)
+		}
+		log.Printf("Elasticsearch returned with code %d and version %s", code, info.Version.Number)
+		break
 	}
-	log.Printf("Elasticsearch returned with code %d and version %s", code, info.Version.Number)
 
 	s := storage{
 		ctx:    ctx,

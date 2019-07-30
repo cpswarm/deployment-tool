@@ -50,7 +50,7 @@ func main() {
 
 	m, err := startManager(zmqServer.Pipe, zmqConf, os.Getenv(EnvStorageDSN))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error starting manager: %s", err)
 	}
 
 	go startRESTAPI(":"+os.Getenv(EnvHTTPServerPort), m)

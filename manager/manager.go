@@ -39,7 +39,7 @@ type event struct {
 func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageDSN string) (*manager, error) {
 	s, err := storage.NewElasticStorage(storageDSN)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating elastic client: %s", err)
 	}
 
 	m := &manager{
@@ -52,7 +52,7 @@ func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageDSN st
 
 	keys, err := m.storage.GetTargetKeys()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading public keys from database: %s", err)
 	}
 	m.pipe.OperationCh <- model.Operation{model.OperationAuthAdd, keys}
 
