@@ -1,13 +1,16 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types"
@@ -18,155 +21,207 @@ import (
 )
 
 const (
-	endpoint     = "http://localhost:8080"
-	elasticPort  = "9090"
-	imageElastic = "elasticsearch:6.6.1"
-	imageManager = "linksmart/deployment-manager"
-	imageAgent   = "linksmart/deployment-agent"
+	userDefinedNetwork = "test-network"
+	// elastic
+	elasticImage = "elasticsearch:6.6.1"
+	elasticName  = "test-elastic"
+	elasticPort  = "9200"
+	// manager
+	managerImage = "linksmart/deployment-manager"
+	managerName  = "test-manager"
+	managerPort  = "8080"
+	// agent
+	agentImage = "linksmart/deployment-agent"
 )
 
-// TODO create user defined network
+var (
+	elasticEndpoint        = "http://" + elasticName + ":" + elasticPort
+	managerEndpoint        = "http://" + managerName + ":" + managerPort
+	managerExposedEndpoint = "http://localhost:" + managerPort
+)
 
 func TestDeploy(t *testing.T) {
 
+	var tearDownFuncs []func()
+
+	t.Run("create network", func(t *testing.T) {
+		tearDown := createNetwork(t)
+		tearDownFuncs = append(tearDownFuncs, tearDown)
+	})
+
 	t.Run("run elastic", func(t *testing.T) {
-		tearDown, err := runElastic(t)
-		defer tearDown()
-		if err != nil {
-			t.Fatal(err)
-		}
+		tearDown := runElastic(t)
+		tearDownFuncs = append(tearDownFuncs, tearDown)
 	})
 
 	t.Run("run manager", func(t *testing.T) {
-		tearDown, err := runManager(t)
-		defer tearDown()
-		if err != nil {
-			t.Fatal(err)
-		}
+		tearDown := runManager(t)
+		tearDownFuncs = append(tearDownFuncs, tearDown)
 	})
 
-	var err error
 	var token string
-	t.Run("get a token", func(t *testing.T) {
-		token, err = getToken()
-		if err != nil {
-			t.Fatalf("%s", err)
-		}
+	t.Run("get token", func(t *testing.T) {
+		token = getToken(t)
 	})
 	t.Log(token)
 
-	t.Run("run an agent", func(t *testing.T) {
-		tearDown, err := runAgent(t, token)
-		defer tearDown()
-		if err != nil {
-			t.Fatal(err)
-		}
+	t.Run("run agent", func(t *testing.T) {
+		tearDown := runAgent(t, token)
+		tearDownFuncs = append(tearDownFuncs, tearDown)
 	})
 
+	for _, tearDown := range tearDownFuncs {
+		defer tearDown()
+	}
 }
 
-func getToken() (string, error) {
-	resp, err := http.Post(endpoint+"/token_sets?name=test&total=1", "none", nil)
-	if err != nil {
-		return "", fmt.Errorf("error requesting token: %s", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("expected status 201 but got %d", resp.StatusCode)
-	}
-
-	decoder := json.NewDecoder(resp.Body)
-	respMap := make(map[string]interface{})
-	err = decoder.Decode(&respMap)
-	if err != nil {
-		return "", fmt.Errorf("error decoding response: %s", err)
-	}
-
-	if _, found := respMap["tokens"]; !found {
-		return "", fmt.Errorf("tokens not found in response:\n%s", spew.Sdump(respMap))
-	}
-
-	tokens, ok := respMap["tokens"].([]interface{})
-	if !ok {
-		return "", fmt.Errorf("type assertion not possible for tokens in response:\n%s", spew.Sdump(respMap))
-	}
-
-	if len(tokens) != 1 {
-		return "", fmt.Errorf("expected 1 token but got %d", len(tokens))
-	}
-
-	token, ok := tokens[0].(string)
-	if !ok {
-		return "", fmt.Errorf("type assertion not possible for token in response:\n%s", spew.Sdump(respMap))
-	}
-
-	return token, nil
-}
-
-func runElastic(t *testing.T) (func(), error) {
-	ctx := context.Background()
-	cli, err := client.NewEnvClient()
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = cli.ImagePull(ctx, imageElastic, types.ImagePullOptions{})
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Pulled image:", imageElastic)
-
-	// container to generate key pair
-	resp, err := cli.ContainerCreate(ctx,
-		&container.Config{
-			Image: imageElastic,
-			Env: []string{
-				"discovery.type=single-node",
-				"bootstrap.memory_lock=true",
-				"ES_JAVA_OPTS=-Xms512m -Xmx512m",
-			},
-		},
-		&container.HostConfig{
-			PortBindings: nat.PortMap{
-				"9200/tcp": []nat.PortBinding{
-					{
-						HostIP:   "127.0.0.1",
-						HostPort: elasticPort,
-					},
-				},
-			},
-		},
-		nil,
-		"")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Created container:", resp.ID)
-
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		panic(err)
-	}
-	fmt.Println("Started container:", resp.ID)
-
-	return func() {
-		containerStop(t, cli, ctx, resp.ID)
-	}, nil
-}
-
-func runManager(t *testing.T) (func(), error) {
+func createNetwork(t *testing.T) func() {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = cli.ImagePull(ctx, imageManager, types.ImagePullOptions{})
+	resp, err := cli.NetworkCreate(ctx, userDefinedNetwork, types.NetworkCreate{CheckDuplicate: true, Attachable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Created network:", resp.ID)
+
+	if t.Failed() {
+		containerRemove(t, cli, ctx, resp.ID)
+	}
+	return func() {
+		err := cli.NetworkRemove(ctx, resp.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log("Removed network:", resp.ID)
+	}
+}
+
+func getToken(t *testing.T) string {
+	time.Sleep(60 * time.Second)
+	attempts := 1
+RETRY:
+	conn, err := net.Dial("tcp", "localhost:"+managerPort)
+	if err != nil {
+		t.Log("Connection error:", err)
+		time.Sleep(5 * time.Second)
+		if attempts < 10 {
+			attempts++
+			goto RETRY
+		}
+	} else {
+		conn.Close()
+	}
+
+	resp, err := http.Post(managerExposedEndpoint+"/token_sets?name=test&total=1", "none", nil)
+	if err != nil {
+		t.Fatalf("Error requesting token: %s", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected status 201 but got %d", resp.StatusCode)
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+	respMap := make(map[string]interface{})
+	err = decoder.Decode(&respMap)
+	if err != nil {
+		t.Fatalf("Error decoding response: %s", err)
+	}
+
+	if _, found := respMap["tokens"]; !found {
+		t.Fatalf("Tokens not found in response:\n%s", spew.Sdump(respMap))
+	}
+
+	tokens, ok := respMap["tokens"].([]interface{})
+	if !ok {
+		t.Fatalf("Type assertion not possible for tokens in response:\n%s", spew.Sdump(respMap))
+	}
+
+	if len(tokens) != 1 {
+		t.Fatalf("Expected 1 token but got %d", len(tokens))
+	}
+
+	token, ok := tokens[0].(string)
+	if !ok {
+		t.Fatalf("Type assertion not possible for token in response:\n%s", spew.Sdump(respMap))
+	}
+
+	return token
+}
+
+func runElastic(t *testing.T) func() {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fmt.Println("Pulled image:", imageManager)
+	reader, err := cli.ImagePull(ctx, elasticImage, types.ImagePullOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	io.Copy(&buf, reader)
+	t.Log(buf.String())
+	t.Log("Pulled image:", elasticImage)
+
+	// container to generate key pair
+	resp, err := cli.ContainerCreate(ctx,
+		&container.Config{
+			Image: elasticImage,
+			Env: []string{
+				"discovery.type=single-node",
+				"bootstrap.memory_lock=true",
+				"ES_JAVA_OPTS=-Xms512m -Xmx512m",
+			},
+		},
+		nil,
+		nil,
+		elasticName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Created container:", resp.ID)
+
+	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Connected to network:", userDefinedNetwork)
+
+	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Started container:", resp.ID)
+
+	if t.Failed() {
+		containerRemove(t, cli, ctx, resp.ID)
+	}
+	return func() {
+		containerRemove(t, cli, ctx, resp.ID)
+	}
+}
+
+func runManager(t *testing.T) func() {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reader, err := cli.ImagePull(ctx, managerImage, types.ImagePullOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	io.Copy(&buf, reader)
+	t.Log(buf.String())
+	t.Log("Pulled image:", managerImage)
 
 	workDir, _ := os.Getwd()
 	mountPoint := workDir + "/volumes/manager"
@@ -174,7 +229,7 @@ func runManager(t *testing.T) (func(), error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mountAgent := mount.Mount{
+	keysVolume := mount.Mount{
 		Type:   mount.TypeBind,
 		Source: mountPoint,
 		Target: "/home/keys",
@@ -183,74 +238,98 @@ func runManager(t *testing.T) (func(), error) {
 	// container to generate key pair
 	resp, err := cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: imageManager,
+			Image: managerImage,
 			Cmd:   []string{"-newkeypair", "keys/manager"},
 		},
 		&container.HostConfig{
-			Mounts: []mount.Mount{mountAgent},
+			Mounts: []mount.Mount{keysVolume},
 		},
 		nil,
 		"")
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Created container for key pair generation:", resp.ID)
+	t.Log("Created container for key pair generation:", resp.ID)
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Started container:", resp.ID)
+	t.Log("Started container:", resp.ID)
 
-	fmt.Println("Waiting for container to exit...")
+	t.Log("Waiting for container to exit...")
 	waitOK, _ := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	if body := <-waitOK; body.Error != nil {
 		t.Fatal(body.Error)
 	}
-	fmt.Println("Container exited:", resp.ID)
+	t.Log("Container exited:", resp.ID)
 	containerLogs(t, cli, ctx, resp.ID)
 
 	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Removed container:", resp.ID)
+	t.Log("Removed container:", resp.ID)
 
 	// actual runtime container
 	resp, err = cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: imageManager,
-			Env:   []string{"STORAGE_DSN=http://localhost:" + elasticPort},
+			Image: managerImage,
+			Env:   []string{"STORAGE_DSN=" + elasticEndpoint, "VERBOSE=1"},
 		},
 		&container.HostConfig{
-			Mounts: []mount.Mount{mountAgent},
+			Mounts: []mount.Mount{keysVolume},
+			PortBindings: nat.PortMap{
+				"8080/tcp": []nat.PortBinding{
+					{
+						HostIP:   "127.0.0.1",
+						HostPort: managerPort,
+					},
+				},
+			},
 		},
 		nil,
-		"")
+		managerName)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Created container:", resp.ID)
+	t.Log("Created container:", resp.ID)
+
+	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Connected to network:", userDefinedNetwork)
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Started container:", resp.ID)
+	t.Log("Started container:", resp.ID)
+
+	//fmt.Println("sleeping")
+	//time.Sleep(1 * time.Minute)
+
+	if t.Failed() {
+		containerRemove(t, cli, ctx, resp.ID)
+	}
 	return func() {
-		containerStop(t, cli, ctx, resp.ID)
-	}, nil
+		containerRemove(t, cli, ctx, resp.ID)
+	}
 }
 
-func runAgent(t *testing.T, token string) (func(), error) {
+func runAgent(t *testing.T, token string) func() {
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := client.NewClientWithOpts()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = cli.ImagePull(ctx, imageAgent, types.ImagePullOptions{})
+	reader, err := cli.ImagePull(ctx, agentImage, types.ImagePullOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Pulled image:", imageAgent)
+	var buf bytes.Buffer
+	io.Copy(&buf, reader)
+	t.Log(buf.String())
+	t.Log("Pulled image:", agentImage)
 
 	workDir, _ := os.Getwd()
 	mountPoint := workDir + "/volumes/agent"
@@ -267,7 +346,7 @@ func runAgent(t *testing.T, token string) (func(), error) {
 	// container to generate key pair
 	resp, err := cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: imageAgent,
+			Image: agentImage,
 			Cmd:   []string{"-newkeypair", "agent"},
 		},
 		&container.HostConfig{
@@ -278,30 +357,30 @@ func runAgent(t *testing.T, token string) (func(), error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Created container for key pair generation:", resp.ID)
+	t.Log("Created container for key pair generation:", resp.ID)
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Started container:", resp.ID)
+	t.Log("Started container:", resp.ID)
 
-	fmt.Println("Waiting for container to exit...")
+	t.Log("Waiting for container to exit...")
 	waitOK, _ := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	if body := <-waitOK; body.Error != nil {
 		t.Fatal(body.Error)
 	}
-	fmt.Println("Container exited:", resp.ID)
+	t.Log("Container exited:", resp.ID)
 
 	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Removed container:", resp.ID)
+	t.Log("Removed container:", resp.ID)
 
 	// actual runtime container
 	resp, err = cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: imageAgent,
-			Env:   []string{"AUTH_TOKEN=" + token, "MANAGER_ADDR=" + endpoint},
+			Image: agentImage,
+			Env:   []string{"AUTH_TOKEN=" + token, "MANAGER_ADDR=" + managerEndpoint},
 		},
 		&container.HostConfig{
 			Mounts: []mount.Mount{mountAgent},
@@ -311,23 +390,32 @@ func runAgent(t *testing.T, token string) (func(), error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Created container:", resp.ID)
+	t.Log("Created container:", resp.ID)
+
+	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Connected to network:", userDefinedNetwork)
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Started container:", resp.ID)
+	t.Log("Started container:", resp.ID)
 
+	if t.Failed() {
+		containerRemove(t, cli, ctx, resp.ID)
+	}
 	return func() {
-		containerStop(t, cli, ctx, resp.ID)
-	}, nil
+		containerRemove(t, cli, ctx, resp.ID)
+	}
 }
 
-func containerStop(t *testing.T, cli *client.Client, ctx context.Context, id string) {
+func containerRemove(t *testing.T, cli *client.Client, ctx context.Context, id string) {
 	if err := cli.ContainerStop(ctx, id, nil); err != nil {
-		t.Fatalf("%s", err)
+		t.Fatal(err)
 	}
-	fmt.Println("Stopped container:", id)
+	t.Log("Stopped container:", id)
 
 	if t.Failed() {
 		containerLogs(t, cli, ctx, id)
@@ -336,7 +424,7 @@ func containerStop(t *testing.T, cli *client.Client, ctx context.Context, id str
 	if err := cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{Force: true}); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("Removed container:", id)
+	t.Log("Removed container:", id)
 }
 
 func containerLogs(t *testing.T, cli *client.Client, ctx context.Context, id string) {
