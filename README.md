@@ -6,11 +6,11 @@
 
 The CPSwarm Deployment Tool is a lightweight software deployment system for IoT devices. It aims to provide secure, practical, and easy to use utilities for over-the-air (OTA) provisioning of software on single-board computers (e.g. Raspberry Pi). The project is currently under active development.
 
-![CPSwarm Deployment Tool - Conceptual Diagram](https://raw.githubusercontent.com/wiki/cpswarm/deployment-tool/figures/deployment-tool-concept-v2.jpg)
+![CPSwarm Deployment Tool - Conceptual Diagram](https://raw.githubusercontent.com/wiki/cpswarm/deployment-tool/figures/deployment-tool-concept-v3.jpg)
 
 ## Links
 * Documentation: [wiki](https://github.com/cpswarm/deployment-tool/wiki) | [apidocs](https://app.swaggerhub.com/apis-docs/farshidtz8/deployment-tool)
-* :star: Deployment GUI: [source code](https://github.com/cpswarm/deployment-tool-ui)
+* :star: Deployment GUI: [source code](https://github.com/cpswarm/deployment-tool-ui) | [wiki](https://github.com/cpswarm/deployment-tool-ui/wiki)
 
 ## Development Status
 - [x] Graphical User Interface ([separate repo](https://github.com/cpswarm/deployment-tool-ui))
