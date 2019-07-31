@@ -33,7 +33,7 @@ func main() {
 		return
 	}
 
-	log.Println("Started deployment manager")
+	log.Println("STARTED DEPLOYMENT MANAGER")
 	defer log.Println("bye.")
 
 	zmqServer, err := zeromq.StartServer("tcp://*:"+os.Getenv(EnvZeromqPubPort), "tcp://*:"+os.Getenv(EnvZeromqSubPort))

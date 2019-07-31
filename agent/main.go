@@ -29,7 +29,7 @@ var WorkDir = "."
 func main() {
 	parseFlags()
 
-	log.Println("Started deployment agent")
+	log.Println("STARTED DEPLOYMENT AGENT")
 	defer log.Println("bye.")
 
 	WorkDir, _ = os.Getwd()
