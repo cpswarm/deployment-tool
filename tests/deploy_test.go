@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -38,11 +37,23 @@ var (
 	elasticEndpoint        = "http://" + elasticName + ":" + elasticPort
 	managerEndpoint        = "http://" + managerName + ":" + managerPort
 	managerExposedEndpoint = "http://localhost:" + managerPort
+	testDir                string
 )
 
 func TestDeploy(t *testing.T) {
 
-	var tearDownFuncs []func()
+	var tearDownFuncs []func(*testing.T)
+
+	// prepare the work directory
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal("Error getting work directory:", err)
+	}
+	testDir = wd + "/volumes"
+	err = os.MkdirAll(testDir, os.ModePerm)
+	if err != nil {
+		t.Fatal("Error creating test dir:", err)
+	}
 
 	t.Run("create network", func(t *testing.T) {
 		tearDown := createNetwork(t)
@@ -70,12 +81,24 @@ func TestDeploy(t *testing.T) {
 		tearDownFuncs = append(tearDownFuncs, tearDown)
 	})
 
+	time.Sleep(5 * time.Second) // wait for the registration by agent
+
+	t.Run("check registration", func(t *testing.T) {
+		checkRegistration(t)
+	})
+
+	t.Log("Starting to tear down.")
 	for _, tearDown := range tearDownFuncs {
-		defer tearDown()
+		defer tearDown(t)
+	}
+	// delete data
+	err = os.RemoveAll(testDir)
+	if err != nil {
+		t.Fatal("Error removing test files:", err)
 	}
 }
 
-func createNetwork(t *testing.T) func() {
+func createNetwork(t *testing.T) func(*testing.T) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts()
 	if err != nil {
@@ -91,7 +114,7 @@ func createNetwork(t *testing.T) func() {
 	if t.Failed() {
 		containerRemove(t, cli, ctx, resp.ID)
 	}
-	return func() {
+	return func(t *testing.T) {
 		err := cli.NetworkRemove(ctx, resp.ID)
 		if err != nil {
 			t.Fatal(err)
@@ -101,22 +124,21 @@ func createNetwork(t *testing.T) func() {
 }
 
 func getToken(t *testing.T) string {
-	time.Sleep(60 * time.Second)
+
 	attempts := 1
 RETRY:
-	conn, err := net.Dial("tcp", "localhost:"+managerPort)
-	if err != nil {
-		t.Log("Connection error:", err)
+	resp, err := http.Get(managerExposedEndpoint + "/health")
+	if err != nil && attempts < 10 {
+		t.Log("Waiting for manager: health request error:", err)
 		time.Sleep(5 * time.Second)
-		if attempts < 10 {
-			attempts++
-			goto RETRY
-		}
-	} else {
-		conn.Close()
+		attempts++
+		goto RETRY
+	} else if err != nil {
+		t.Fatal("Manager not reachable.")
 	}
+	defer resp.Body.Close()
 
-	resp, err := http.Post(managerExposedEndpoint+"/token_sets?name=test&total=1", "none", nil)
+	resp, err = http.Post(managerExposedEndpoint+"/token_sets?name=test&total=1", "none", nil)
 	if err != nil {
 		t.Fatalf("Error requesting token: %s", err)
 	}
@@ -154,7 +176,35 @@ RETRY:
 	return token
 }
 
-func runElastic(t *testing.T) func() {
+func checkRegistration(t *testing.T) {
+
+	resp, err := http.Get(managerExposedEndpoint + "/targets/test-agent")
+	if err != nil {
+		t.Fatalf("Error getting the target: %s", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Error("Target response was not 200.")
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Error("Response:", string(b))
+
+		resp, err := http.Get(managerExposedEndpoint + "/targets")
+		if err != nil {
+			t.Fatalf("Error getting list of targets: %s", err)
+		}
+		defer resp.Body.Close()
+		b, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal("List of targets:", string(b))
+	}
+}
+
+func runElastic(t *testing.T) func(*testing.T) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts()
 	if err != nil {
@@ -186,7 +236,7 @@ func runElastic(t *testing.T) func() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created container:", resp.ID)
+	t.Log("Created elasticsearch container:", resp.ID)
 
 	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
 	if err != nil {
@@ -199,15 +249,12 @@ func runElastic(t *testing.T) func() {
 	}
 	t.Log("Started container:", resp.ID)
 
-	if t.Failed() {
-		containerRemove(t, cli, ctx, resp.ID)
-	}
-	return func() {
+	return func(t *testing.T) {
 		containerRemove(t, cli, ctx, resp.ID)
 	}
 }
 
-func runManager(t *testing.T) func() {
+func runManager(t *testing.T) func(*testing.T) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts()
 	if err != nil {
@@ -223,8 +270,7 @@ func runManager(t *testing.T) func() {
 	t.Log(buf.String())
 	t.Log("Pulled image:", managerImage)
 
-	workDir, _ := os.Getwd()
-	mountPoint := workDir + "/volumes/manager"
+	mountPoint := testDir + "/manager"
 	err = os.MkdirAll(mountPoint, os.ModePerm)
 	if err != nil {
 		t.Fatal(err)
@@ -249,7 +295,7 @@ func runManager(t *testing.T) func() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created container for key pair generation:", resp.ID)
+	t.Log("Created manager container for key pair generation:", resp.ID)
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
@@ -262,7 +308,7 @@ func runManager(t *testing.T) func() {
 		t.Fatal(body.Error)
 	}
 	t.Log("Container exited:", resp.ID)
-	containerLogs(t, cli, ctx, resp.ID)
+	//containerLogs(t, cli, ctx, resp.ID)
 
 	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
 		t.Fatal(err)
@@ -291,7 +337,7 @@ func runManager(t *testing.T) func() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created container:", resp.ID)
+	t.Log("Created manager container:", resp.ID)
 
 	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
 	if err != nil {
@@ -304,18 +350,12 @@ func runManager(t *testing.T) func() {
 	}
 	t.Log("Started container:", resp.ID)
 
-	//fmt.Println("sleeping")
-	//time.Sleep(1 * time.Minute)
-
-	if t.Failed() {
-		containerRemove(t, cli, ctx, resp.ID)
-	}
-	return func() {
+	return func(t *testing.T) {
 		containerRemove(t, cli, ctx, resp.ID)
 	}
 }
 
-func runAgent(t *testing.T, token string) func() {
+func runAgent(t *testing.T, token string) func(*testing.T) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts()
 	if err != nil {
@@ -331,8 +371,7 @@ func runAgent(t *testing.T, token string) func() {
 	t.Log(buf.String())
 	t.Log("Pulled image:", agentImage)
 
-	workDir, _ := os.Getwd()
-	mountPoint := workDir + "/volumes/agent"
+	mountPoint := testDir + "/agent"
 	err = os.MkdirAll(mountPoint, os.ModePerm)
 	if err != nil {
 		t.Fatal(err)
@@ -357,7 +396,7 @@ func runAgent(t *testing.T, token string) func() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created container for key pair generation:", resp.ID)
+	t.Log("Created agent container for key pair generation:", resp.ID)
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
@@ -380,7 +419,11 @@ func runAgent(t *testing.T, token string) func() {
 	resp, err = cli.ContainerCreate(ctx,
 		&container.Config{
 			Image: agentImage,
-			Env:   []string{"AUTH_TOKEN=" + token, "MANAGER_ADDR=" + managerEndpoint},
+			Env: []string{
+				"ID=" + "test-agent",
+				"AUTH_TOKEN=" + token,
+				"MANAGER_ADDR=" + managerEndpoint,
+			},
 		},
 		&container.HostConfig{
 			Mounts: []mount.Mount{mountAgent},
@@ -390,7 +433,7 @@ func runAgent(t *testing.T, token string) func() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created container:", resp.ID)
+	t.Log("Created agent container:", resp.ID)
 
 	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
 	if err != nil {
@@ -403,10 +446,7 @@ func runAgent(t *testing.T, token string) func() {
 	}
 	t.Log("Started container:", resp.ID)
 
-	if t.Failed() {
-		containerRemove(t, cli, ctx, resp.ID)
-	}
-	return func() {
+	return func(t *testing.T) {
 		containerRemove(t, cli, ctx, resp.ID)
 	}
 }
@@ -428,7 +468,6 @@ func containerRemove(t *testing.T, cli *client.Client, ctx context.Context, id s
 }
 
 func containerLogs(t *testing.T, cli *client.Client, ctx context.Context, id string) {
-
 	reader, err := cli.ContainerLogs(ctx, id, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
