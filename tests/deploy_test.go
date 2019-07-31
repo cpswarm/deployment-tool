@@ -57,7 +57,11 @@ func TestDeploy(t *testing.T) {
 
 	// create docker client
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.WithVersion("1.39"))
+	var ops []func(*client.Client) error
+	if version := os.Getenv("DOCKER_API"); version != "" {
+		ops = append(ops, client.WithVersion(version))
+	}
+	cli, err := client.NewClientWithOpts(ops...)
 	if err != nil {
 		t.Fatal(err)
 	}
