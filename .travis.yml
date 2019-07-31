@@ -3,5 +3,6 @@ language: go
 go:
   - 1.12.x
   
-install: true
-script: go test ./tests
+install: true # to skip defaults
+
+script: go test ./tests -v -failfast

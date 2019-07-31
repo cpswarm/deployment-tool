@@ -55,18 +55,25 @@ func TestDeploy(t *testing.T) {
 		t.Fatal("Error creating test dir:", err)
 	}
 
+	// create docker client
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.WithVersion("1.39"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	t.Run("create network", func(t *testing.T) {
-		tearDown := createNetwork(t)
+		tearDown := createNetwork(t, cli, ctx)
 		tearDownFuncs = append(tearDownFuncs, tearDown)
 	})
 
 	t.Run("run elastic", func(t *testing.T) {
-		tearDown := runElastic(t)
+		tearDown := runElastic(t, cli, ctx)
 		tearDownFuncs = append(tearDownFuncs, tearDown)
 	})
 
 	t.Run("run manager", func(t *testing.T) {
-		tearDown := runManager(t)
+		tearDown := runManager(t, cli, ctx)
 		tearDownFuncs = append(tearDownFuncs, tearDown)
 	})
 
@@ -77,7 +84,7 @@ func TestDeploy(t *testing.T) {
 	t.Log(token)
 
 	t.Run("run agent", func(t *testing.T) {
-		tearDown := runAgent(t, token)
+		tearDown := runAgent(t, cli, ctx, token)
 		tearDownFuncs = append(tearDownFuncs, tearDown)
 	})
 
@@ -88,8 +95,8 @@ func TestDeploy(t *testing.T) {
 	})
 
 	t.Log("Starting to tear down.")
-	for _, tearDown := range tearDownFuncs {
-		defer tearDown(t)
+	for i := len(tearDownFuncs) - 1; i >= 0; i-- {
+		tearDownFuncs[i](t)
 	}
 	// delete data
 	err = os.RemoveAll(testDir)
@@ -98,13 +105,7 @@ func TestDeploy(t *testing.T) {
 	}
 }
 
-func createNetwork(t *testing.T) func(*testing.T) {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func createNetwork(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
 	resp, err := cli.NetworkCreate(ctx, userDefinedNetwork, types.NetworkCreate{CheckDuplicate: true, Attachable: true})
 	if err != nil {
 		t.Fatal(err)
@@ -204,12 +205,7 @@ func checkRegistration(t *testing.T) {
 	}
 }
 
-func runElastic(t *testing.T) func(*testing.T) {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts()
-	if err != nil {
-		t.Fatal(err)
-	}
+func runElastic(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
 
 	reader, err := cli.ImagePull(ctx, elasticImage, types.ImagePullOptions{})
 	if err != nil {
@@ -254,12 +250,7 @@ func runElastic(t *testing.T) func(*testing.T) {
 	}
 }
 
-func runManager(t *testing.T) func(*testing.T) {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts()
-	if err != nil {
-		t.Fatal(err)
-	}
+func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
 
 	reader, err := cli.ImagePull(ctx, managerImage, types.ImagePullOptions{})
 	if err != nil {
@@ -355,13 +346,7 @@ func runManager(t *testing.T) func(*testing.T) {
 	}
 }
 
-func runAgent(t *testing.T, token string) func(*testing.T) {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token string) func(*testing.T) {
 	reader, err := cli.ImagePull(ctx, agentImage, types.ImagePullOptions{})
 	if err != nil {
 		t.Fatal(err)
