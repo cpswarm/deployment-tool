@@ -32,6 +32,9 @@ const (
 	managerPort  = "8080"
 	// agent
 	agentImage = "linksmart/deployment-agent"
+	agentName  = "test-agent"
+	// test files
+	deployOrder = "https://raw.githubusercontent.com/cpswarm/deployment-tool/master/examples/orders/zip-deploy.yml"
 )
 
 var (
@@ -97,6 +100,19 @@ func TestDeploy(t *testing.T) {
 
 	t.Run("check registration", func(t *testing.T) {
 		checkRegistration(t)
+	})
+
+	t.Run("deploy package", func(t *testing.T) {
+		deployPackage(t)
+		time.Sleep(30 * time.Second)
+	})
+
+	t.Run("check log reports", func(t *testing.T) {
+		t.SkipNow()
+	})
+
+	t.Run("check deployed files", func(t *testing.T) {
+		t.SkipNow()
 	})
 
 	t.Log("Starting to tear down.")
@@ -208,6 +224,42 @@ func checkRegistration(t *testing.T) {
 		}
 		t.Fatal("List of targets:", string(b))
 	}
+}
+
+func deployPackage(t *testing.T) {
+	// download the example order from repository
+	resp, err := http.Get(deployOrder)
+	if err != nil {
+		t.Fatal("Error downloading order:", err)
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal("Error reading downloaded order body:", err)
+	}
+
+	resp2, err := http.Post(managerExposedEndpoint+"/orders", "application/x-yaml", bytes.NewBuffer(b))
+	if err != nil {
+		t.Fatal("Error posting order:", err)
+	}
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode != http.StatusCreated {
+		t.Fatal("Expected status 201, but got", resp2.StatusCode)
+	}
+
+	decoder := json.NewDecoder(resp2.Body)
+	respMap := make(map[string]interface{})
+	err = decoder.Decode(&respMap)
+	if err != nil {
+		t.Fatalf("Error decoding response: %s", err)
+	}
+
+	if _, found := respMap["id"]; !found {
+		t.Fatalf("ID not found in response:\n%s", spew.Sdump(respMap))
+	}
+
+	t.Log("Created order:", respMap["id"])
 }
 
 func runElastic(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
@@ -414,6 +466,7 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 			Image: agentImage,
 			Env: []string{
 				"ID=" + "test-agent",
+				"TAGS=" + "swarm",
 				"AUTH_TOKEN=" + token,
 				"MANAGER_ADDR=" + managerEndpoint,
 			},
@@ -422,7 +475,7 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 			Mounts: []mount.Mount{mountAgent},
 		},
 		nil,
-		"")
+		agentName)
 	if err != nil {
 		t.Fatal(err)
 	}
