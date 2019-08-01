@@ -266,7 +266,7 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Pulled image: %s: %s", elasticImage, status)
+	t.Logf("Pulled image: %s: %s", managerImage, status)
 
 	mountPoint := testDir + "/manager"
 	err = os.MkdirAll(mountPoint, os.ModePerm)
@@ -362,7 +362,7 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Pulled image: %s: %s", elasticImage, status)
+	t.Logf("Pulled image: %s: %s", agentImage, status)
 
 	mountPoint := testDir + "/agent"
 	err = os.MkdirAll(mountPoint, os.ModePerm)
