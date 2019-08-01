@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -215,10 +216,11 @@ func runElastic(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	io.Copy(&buf, reader)
-	t.Log(buf.String())
-	t.Log("Pulled image:", elasticImage)
+	status, err := getLastLine(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Pulled image: %s: %s", elasticImage, status)
 
 	// container to generate key pair
 	resp, err := cli.ContainerCreate(ctx,
@@ -260,10 +262,11 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	io.Copy(&buf, reader)
-	t.Log(buf.String())
-	t.Log("Pulled image:", managerImage)
+	status, err := getLastLine(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Pulled image: %s: %s", elasticImage, status)
 
 	mountPoint := testDir + "/manager"
 	err = os.MkdirAll(mountPoint, os.ModePerm)
@@ -355,10 +358,11 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	io.Copy(&buf, reader)
-	t.Log(buf.String())
-	t.Log("Pulled image:", agentImage)
+	status, err := getLastLine(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Pulled image: %s: %s", elasticImage, status)
 
 	mountPoint := testDir + "/agent"
 	err = os.MkdirAll(mountPoint, os.ModePerm)
@@ -469,4 +473,13 @@ func containerLogs(t *testing.T, cli *client.Client, ctx context.Context, id str
 		t.Fatal(err)
 	}
 	t.Logf("Printing container logs for: %s\n%s", id, logs)
+}
+
+func getLastLine(reader io.Reader) (string, error) {
+	logs, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("error reading: %s", err)
+	}
+	split := bytes.Split(logs, []byte("\n"))
+	return string(split[len(split)-2]), nil
 }
