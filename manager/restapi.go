@@ -165,13 +165,12 @@ func (a *restAPI) addOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// order is accepted
 	b, err := json.Marshal(order) // marshal updated order
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
 	}
-	HTTPResponse(w, http.StatusAccepted, b)
+	HTTPResponse(w, http.StatusCreated, b)
 	return
 }
 
