@@ -53,7 +53,7 @@ func TestDeploy(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error getting work directory:", err)
 	}
-	testDir = wd + "/volumes"
+	testDir = fmt.Sprintf("%s/volumes/%d", wd, time.Now().Unix())
 	err = os.MkdirAll(testDir, os.ModePerm)
 	if err != nil {
 		t.Fatal("Error creating test dir:", err)
@@ -125,11 +125,11 @@ func TestDeploy(t *testing.T) {
 	}
 
 	// delete data
-	//err = os.RemoveAll(testDir)
-	//if err != nil {
-	//	t.Fatal("Error removing test files:", err)
-	//}
-	//t.Log("Removed test files.")
+	err = os.RemoveAll(testDir)
+	if err != nil {
+		t.Fatal("Error removing test files:", err)
+	}
+	t.Log("Removed test files.")
 }
 
 func createNetwork(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
@@ -150,18 +150,19 @@ func createNetwork(t *testing.T, cli *client.Client, ctx context.Context) func(*
 
 func getToken(t *testing.T) string {
 
+	t.Log("Waiting for manager.")
 	attempts := 1
 RETRY:
 	resp, err := http.Get(managerExposedEndpoint + "/health")
 	if err != nil && attempts < 10 {
-		t.Log("Waiting for manager: health request error:", err)
+		t.Log(err)
 		time.Sleep(5 * time.Second)
 		attempts++
 		goto RETRY
 	} else if err != nil {
 		t.Fatal("Manager not reachable.")
 	}
-	defer resp.Body.Close()
+	resp.Body.Close()
 
 	resp, err = http.Post(managerExposedEndpoint+"/token_sets?name=test&total=1", "none", nil)
 	if err != nil {
@@ -235,23 +236,24 @@ func deployPackage(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error downloading order:", err)
 	}
-	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		resp.Body.Close()
 		t.Fatal("Error reading downloaded order body:", err)
 	}
+	resp.Body.Close()
 
-	resp2, err := http.Post(managerExposedEndpoint+"/orders", "application/x-yaml", bytes.NewBuffer(b))
+	resp, err = http.Post(managerExposedEndpoint+"/orders", "application/x-yaml", bytes.NewBuffer(b))
 	if err != nil {
 		t.Fatal("Error posting order:", err)
 	}
-	defer resp2.Body.Close()
+	defer resp.Body.Close()
 
-	if resp2.StatusCode != http.StatusCreated {
-		t.Fatal("Expected status 201, but got", resp2.StatusCode)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatal("Expected status 201, but got", resp.StatusCode)
 	}
 
-	decoder := json.NewDecoder(resp2.Body)
+	decoder := json.NewDecoder(resp.Body)
 	respMap := make(map[string]interface{})
 	err = decoder.Decode(&respMap)
 	if err != nil {
@@ -337,8 +339,9 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	// container to generate key pair
 	resp, err := cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: managerImage,
-			Cmd:   []string{"-newkeypair", "keys/manager"},
+			Image:           managerImage,
+			NetworkDisabled: true,
+			Cmd:             []string{"-newkeypair", "keys/manager"},
 		},
 		&container.HostConfig{
 			Mounts: []mount.Mount{keysVolume},
@@ -363,7 +366,7 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	t.Log("Container exited:", resp.ID)
 	//containerLogs(t, cli, ctx, resp.ID)
 
-	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
+	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
 		t.Fatal(err)
 	}
 	t.Log("Removed container:", resp.ID)
@@ -433,8 +436,9 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 	// container to generate key pair
 	resp, err := cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: agentImage,
-			Cmd:   []string{"-newkeypair", "agent"},
+			Image:           agentImage,
+			NetworkDisabled: true,
+			Cmd:             []string{"-newkeypair", "agent"},
 		},
 		&container.HostConfig{
 			Mounts: []mount.Mount{mountAgent},
@@ -458,7 +462,7 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 	}
 	t.Log("Container exited:", resp.ID)
 
-	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
+	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
 		t.Fatal(err)
 	}
 	t.Log("Removed container:", resp.ID)
@@ -515,13 +519,13 @@ func removeVolumes(t *testing.T, cli *client.Client, ctx context.Context) {
 	volume := mount.Mount{
 		Type:   mount.TypeBind,
 		Source: testDir,
-		Target: "/home/volume",
+		Target: "/home/testdata",
 	}
 
 	resp, err := cli.ContainerCreate(ctx,
 		&container.Config{
 			Image: imageName,
-			Cmd:   []string{"rm", "-fr", "/home/volume"},
+			Cmd:   []string{"rm", "-fr", "/home/testdata"},
 		},
 		&container.HostConfig{
 			Mounts:     []mount.Mount{volume},
@@ -557,7 +561,10 @@ func containerRemove(t *testing.T, cli *client.Client, ctx context.Context, id s
 		containerLogs(t, cli, ctx, id)
 	}
 
-	if err := cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{Force: true}); err != nil {
+	if err := cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
+		Force:         true,
+		RemoveVolumes: true,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	t.Log("Removed container:", id)
