@@ -116,14 +116,20 @@ func TestDeploy(t *testing.T) {
 	})
 
 	t.Log("Starting to tear down.")
+	t.Run("remove volumes", func(t *testing.T) {
+		removeVolumes(t, cli, ctx)
+	})
+
 	for i := len(tearDownFuncs) - 1; i >= 0; i-- {
 		tearDownFuncs[i](t)
 	}
+
 	// delete data
-	err = os.RemoveAll(testDir)
-	if err != nil {
-		t.Fatal("Error removing test files:", err)
-	}
+	//err = os.RemoveAll(testDir)
+	//if err != nil {
+	//	t.Fatal("Error removing test files:", err)
+	//}
+	//t.Log("Removed test files.")
 }
 
 func createNetwork(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
@@ -133,9 +139,6 @@ func createNetwork(t *testing.T, cli *client.Client, ctx context.Context) func(*
 	}
 	t.Log("Created network:", resp.ID)
 
-	if t.Failed() {
-		containerRemove(t, cli, ctx, resp.ID)
-	}
 	return func(t *testing.T) {
 		err := cli.NetworkRemove(ctx, resp.ID)
 		if err != nil {
@@ -495,6 +498,53 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 	return func(t *testing.T) {
 		containerRemove(t, cli, ctx, resp.ID)
 	}
+}
+
+func removeVolumes(t *testing.T, cli *client.Client, ctx context.Context) {
+	imageName := "alpine"
+	reader, err := cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := getLastLine(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Pulled image: %s: %s", imageName, status)
+
+	volume := mount.Mount{
+		Type:   mount.TypeBind,
+		Source: testDir,
+		Target: "/home/volume",
+	}
+
+	resp, err := cli.ContainerCreate(ctx,
+		&container.Config{
+			Image: imageName,
+			Cmd:   []string{"rm", "-fr", "/home/volume"},
+		},
+		&container.HostConfig{
+			Mounts:     []mount.Mount{volume},
+			AutoRemove: true,
+		},
+		nil,
+		"")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Created cleaner container:", resp.ID)
+
+	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Started container:", resp.ID)
+
+	t.Log("Waiting for container to exit...")
+	waitOK, _ := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	if body := <-waitOK; body.Error != nil {
+		t.Fatal(body.Error)
+	}
+	t.Log("Container exited:", resp.ID)
 }
 
 func containerRemove(t *testing.T, cli *client.Client, ctx context.Context, id string) {
