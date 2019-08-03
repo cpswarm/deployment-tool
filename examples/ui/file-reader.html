@@ -17,7 +17,7 @@
             // too many files may cause problems
             console.log("Selected files:", files.length);
 
-            var archive = (new JSZip()).folder("archive");
+            var archive = new JSZip();
             var pending = files.length;
 
             for (var i = 0, f; f = files[i]; i++) {
@@ -36,7 +36,11 @@
                         // console.log("e:", e.target.result);
                         console.log("loaded:", file.webkitRelativePath);
                         // parent directory name is in the path
-                        archive.file(file.webkitRelativePath, e.target.result)
+                        // trim selected directory name
+                        console.log(file.webkitRelativePath);
+                        var path = file.webkitRelativePath.substring(file.webkitRelativePath.indexOf('/')+1)
+                        archive.file(path, file);
+                        console.log(path);
 
                         // count down and resolve promise
                         pending--;
