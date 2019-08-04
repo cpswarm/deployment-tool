@@ -1,3 +1,5 @@
+// run tests:
+// go test -v -failfast
 package tests
 
 import (
@@ -18,7 +20,12 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
+
+// TODO
+// auto remove containers?
+// bug: travis starts before bamboo build new image
 
 const (
 	userDefinedNetwork = "test-network"
@@ -33,8 +40,6 @@ const (
 	// agent
 	agentImage = "linksmart/deployment-agent"
 	agentName  = "test-agent"
-	// test files
-	deployOrder = "https://raw.githubusercontent.com/cpswarm/deployment-tool/master/examples/orders/zip-deploy.yml"
 )
 
 var (
@@ -102,13 +107,14 @@ func TestDeploy(t *testing.T) {
 		checkRegistration(t)
 	})
 
+	var orderID string
 	t.Run("deploy package", func(t *testing.T) {
-		deployPackage(t)
+		orderID = deployPackage(t)
 		time.Sleep(30 * time.Second)
 	})
 
 	t.Run("check log reports", func(t *testing.T) {
-		t.SkipNow()
+		checkLogs(t, orderID)
 	})
 
 	t.Run("check deployed files", func(t *testing.T) {
@@ -230,20 +236,9 @@ func checkRegistration(t *testing.T) {
 	}
 }
 
-func deployPackage(t *testing.T) {
-	// download the example order from repository
-	resp, err := http.Get(deployOrder)
-	if err != nil {
-		t.Fatal("Error downloading order:", err)
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		resp.Body.Close()
-		t.Fatal("Error reading downloaded order body:", err)
-	}
-	resp.Body.Close()
-
-	resp, err = http.Post(managerExposedEndpoint+"/orders", "application/x-yaml", bytes.NewBuffer(b))
+func deployPackage(t *testing.T) string {
+	t.Log("Submitting order.")
+	resp, err := http.Post(managerExposedEndpoint+"/orders", "application/x-yaml", bytes.NewBuffer(refDeploy))
 	if err != nil {
 		t.Fatal("Error posting order:", err)
 	}
@@ -265,6 +260,70 @@ func deployPackage(t *testing.T) {
 	}
 
 	t.Log("Created order:", respMap["id"])
+	id, ok := respMap["id"].(string)
+	if !ok {
+		t.Fatalf("Type assertion not possible for order id in response:\n%s", spew.Sdump(respMap))
+	}
+
+	return id
+}
+
+func checkLogs(t *testing.T, orderID string) {
+	t.Log("Getting task logs.")
+	resp, err := http.Get(managerExposedEndpoint + "/logs?task=" + orderID)
+	if err != nil {
+		t.Fatal("Error getting logs:", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("Expected status 200, but got", resp.StatusCode)
+	}
+
+	respMap := make(map[string]interface{})
+	err = json.NewDecoder(resp.Body).Decode(&respMap)
+	if err != nil {
+		t.Fatal("Error decoding response:", err)
+	}
+
+	items, ok := respMap["items"].([]interface{})
+	if !ok {
+		t.Fatalf("Type assertion not possible for items in response:\n%s", spew.Sdump(respMap))
+	}
+
+	var logs string
+	for _, itemIntf := range items {
+		item, ok := itemIntf.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Type assertion not possible for items.item in response:\n%s", spew.Sdump(respMap))
+		}
+
+		stage, ok := item["stage"].(string)
+		if !ok {
+			t.Fatalf("Type assertion not possible for items.item.stage in response:\n%s", spew.Sdump(respMap))
+		}
+
+		command, ok := item["command"].(string)
+		if !ok {
+			t.Fatalf("Type assertion not possible for items.item.command in response:\n%s", spew.Sdump(respMap))
+		}
+
+		output, ok := item["output"].(string)
+		if !ok {
+			t.Fatalf("Type assertion not possible for items.item.output in response:\n%s", spew.Sdump(respMap))
+		}
+
+		logs += stage + " " + command + " " + output + "\n"
+	}
+	if logs != refDeployLogs {
+		t.Log("Produced bytes:", []byte(logs))
+		t.Log("Reference bytes:", []byte(refDeployLogs))
+		dmp := diffmatchpatch.New()
+		diffs := dmp.DiffMain(logs, refDeployLogs, false)
+		t.Logf("Log diff:\n%+v", diffs)
+		t.Log("Log diff (pretty):\n" + dmp.DiffPrettyText(diffs))
+		t.Fatal("Produced logs don't match the reference.")
+	}
 }
 
 func runElastic(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
@@ -524,8 +583,9 @@ func removeVolumes(t *testing.T, cli *client.Client, ctx context.Context) {
 
 	resp, err := cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: imageName,
-			Cmd:   []string{"rm", "-fr", "/home/testdata"},
+			Image:           imageName,
+			NetworkDisabled: true,
+			Cmd:             []string{"rm", "-fr", "/home/testdata"},
 		},
 		&container.HostConfig{
 			Mounts:     []mount.Mount{volume},

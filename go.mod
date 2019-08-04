@@ -37,6 +37,7 @@ require (
 	github.com/pierrec/lz4 v0.0.0-20181005164709-635575b42742 // indirect
 	github.com/rs/cors v1.6.0
 	github.com/satori/go.uuid v1.2.0
+	github.com/sergi/go-diff v1.0.0
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/stianeikeland/go-rpio v4.2.0+incompatible
 	github.com/stretchr/testify v1.3.0 // indirect

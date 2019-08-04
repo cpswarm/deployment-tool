@@ -52,6 +52,11 @@ go build -v code.linksmart.eu/dt/deployment-tool/agent
 CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a -o bin/agent ./agent
 ```
 
+## Run tests
+```bash
+ go test ./tests -v -failfast
+```
+
 ## Dependencies
 * [ZeroMQ v4.x.x](http://zeromq.org/intro:get-the-software).  
 Runtime: libzmq5, Build: libzmq3-dev
