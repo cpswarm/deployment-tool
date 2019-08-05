@@ -690,11 +690,11 @@ func containerLogs(t *testing.T, cli *client.Client, ctx context.Context, id str
 	}
 
 	if os.Getenv("TRAVIS") == "true" {
-		t.Log("travis_fold:start:container_" + id)
+		t.Log("travis_fold:start:container." + id[:3])
 	}
 	t.Logf("Printing container logs for: %s\n%s", id, logs)
 	if os.Getenv("TRAVIS") == "true" {
-		t.Log("travis_fold:end:container_" + id)
+		t.Log("travis_fold:end:container." + id[:3])
 	}
 }
 
