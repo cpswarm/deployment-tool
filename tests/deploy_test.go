@@ -21,6 +21,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
@@ -96,8 +97,8 @@ func TestDeploy(t *testing.T) {
 	var token string
 	t.Run("get token", func(t *testing.T) {
 		token = getToken(t)
+		t.Log(token)
 	})
-	t.Log(token)
 
 	t.Run("run agent", func(t *testing.T) {
 		tearDown := runAgent(t, cli, ctx, token)
@@ -676,14 +677,21 @@ func containerLogs(t *testing.T, cli *client.Client, ctx context.Context, id str
 	if err != nil {
 		t.Fatal(err)
 	}
-	logs, err := ioutil.ReadAll(reader)
+	// demultiplex logs
+	buf := bytes.NewBuffer(nil)
+	_, err = stdcopy.StdCopy(buf, buf, reader)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	logs, err := ioutil.ReadAll(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if os.Getenv("TRAVIS") == "true" {
 		t.Log("travis_fold:start:container_" + id)
 	}
-
 	t.Logf("Printing container logs for: %s\n%s", id, logs)
 	if os.Getenv("TRAVIS") == "true" {
 		t.Log("travis_fold:end:container_" + id)
