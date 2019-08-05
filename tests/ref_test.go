@@ -27,26 +27,39 @@ deploy:
 debug: true
 `)
 
-var refDeployLogs = `install $manager STAGE-START
-install $manager compressed to 534 bytes
-install $manager sending task
-install $agent received announcement
-install $agent subscribed to task
-install $agent received task
-install $agent decompressed archive of 534 bytes
-install chmod +x english.sh german.sh EXEC-START
-install chmod +x english.sh german.sh EXEC-END
-install $agent STAGE-END
-run $agent STAGE-START
-run ./english.sh EXEC-START
-run sleep 5 && ./german.sh EXEC-START
-run ./english.sh hi 1
-run ./english.sh hi 2
-run ./english.sh hi 3
-run ./english.sh EXEC-END
-run sleep 5 && ./german.sh hallo 1
-run sleep 5 && ./german.sh hallo 2
-run sleep 5 && ./german.sh hallo 3
-run sleep 5 && ./german.sh EXEC-END
-run $agent STAGE-END
-`
+var refDeployLogs = map[string]string{
+	//////////////////
+	"install $manager": `
+STAGE-START
+compressed to 534 bytes
+sending task`,
+	////////////////
+	"install $agent": `
+received announcement
+subscribed to task
+received task
+decompressed archive of 534 bytes
+STAGE-END`,
+	///////////////////////////////////////
+	"install chmod +x english.sh german.sh": `
+EXEC-START
+EXEC-END`,
+	////////////
+	"run $agent": `
+STAGE-START
+STAGE-END`,
+	//////////////////
+	"run ./english.sh": `
+EXEC-START
+hi 1
+hi 2
+hi 3
+EXEC-END`,
+	////////////////////////////
+	"run sleep 5 && ./german.sh": `
+EXEC-START
+hallo 1
+hallo 2
+hallo 3
+EXEC-END`,
+}

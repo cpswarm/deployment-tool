@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -275,7 +276,7 @@ func checkLogs(t *testing.T, orderID string) {
 		t.Fatalf("Type assertion not possible for items in response:\n%s", spew.Sdump(respMap))
 	}
 
-	var logs string
+	logGroups := make(map[string]string)
 	for _, itemIntf := range items {
 		item, ok := itemIntf.(map[string]interface{})
 		if !ok {
@@ -297,14 +298,19 @@ func checkLogs(t *testing.T, orderID string) {
 			t.Fatalf("Type assertion not possible for items.item.output in response:\n%s", spew.Sdump(respMap))
 		}
 
-		logs += stage + " " + command + " " + output + "\n"
+		logGroups[stage+" "+command] += output + "\n"
 	}
-	if logs != refDeployLogs {
-		dmp := diffmatchpatch.New()
-		diffs := dmp.DiffMain(refDeployLogs, logs, false)
-		t.Logf("Log diff:\n%+v", diffs)
-		t.Log("Log diff (pretty):\n" + dmp.DiffPrettyText(diffs))
-		t.Fatal("Produced logs don't match the reference.")
+	for k := range logGroups {
+		ref := strings.TrimSpace(refDeployLogs[k])
+		res := strings.TrimSpace(logGroups[k])
+		if ref != res {
+			t.Error("Produced logs don't match the reference for:", k)
+			dmp := diffmatchpatch.New()
+			diffs := dmp.DiffMain(ref, res, false)
+			t.Logf("Log diff:\n%+v", diffs)
+			t.Log("Log diff (pretty):\n" + dmp.DiffPrettyText(diffs))
+			t.FailNow()
+		}
 	}
 }
 
