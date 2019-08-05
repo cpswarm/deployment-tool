@@ -5,6 +5,7 @@ package tests
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -99,9 +100,9 @@ func TestDeploy(t *testing.T) {
 	t.Run("run agent", func(t *testing.T) {
 		tearDown := runAgent(t, cli, ctx, token)
 		tearDownFuncs = append(tearDownFuncs, tearDown)
+		// TODO listen to websocket event instead
+		time.Sleep(5 * time.Second) // wait for the registration by agent
 	})
-
-	time.Sleep(5 * time.Second) // wait for the registration by agent
 
 	t.Run("check registration", func(t *testing.T) {
 		checkRegistration(t)
@@ -110,7 +111,8 @@ func TestDeploy(t *testing.T) {
 	var orderID string
 	t.Run("deploy package", func(t *testing.T) {
 		orderID = deployPackage(t)
-		time.Sleep(30 * time.Second)
+		// TODO listen to websocket event instead
+		time.Sleep(30 * time.Second) // wait for install+run
 	})
 
 	t.Run("check log reports", func(t *testing.T) {
@@ -118,7 +120,7 @@ func TestDeploy(t *testing.T) {
 	})
 
 	t.Run("check deployed files", func(t *testing.T) {
-		t.SkipNow()
+		checkFiles(t, orderID)
 	})
 
 	t.Log("Starting to tear down.")
@@ -326,6 +328,28 @@ func checkLogs(t *testing.T, orderID string) {
 	}
 }
 
+func checkFiles(t *testing.T, orderID string) {
+	md5sum := func(filepath string) string {
+		f, err := os.Open(filepath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		h := md5.New()
+		if _, err := io.Copy(h, f); err != nil {
+			t.Fatal(err)
+		}
+		return fmt.Sprintf("%x", h.Sum(nil))
+	}
+
+	for name, sum := range refSums {
+		deployedSum := md5sum(testDir + "/agent/tasks/" + orderID + "/src/" + name)
+		if deployedSum != sum {
+			t.Fatalf("Checksum mismatch for %s: expected %s, got %s", name, sum, deployedSum)
+		}
+	}
+}
+
 func runElastic(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
 
 	reader, err := cli.ImagePull(ctx, elasticImage, types.ImagePullOptions{})
@@ -384,14 +408,14 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	}
 	t.Logf("Pulled image: %s: %s", managerImage, status)
 
-	mountPoint := testDir + "/manager"
-	err = os.MkdirAll(mountPoint, os.ModePerm)
+	keysMountPoint := testDir + "/manager/keys"
+	err = os.MkdirAll(keysMountPoint, os.ModePerm)
 	if err != nil {
 		t.Fatal(err)
 	}
 	keysVolume := mount.Mount{
 		Type:   mount.TypeBind,
-		Source: mountPoint,
+		Source: keysMountPoint,
 		Target: "/home/keys",
 	}
 
@@ -430,6 +454,17 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	}
 	t.Log("Removed container:", resp.ID)
 
+	ordersMountPoint := testDir + "/manager/orders"
+	err = os.MkdirAll(ordersMountPoint, os.ModePerm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ordersVolume := mount.Mount{
+		Type:   mount.TypeBind,
+		Source: ordersMountPoint,
+		Target: "/home/orders",
+	}
+
 	// actual runtime container
 	resp, err = cli.ContainerCreate(ctx,
 		&container.Config{
@@ -437,7 +472,7 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 			Env:   []string{"STORAGE_DSN=" + elasticEndpoint, "VERBOSE=1"},
 		},
 		&container.HostConfig{
-			Mounts: []mount.Mount{keysVolume},
+			Mounts: []mount.Mount{keysVolume, ordersVolume},
 			PortBindings: nat.PortMap{
 				"8080/tcp": []nat.PortBinding{
 					{
