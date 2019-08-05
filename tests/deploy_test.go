@@ -27,6 +27,7 @@ import (
 // TODO
 // auto remove containers?
 // bug: travis starts before bamboo build new image
+// remove special chars from container logs
 
 const (
 	userDefinedNetwork = "test-network"
@@ -124,36 +125,17 @@ func TestDeploy(t *testing.T) {
 	})
 
 	t.Log("Starting to tear down.")
-	t.Run("remove volumes", func(t *testing.T) {
-		removeVolumes(t, cli, ctx)
-	})
-
 	for i := len(tearDownFuncs) - 1; i >= 0; i-- {
 		tearDownFuncs[i](t)
 	}
 
 	// delete data
+	removeVolumes(t, cli, ctx)
 	err = os.RemoveAll(testDir)
 	if err != nil {
 		t.Fatal("Error removing test files:", err)
 	}
 	t.Log("Removed test files.")
-}
-
-func createNetwork(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
-	resp, err := cli.NetworkCreate(ctx, userDefinedNetwork, types.NetworkCreate{CheckDuplicate: true, Attachable: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("Created network:", resp.ID)
-
-	return func(t *testing.T) {
-		err := cli.NetworkRemove(ctx, resp.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Log("Removed network:", resp.ID)
-	}
 }
 
 func getToken(t *testing.T) string {
@@ -345,6 +327,22 @@ func checkFiles(t *testing.T, orderID string) {
 		if deployedSum != sum {
 			t.Fatalf("Checksum mismatch for %s: expected %s, got %s", name, sum, deployedSum)
 		}
+	}
+}
+
+func createNetwork(t *testing.T, cli *client.Client, ctx context.Context) func(*testing.T) {
+	resp, err := cli.NetworkCreate(ctx, userDefinedNetwork, types.NetworkCreate{CheckDuplicate: true, Attachable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Created network:", resp.ID)
+
+	return func(t *testing.T) {
+		err := cli.NetworkRemove(ctx, resp.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log("Removed network:", resp.ID)
 	}
 }
 
@@ -597,6 +595,7 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 }
 
 func removeVolumes(t *testing.T, cli *client.Client, ctx context.Context) {
+	t.Log("Removing mounted data.")
 	imageName := "alpine"
 	reader, err := cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
@@ -675,7 +674,14 @@ func containerLogs(t *testing.T, cli *client.Client, ctx context.Context, id str
 	if err != nil {
 		t.Fatal(err)
 	}
+	if os.Getenv("TRAVIS") == "true" {
+		t.Log("travis_fold:start:container_" + id)
+	}
+
 	t.Logf("Printing container logs for: %s\n%s", id, logs)
+	if os.Getenv("TRAVIS") == "true" {
+		t.Log("travis_fold:end:container_" + id)
+	}
 }
 
 func getLastLine(reader io.Reader) (string, error) {
