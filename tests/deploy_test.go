@@ -29,33 +29,34 @@ import (
 // TODO
 // auto remove containers?
 // bug: travis starts before bamboo build new image
-// remove special chars from container logs
 
 const (
 	userDefinedNetwork = "test-network"
 	// elastic
-	elasticImage = "elasticsearch:6.6.1"
-	elasticName  = "test-elastic"
-	elasticPort  = "9200"
+	elasticImage    = "elasticsearch:6.6.1"
+	elasticName     = "test-elastic"
+	elasticPort     = "9200"
+	elasticEndpoint = "http://" + elasticName + ":" + elasticPort
 	// manager
-	managerImage = "linksmart/deployment-manager"
-	managerName  = "test-manager"
-	managerPort  = "8080"
+	managerImage           = "linksmart/deployment-manager"
+	managerName            = "test-manager"
+	managerPort            = "8080"
+	managerEndpoint        = "http://" + managerName + ":" + managerPort
+	managerExposedEndpoint = "http://localhost:" + managerPort
 	// agent
 	agentImage = "linksmart/deployment-agent"
 	agentName  = "test-agent"
 )
 
 var (
-	elasticEndpoint        = "http://" + elasticName + ":" + elasticPort
-	managerEndpoint        = "http://" + managerName + ":" + managerPort
-	managerExposedEndpoint = "http://localhost:" + managerPort
-	testDir                string
+	testDir    string
+	containers map[string]string // id: name
 )
 
 func TestDeploy(t *testing.T) {
 
 	var tearDownFuncs []func(*testing.T)
+	containers = make(map[string]string)
 
 	// prepare the work directory
 	wd, err := os.Getwd()
@@ -97,7 +98,6 @@ func TestDeploy(t *testing.T) {
 	var token string
 	t.Run("get token", func(t *testing.T) {
 		token = getToken(t)
-		t.Log(token)
 	})
 
 	t.Run("run agent", func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestDeploy(t *testing.T) {
 		checkFiles(t, orderID)
 	})
 
-	t.Log("Starting to tear down.")
+	t.Log("TEAR DOWN:")
 	for i := len(tearDownFuncs) - 1; i >= 0; i-- {
 		tearDownFuncs[i](t)
 	}
@@ -191,6 +191,7 @@ RETRY:
 		t.Fatalf("Type assertion not possible for token in response:\n%s", spew.Sdump(respMap))
 	}
 
+	t.Log("Received token with length:", len(token))
 	return token
 }
 
@@ -342,14 +343,15 @@ func createNetwork(t *testing.T, cli *client.Client, ctx context.Context) func(*
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created network:", resp.ID)
+	containers[resp.ID] = userDefinedNetwork
+	t.Log("Created network:", containerName(resp.ID))
 
 	return func(t *testing.T) {
 		err := cli.NetworkRemove(ctx, resp.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Log("Removed network:", resp.ID)
+		t.Log("Removed network:", containerName(resp.ID))
 	}
 }
 
@@ -381,7 +383,8 @@ func runElastic(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created elasticsearch container:", resp.ID)
+	containers[resp.ID] = elasticName
+	t.Log("Created container:", containerName(resp.ID))
 
 	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
 	if err != nil {
@@ -392,7 +395,7 @@ func runElastic(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Started container:", resp.ID)
+	t.Log("Started container:", containerName(resp.ID))
 
 	return func(t *testing.T) {
 		containerRemove(t, cli, ctx, resp.ID)
@@ -437,25 +440,25 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created manager container for key pair generation:", resp.ID)
+	t.Log("Created manager container for key pair generation:", containerName(resp.ID))
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Started container:", resp.ID)
+	t.Log("Started container:", containerName(resp.ID))
 
 	t.Log("Waiting for container to exit...")
 	waitOK, _ := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	if body := <-waitOK; body.Error != nil {
 		t.Fatal(body.Error)
 	}
-	t.Log("Container exited:", resp.ID)
+	t.Log("Container exited:", containerName(resp.ID))
 	//containerLogs(t, cli, ctx, resp.ID)
 
 	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Removed container:", resp.ID)
+	t.Log("Removed container:", containerName(resp.ID))
 
 	ordersMountPoint := testDir + "/manager/orders"
 	err = os.MkdirAll(ordersMountPoint, os.ModePerm)
@@ -490,7 +493,8 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created manager container:", resp.ID)
+	containers[resp.ID] = managerName
+	t.Log("Created container:", containerName(resp.ID))
 
 	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
 	if err != nil {
@@ -501,7 +505,7 @@ func runManager(t *testing.T, cli *client.Client, ctx context.Context) func(*tes
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Started container:", resp.ID)
+	t.Log("Started container:", containerName(resp.ID))
 
 	return func(t *testing.T) {
 		containerRemove(t, cli, ctx, resp.ID)
@@ -545,24 +549,24 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created agent container for key pair generation:", resp.ID)
+	t.Log("Created agent container for key pair generation:", containerName(resp.ID))
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Started container:", resp.ID)
+	t.Log("Started container:", containerName(resp.ID))
 
 	t.Log("Waiting for container to exit...")
 	waitOK, _ := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	if body := <-waitOK; body.Error != nil {
 		t.Fatal(body.Error)
 	}
-	t.Log("Container exited:", resp.ID)
+	t.Log("Container exited:", containerName(resp.ID))
 
 	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Removed container:", resp.ID)
+	t.Log("Removed container:", containerName(resp.ID))
 
 	// actual runtime container
 	resp, err = cli.ContainerCreate(ctx,
@@ -583,7 +587,8 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created agent container:", resp.ID)
+	containers[resp.ID] = agentName
+	t.Log("Created container:", containerName(resp.ID))
 
 	err = cli.NetworkConnect(ctx, userDefinedNetwork, resp.ID, nil)
 	if err != nil {
@@ -594,7 +599,7 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Started container:", resp.ID)
+	t.Log("Started container:", containerName(resp.ID))
 
 	return func(t *testing.T) {
 		containerRemove(t, cli, ctx, resp.ID)
@@ -602,7 +607,7 @@ func runAgent(t *testing.T, cli *client.Client, ctx context.Context, token strin
 }
 
 func removeVolumes(t *testing.T, cli *client.Client, ctx context.Context) {
-	t.Log("Removing mounted data.")
+	t.Log("Removing mounted data using a container.")
 	imageName := "alpine"
 	reader, err := cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
@@ -635,26 +640,26 @@ func removeVolumes(t *testing.T, cli *client.Client, ctx context.Context) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Created cleaner container:", resp.ID)
+	t.Log("Created cleaner container:", containerName(resp.ID))
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Started container:", resp.ID)
+	t.Log("Started container:", containerName(resp.ID))
 
 	t.Log("Waiting for container to exit...")
 	waitOK, _ := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	if body := <-waitOK; body.Error != nil {
 		t.Fatal(body.Error)
 	}
-	t.Log("Container exited:", resp.ID)
+	t.Log("Container exited:", containerName(resp.ID))
 }
 
 func containerRemove(t *testing.T, cli *client.Client, ctx context.Context, id string) {
 	if err := cli.ContainerStop(ctx, id, nil); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Stopped container:", id)
+	t.Log("Stopped container:", containerName(id))
 
 	if t.Failed() {
 		containerLogs(t, cli, ctx, id)
@@ -666,7 +671,7 @@ func containerRemove(t *testing.T, cli *client.Client, ctx context.Context, id s
 	}); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Removed container:", id)
+	t.Log("Removed container:", containerName(id))
 }
 
 func containerLogs(t *testing.T, cli *client.Client, ctx context.Context, id string) {
@@ -690,11 +695,11 @@ func containerLogs(t *testing.T, cli *client.Client, ctx context.Context, id str
 	}
 
 	if os.Getenv("TRAVIS") == "true" {
-		t.Log("travis_fold:start:container." + id[:3])
+		t.Log("travis_fold:start:container.logs")
 	}
-	t.Logf("Printing container logs for: %s\n%s", id, logs)
+	t.Logf("Printing container logs for: %s\n%s", containerName(id), logs)
 	if os.Getenv("TRAVIS") == "true" {
-		t.Log("travis_fold:end:container." + id[:3])
+		t.Log("travis_fold:end:container.logs")
 	}
 }
 
@@ -705,4 +710,13 @@ func getLastLine(reader io.Reader) (string, error) {
 	}
 	split := bytes.Split(logs, []byte("\n"))
 	return string(split[len(split)-2]), nil
+}
+
+func containerName(id string) (out string) {
+	out = id[:4]
+	name, found := containers[id]
+	if found {
+		out += " (" + name + ")"
+	}
+	return out
 }

@@ -59,7 +59,7 @@ EXEC-END`,
 	"run sleep 5 && ./german.sh": `
 EXEC-START
 hallo 1
-hallo 2+
+hallo 2
 hallo 3
 EXEC-END`,
 }
