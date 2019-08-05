@@ -318,10 +318,8 @@ func checkLogs(t *testing.T, orderID string) {
 		logs += stage + " " + command + " " + output + "\n"
 	}
 	if logs != refDeployLogs {
-		t.Log("Produced bytes:", []byte(logs))
-		t.Log("Reference bytes:", []byte(refDeployLogs))
 		dmp := diffmatchpatch.New()
-		diffs := dmp.DiffMain(logs, refDeployLogs, false)
+		diffs := dmp.DiffMain(refDeployLogs, logs, false)
 		t.Logf("Log diff:\n%+v", diffs)
 		t.Log("Log diff (pretty):\n" + dmp.DiffPrettyText(diffs))
 		t.Fatal("Produced logs don't match the reference.")
