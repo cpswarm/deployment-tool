@@ -704,7 +704,7 @@ func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
 func (a *restAPI) getTokenSet(w http.ResponseWriter, r *http.Request) {
 	tokenSet, err := a.manager.getTokenSet(mux.Vars(r)[_name])
 	if err != nil {
-		HTTPResponseError(w, http.StatusInternalServerError, "error creating set: "+err.Error())
+		HTTPResponseError(w, http.StatusInternalServerError, "error getting set: "+err.Error())
 		return
 	}
 
