@@ -1,6 +1,5 @@
 # CPSwarm Deployment Tool 
 [![GoDoc](https://godoc.org/github.com/cpswarm/deployment-tool?status.svg)](https://godoc.org/github.com/cpswarm/deployment-tool)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cpswarm/deployment-tool)](https://goreportcard.com/report/github.com/cpswarm/deployment-tool)
 [![Docker Pulls](https://img.shields.io/docker/pulls/linksmart/deployment-manager.svg)](https://hub.docker.com/r/linksmart/deployment-manager/tags)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/cpswarm/deployment-tool.svg)](https://github.com/cpswarm/deployment-tool/tags)
 [![Build Status](https://travis-ci.com/cpswarm/deployment-tool.svg?branch=master)](https://travis-ci.com/cpswarm/deployment-tool)  
