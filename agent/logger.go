@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	BufferCapacity = 255
-	LogInterval    = 5 * time.Second
+	MemoryStorageCapacity  = 100             // number of logs kept in memory that can be queried
+	OutgoingBufferCapacity = 255             // number of logs collected before the next flush timeout
+	OutgoingFlushInterval  = 5 * time.Second // frequency of logs submissions to server
 )
 
 type logger struct {
@@ -29,7 +30,7 @@ func newLogger(targetID string, responseCh chan<- model.Message) *logger {
 	l := &logger{
 		targetID:   targetID,
 		responseCh: responseCh,
-		buffer:     buffer.NewBuffer(BufferCapacity),
+		buffer:     buffer.NewBuffer(MemoryStorageCapacity),
 		tickerQuit: make(chan struct{}),
 		queue:      make(chan model.Log),
 	}
@@ -40,8 +41,8 @@ func newLogger(targetID string, responseCh chan<- model.Message) *logger {
 }
 
 func (l *logger) startTicker() {
-	l.ticker = time.NewTicker(LogInterval)
-	var tickBuffer []model.Log
+	l.ticker = time.NewTicker(OutgoingFlushInterval)
+	tickBuffer := buffer.NewBuffer(OutgoingBufferCapacity)
 	for {
 		select {
 		case logM := <-l.queue:
@@ -59,19 +60,19 @@ func (l *logger) startTicker() {
 				logM.Error ||
 				logM.Output == model.StageStart || logM.Output == model.StageEnd ||
 				logM.Output == model.ExecStart || logM.Output == model.ExecEnd {
-				tickBuffer = append(tickBuffer, logM)
+				tickBuffer.Insert(logM)
 			}
 		case <-l.ticker.C:
 			// send out and flush
-			if len(tickBuffer) > 0 {
-				l.send(tickBuffer, false)
-				tickBuffer = nil
+			if tickBuffer.Size() > 0 {
+				l.send(tickBuffer.Collect(), false)
+				tickBuffer.Flush()
 			}
 		case <-l.tickerQuit:
 			// send out and flush
-			if len(tickBuffer) > 0 {
-				l.send(tickBuffer, false)
-				tickBuffer = nil
+			if tickBuffer.Size() > 0 {
+				l.send(tickBuffer.Collect(), false)
+				tickBuffer.Flush()
 			}
 			return
 		}

@@ -21,8 +21,8 @@ type Buffer struct {
 }
 
 func (b *Buffer) Insert(line model.Log) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
 	if uint8(len(b.list)) < b.capacity { // buffer expanding
 		b.list = append(b.list, line)
@@ -35,9 +35,16 @@ func (b *Buffer) Insert(line model.Log) {
 	}
 }
 
+func (b *Buffer) Size() uint8 {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return uint8(len(b.list))
+}
+
 func (b *Buffer) Collect() []model.Log {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
 
 	return append(b.list[b.index:], b.list[:b.index]...)
 }
