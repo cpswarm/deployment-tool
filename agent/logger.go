@@ -65,15 +65,14 @@ func (l *logger) startTicker() {
 			}
 		case <-l.ticker.C:
 			// send out and flush
-			if tickBuffer.Size() > 0 {
+			if Connected() && tickBuffer.Size() > 0 {
 				l.send(tickBuffer.Collect(), false)
 				tickBuffer.Flush()
 			}
 		case <-l.tickerQuit:
-			// send out and flush
-			if tickBuffer.Size() > 0 {
+			// send out and return
+			if Connected() && tickBuffer.Size() > 0 {
 				l.send(tickBuffer.Collect(), false)
-				tickBuffer.Flush()
 			}
 			return
 		}

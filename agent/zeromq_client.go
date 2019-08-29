@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/env"
@@ -209,11 +210,15 @@ func (c *zmqClient) setupMonitor() (func(), error) {
 			}()
 			switch eventType {
 			case zmq.EVENT_CONNECTED:
+				log.Println("zeromq: Connected.")
 				// send to worker
 				c.pipe.RequestCh <- model.Message{Topic: model.PipeConnected}
+				setConnected(true)
 			case zmq.EVENT_DISCONNECTED:
+				log.Println("zeromq: Disconnected!")
 				// send to worker
 				c.pipe.RequestCh <- model.Message{Topic: model.PipeDisconnected}
+				setConnected(false)
 			}
 		}
 	}, nil
@@ -267,4 +272,21 @@ func writeNewKeys() error {
 
 	log.Printf("zeromq: Created new key pair.")
 	return nil
+}
+
+var (
+	connMutex sync.RWMutex
+	connected bool
+)
+
+func Connected() bool {
+	connMutex.RLock()
+	defer connMutex.RUnlock()
+	return connected
+}
+
+func setConnected(value bool) {
+	connMutex.Lock()
+	connected = value
+	connMutex.Unlock()
 }
