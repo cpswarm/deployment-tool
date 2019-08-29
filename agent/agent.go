@@ -260,6 +260,10 @@ func (a *agent) handleAnnouncement(taskA *model.Announcement) {
 	}
 
 	log.Printf("Received announcement %s/%d", taskA.ID, taskA.Type)
+	if len(a.target.TaskHistory) >= 10 {
+		log.Printf("Clearing task history.")
+		a.target.TaskHistory = make(map[string]uint8)
+	}
 	a.target.TaskHistory[taskA.ID] = taskA.Type
 	a.target.saveState()
 
