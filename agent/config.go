@@ -78,6 +78,8 @@ func loadConf() (*target, error) {
 		log.Println("Taking previously generated ID:", t.AutoGenID)
 		t.ID = t.AutoGenID
 		changed = true
+	} else if id != "" && t.ID != "" && id != t.ID && t.Registered {
+		return nil, fmt.Errorf("env var ID must not be changed after registration. Omit or use: %s", t.ID)
 	} else if id != "" && id != t.ID {
 		log.Println("Taking ID from env var:", id)
 		t.ID = id
