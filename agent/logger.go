@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -91,11 +92,15 @@ func (l *logger) priorityEnqueue(logM *model.Log) {
 
 func (l *logger) send(logs []model.Log, onRequest bool) {
 	log.Printf("logger: Sending %d entries.", len(logs))
-	b, _ := json.Marshal(model.Response{
+	b, err := json.Marshal(model.Response{
 		TargetID:  l.targetID,
 		Logs:      logs,
 		OnRequest: onRequest,
 	})
+	if err != nil {
+		b = []byte(fmt.Sprintf("Error mashalling logs: %s", err))
+		log.Printf("%s", b)
+	}
 	l.responseCh <- model.Message{string(model.ResponseLogs), b}
 }
 
