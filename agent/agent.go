@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"sync"
@@ -186,11 +187,13 @@ func (a *agent) subscribe() map[string]bool {
 }
 
 func (a *agent) connected() {
-	log.Printf("Connected.")
-	defer log.Println("Disconnected!")
+	//log.Printf("Connected.")
+	//defer log.Println("Disconnected!")
 
-	// send first adv after a second. Cancel if disconnected
-	//first := time.AfterFunc(time.Second, a.sendAdvertisement)
+	// send adv after 1-5s. Cancel if disconnected
+	// min 1s to avoid sending adv on short reconnects
+	// add random delay to avoid burst of connects from multiple devices when server becomes available
+	adv := time.AfterFunc(time.Duration(rand.Int31n(4)+1)*time.Second, a.sendAdvertisement)
 
 	//t := time.NewTicker(AdvInterval)
 	for {
@@ -199,7 +202,7 @@ func (a *agent) connected() {
 		//	a.sendAdvertisement()
 		case <-a.disconnected:
 			//t.Stop()
-			//first.Stop()
+			adv.Stop()
 			return
 		}
 	}
@@ -212,8 +215,8 @@ func (a *agent) sendAdvertisement() {
 		Location:  a.target.Location,
 		PublicKey: a.target.PublicKey,
 	}
-	log.Println("Sent adv:", t.ID, t.Tags, t.Location)
 	b, _ := json.Marshal(t)
+	log.Printf("Sending adv: %s", b)
 	a.pipe.ResponseCh <- model.Message{model.ResponseAdvertisement, b}
 }
 
