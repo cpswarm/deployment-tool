@@ -14,6 +14,7 @@ The CPSwarm Deployment Tool is a lightweight software deployment system for IoT 
 
 ## Deployment
 Packages are built continuously with [Bamboo](https://pipelines.linksmart.eu/browse/CPSW-DTB/latest).
+
 ### Docker
 Docker compose scripts are available for [Deployment Manager](https://github.com/cpswarm/deployment-tool/blob/update-readme/manager/docker-compose.yml) and dummy [Deployment Agents](https://github.com/cpswarm/deployment-tool/blob/update-readme/agent/docker-compose.yml).
 ### Install on Debian ARM
@@ -22,23 +23,21 @@ wget https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/Debia
 sudo apt install ./deployment-agent-linux-arm.deb
 ```
 
-## Compile from source
+### Compile from source
 Within the root of the repository:
 ```bash
 go build -o bin/manager ./manager
 go build -o bin/agent  ./agent
 ```
-
-#### Using Go < 1.11
+#### Build with static linking
+```bash
+CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a -o bin/agent ./agent
+```
+#### Compile using Go < 1.11
 ```bash
 git clone <repo-addr> src/code.linksmart.eu/dt/deployment-tool
 export GOPATH=$(pwd)
 go build -v code.linksmart.eu/dt/deployment-tool/agent
-```
-
-#### Build with static linking
-```bash
-CGO_CPPFLAGS="-I/usr/include" CGO_LDFLAGS="-L/usr/lib -lzmq -lpthread -lrt -lstdc++ -lm -lc -lgcc" go build -v --ldflags '-extldflags "-static"' -a -o bin/agent ./agent
 ```
 
 ## Development
