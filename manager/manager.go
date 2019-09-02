@@ -371,7 +371,15 @@ func (m *manager) searchLogs(search map[string]interface{}) ([]storage.Log, int6
 	return logs, total, nil
 }
 
-func (m *manager) createTokenSet(total int, name string) (set *tokenSetSecret, err error) {
+func (m *manager) createTokenSet(total int, name string) (set *tokenSetSecret, conflict bool, err error) {
+
+	tokens, err := m.storage.GetTokens(name)
+	if err != nil {
+		return nil, false, fmt.Errorf("error checking existing tokens: %s", err)
+	}
+	if len(tokens) > 0 { // name is not unique
+		return nil, true, nil
+	}
 
 	set = &tokenSetSecret{
 		Tokens: make([]string, total),
@@ -388,11 +396,11 @@ func (m *manager) createTokenSet(total int, name string) (set *tokenSetSecret, e
 	retry:
 		set.Tokens[i], t.Hash, err = GenerateRandomToken(TokenLength)
 		if err != nil {
-			return nil, fmt.Errorf("error creating token: %s", err)
+			return nil, false, fmt.Errorf("error creating token: %s", err)
 		}
 		duplicate, err := m.storage.AddToken(t)
 		if err != nil {
-			return nil, fmt.Errorf("error storing token: %s", err)
+			return nil, false, fmt.Errorf("error storing token: %s", err)
 		}
 		if duplicate {
 			log.Println("Retrying token generation")
@@ -400,7 +408,7 @@ func (m *manager) createTokenSet(total int, name string) (set *tokenSetSecret, e
 		}
 	}
 
-	return set, nil
+	return set, false, nil
 }
 
 func (m *manager) getTokenSet(name string) (set *tokenSet, err error) {

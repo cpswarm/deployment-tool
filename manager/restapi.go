@@ -684,10 +684,14 @@ func (a *restAPI) createTokenSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenSet, err := a.manager.createTokenSet(total, query.Get(_name))
+	tokenSet, conflict, err := a.manager.createTokenSet(total, query.Get(_name))
 	if err != nil {
 		log.Printf("Error creating set: %s", err)
 		HTTPResponseError(w, http.StatusInternalServerError, "error creating set") // should be vague
+		return
+	}
+	if conflict {
+		HTTPResponseError(w, http.StatusConflict, fmt.Sprintf("name is not unique: %s", query.Get(_name)))
 		return
 	}
 
