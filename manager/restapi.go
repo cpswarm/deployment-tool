@@ -391,7 +391,7 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 
 	token := r.Header.Get(_tokenHeader)
 	if token == "" {
-		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
