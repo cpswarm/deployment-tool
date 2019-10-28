@@ -16,10 +16,10 @@ The CPSwarm Deployment Tool is a lightweight software deployment system for IoT 
 Packages are built continuously with [Bamboo](https://pipelines.linksmart.eu/browse/CPSW-DTB/latest).
 
 ### Docker
-Docker compose scripts are available for [Deployment Manager](https://github.com/cpswarm/deployment-tool/blob/update-readme/manager/docker-compose.yml) and dummy [Deployment Agents](https://github.com/cpswarm/deployment-tool/blob/update-readme/agent/docker-compose.yml).
+Docker compose scripts are available for [Deployment Manager](https://github.com/cpswarm/deployment-tool/blob/master/manager/docker-compose.yml) and dummy [Deployment Agents](https://github.com/cpswarm/deployment-tool/blob/master/agent/docker-compose.yml).
 ### Install on Debian ARM
 ```bash
-wget https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/Debian-Package/deployment-agent-linux-arm.deb
+wget https://pipelines.linksmart.eu/artifact/CPSW-DTB/shared/build-latest/Debian-packages/linksmart-deployment-agent.deb
 sudo apt install ./deployment-agent-linux-arm.deb
 ```
 
