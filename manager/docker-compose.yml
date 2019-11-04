@@ -27,3 +27,10 @@ services:
       - 8080:8080
       - 5556-5557:5556-5557
     restart: unless-stopped
+  ui:
+    image: linksmart/deployment-ui
+    depends_on:
+      - manager
+    ports:
+      - 8090:80
+    restart: unless-stopped
