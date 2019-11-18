@@ -12,8 +12,8 @@ services:
         hard: -1
     volumes:
       - ./volumes/elasticsearch:/usr/share/elasticsearch/data
-    ports:
-      - 9200:9200
+#    ports:
+#      - 9200:9200
     restart: unless-stopped
   manager:
     image: linksmart/deployment-manager
@@ -22,7 +22,7 @@ services:
     environment:
       - STORAGE_DSN=http://elasticsearch:9200
     volumes:
-      - ./volumes/keys:/home/keys
+      - ./volumes/keys:/home/keys:ro
     ports:
       - 8080:8080
       - 5556-5557:5556-5557

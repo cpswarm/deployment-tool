@@ -1,42 +1,59 @@
 version: '2.4'
 
 services:
-
-  device1:
+  device_0:
     image: linksmart/deployment-agent
+    container_name: device_0
+    labels:
+      - virtual_device
     environment:
-      - ID=device1
-      - TAGS=swarm,amd64
-      - LOCATION_LAT=7.203973
-      - LOCATION_LON=50.749548
-      - AUTH_TOKEN=<token>
-      - MANAGER_ADRR=http://manager:8080
+      ID: device_0
+      TAGS: amd64,virtual
+      LOCATION_LAT: '7.203973'
+      LOCATION_LON: '50.749548'
+      AUTH_TOKEN: <token>
+      MANAGER_ADDR: http://manager:8080
     volumes:
-      - ./volumes/agent:/home/agent
+      - ./volumes/agent_0:/home/agent
     restart: unless-stopped
-
-  device2:
+    command:
+      - --fresh
+  device_1:
     image: linksmart/deployment-agent
+    container_name: device_1
+    labels:
+      - virtual_device
     environment:
-      - ID=device2
-      - TAGS=swarm,amd64
-      - LOCATION_LAT=7.203556
-      - LOCATION_LON=50.749580
-      - AUTH_TOKEN=<token>
-      - MANAGER_ADRR=http://manager:8080
+      ID: device_1
+      TAGS: amd64,virtual
+      LOCATION_LAT: '7.203973'
+      LOCATION_LON: '50.749548'
+      AUTH_TOKEN: <token>
+      MANAGER_ADDR: http://manager:8080
     volumes:
-      - ./volumes/agent:/home/agent
+      - ./volumes/agent_1:/home/agent
     restart: unless-stopped
-
-  device3:
+    command:
+      - --fresh
+  device_2:
     image: linksmart/deployment-agent
+    container_name: device_2
+    labels:
+      - virtual_device
     environment:
-      - ID=device3
-      - TAGS=swarm,amd64
-      - LOCATION_LAT=7.203596
-      - LOCATION_LON=50.749580
-      - AUTH_TOKEN=<token>
-      - MANAGER_ADRR=http://manager:8080
+      ID: device_2
+      TAGS: amd64,virtual
+      LOCATION_LAT: '7.203973'
+      LOCATION_LON: '50.749548'
+      AUTH_TOKEN: <token>
+      MANAGER_ADDR: http://manager:8080
     volumes:
-      - ./volumes/agent:/home/agent
+      - ./volumes/agent_2:/home/agent
     restart: unless-stopped
+    command:
+      - --fresh
+
+networks:
+  default:
+    external:
+      name: dt_default
