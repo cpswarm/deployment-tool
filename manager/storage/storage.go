@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -791,9 +792,20 @@ func (s *storage) DoBulk(requests ...interface{}) error {
 	for i := range requests {
 		bulk.Add(requests[i].(elastic.BulkableRequest))
 	}
-	_, err := bulk.Do(s.ctx)
+	res, err := bulk.Do(s.ctx)
 	if err != nil {
 		return err
+	}
+	var errors []string
+	if res.Errors {
+		for _, item := range res.Items {
+			for operation, result := range item {
+				if result.Error != nil {
+					errors = append(errors, fmt.Sprintf("%s: %v", operation, result.Error))
+				}
+			}
+		}
+		return fmt.Errorf(strings.Join(errors, ","))
 	}
 	return nil
 }
