@@ -132,7 +132,7 @@ func (a *restAPI) index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := json.Marshal(&info)
+	b, err := json.Marshal(info)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return
@@ -395,6 +395,14 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// sign swarmio key
+	cert, err := a.manager.signPublicKey(target.PublicKeySwarmio)
+	if err != nil {
+		HTTPResponseError(w, http.StatusBadRequest, err)
+		return
+	}
+	target.PublicKeySwarmio = nil
+
 	authorized, conflict, err := a.manager.registerTarget(&target, token)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
@@ -407,7 +415,15 @@ func (a *restAPI) registerTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	//w.WriteHeader(http.StatusCreated)
+	// Response for swarmio certificate
+	b, err := json.Marshal(cert)
+	if err != nil {
+		HTTPResponseError(w, http.StatusInternalServerError, err)
+		return
+	}
+	HTTPResponse(w, http.StatusCreated, b)
+
 	return
 }
 
@@ -419,7 +435,7 @@ func (a *restAPI) getServerInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := json.Marshal(&info)
+	b, err := json.Marshal(info)
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err)
 		return

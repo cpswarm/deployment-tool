@@ -1,6 +1,8 @@
 package model
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	// Response types (topics)
@@ -48,10 +50,11 @@ type Location struct {
 
 type TargetBase struct {
 	// omitempty for all fields to allow patch updates
-	ID        string    `json:"id,omitempty"`
-	Tags      []string  `json:"tags,omitempty"`
-	Location  *Location `json:"location,omitempty"`
-	PublicKey string    `json:"publicKey,omitempty"`
+	ID               string    `json:"id,omitempty"`
+	Tags             []string  `json:"tags,omitempty"`
+	Location         *Location `json:"location,omitempty"`
+	PublicKey        string    `json:"publicKey,omitempty"`
+	PublicKeySwarmio []byte    `json:"publicKeySwarmio,omitempty"`
 }
 
 type Package struct {
@@ -67,5 +70,6 @@ type ZeromqServerInfo struct {
 }
 
 type ServerInfo struct {
-	ZeroMQ ZeromqServerInfo `json:"zeromq"`
+	ZeroMQ           ZeromqServerInfo `json:"zeromq"`
+	PublicKeySwarmio []byte           `json:"publicKeySwarmio"`
 }

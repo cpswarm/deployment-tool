@@ -9,6 +9,7 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
 	"code.linksmart.eu/dt/deployment-tool/manager/storage"
+	"code.linksmart.eu/dt/deployment-tool/manager/swarmio"
 	"github.com/cskr/pubsub"
 	uuid "github.com/satori/go.uuid"
 )
@@ -55,6 +56,12 @@ func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageDSN st
 		return nil, fmt.Errorf("error reading public keys from database: %s", err)
 	}
 	m.pipe.OperationCh <- model.Operation{model.OperationAuthAdd, keys}
+
+	// create ca keys for swarmio
+	_, _, err = swarmio.CreateKeys(true)
+	if err != nil {
+		return nil, fmt.Errorf("error creating keys for CA: %s", err)
+	}
 
 	go m.manageResponses()
 	return m, nil
@@ -465,6 +472,10 @@ func (m *manager) deleteTokenSet(name string) error {
 	return nil
 }
 
+func (m *manager) signPublicKey(publicKey []byte) (*swarmio.Cert, error) {
+	return swarmio.SignPublicKey(publicKey)
+}
+
 func (m *manager) registerTarget(target *storage.Target, secret string) (authorized, conflict bool, err error) {
 	hash, err := HashToken(secret)
 	if err != nil {
@@ -504,9 +515,15 @@ func (m *manager) registerTarget(target *storage.Target, secret string) (authori
 	return true, false, nil
 }
 
-func (m *manager) getServerInfo() (model.ServerInfo, error) {
-	return model.ServerInfo{
-		ZeroMQ: m.zmqConf,
+func (m *manager) getServerInfo() (*model.ServerInfo, error) {
+	cert, err := swarmio.LoadCert()
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.ServerInfo{
+		ZeroMQ:           m.zmqConf,
+		PublicKeySwarmio: cert.PublicKey,
 	}, nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"code.linksmart.eu/dt/deployment-tool/manager/model"
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
+	"code.linksmart.eu/dt/deployment-tool/manager/swarmio"
 	"github.com/pbnjay/memory"
 )
 
@@ -97,6 +99,13 @@ func (a *agent) setupTerminal() error {
 
 func (a *agent) registerTarget(addr, token string) error {
 	log.Println("Registering target...")
+
+	publicKeyComm, privateKeyComm, err := swarmio.CreateKeys(false)
+	if err != nil {
+		return fmt.Errorf("error generating public key for communication: %s", err)
+	}
+	a.target.PublicKeySwarmio = publicKeyComm
+
 	b, err := json.Marshal(a.target.TargetBase)
 	if err != nil {
 		return fmt.Errorf("error marshalling: %s", err)
@@ -118,6 +127,24 @@ func (a *agent) registerTarget(addr, token string) error {
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("error registering target: %s", resp.Status)
 	}
+
+	// Swarmio key handling
+	b, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading registration response body: %s", err)
+	}
+	var cert swarmio.Cert
+	err = json.Unmarshal(b, &cert)
+	if err != nil {
+		return fmt.Errorf("error decoding certificate: %s", err)
+	}
+	cert.PublicKey = publicKeyComm
+	cert.PrivateKey = privateKeyComm
+	err = swarmio.StoreCert(cert)
+	if err != nil {
+		return fmt.Errorf("error storing certificate: %s", err)
+	}
+
 	return nil
 }
 
