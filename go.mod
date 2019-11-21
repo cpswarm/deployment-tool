@@ -33,7 +33,7 @@ require (
 	github.com/otiai10/copy v1.0.1
 	github.com/otiai10/curr v0.0.0-20150429015615-9b4961190c95 // indirect
 	github.com/pbnjay/memory v0.0.0-20180430190442-16f8386fc07f
-	github.com/pebbe/zmq4 v1.0.0
+	github.com/pebbe/zmq4 v1.0.1-0.20190921115357-d8d193b5e4e6
 	github.com/pierrec/lz4 v0.0.0-20181005164709-635575b42742 // indirect
 	github.com/rs/cors v1.6.0
 	github.com/satori/go.uuid v1.2.0

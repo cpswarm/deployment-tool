@@ -76,6 +76,8 @@ github.com/pbnjay/memory v0.0.0-20180430190442-16f8386fc07f h1:B25moIlwTrhL3uiQe
 github.com/pbnjay/memory v0.0.0-20180430190442-16f8386fc07f/go.mod h1:RMU2gJXhratVxBDTFeOdNhd540tG57lt9FIUV0YLvIQ=
 github.com/pebbe/zmq4 v1.0.0 h1:D+MSmPpqkL5PSSmnh8g51ogirUCyemThuZzLW7Nrt78=
 github.com/pebbe/zmq4 v1.0.0/go.mod h1:7N4y5R18zBiu3l0vajMUWQgZyjv464prE8RCyBcmnZM=
+github.com/pebbe/zmq4 v1.0.1-0.20190921115357-d8d193b5e4e6 h1:LZ30LzZ4N4JKjpWZK6vFESMYQOONZTWgwd8yDov5TEA=
+github.com/pebbe/zmq4 v1.0.1-0.20190921115357-d8d193b5e4e6/go.mod h1:7N4y5R18zBiu3l0vajMUWQgZyjv464prE8RCyBcmnZM=
 github.com/pierrec/lz4 v0.0.0-20181005164709-635575b42742 h1:wKfigKMTgvSzBLIVvB5QaBBQI0odU6n45/UKSphjLus=
 github.com/pierrec/lz4 v0.0.0-20181005164709-635575b42742/go.mod h1:3/3N9NVKO0jef7pBehbT1qWhCMrIgbYNnFAZCqQ5LRc=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=

@@ -116,6 +116,9 @@ var (
 		[2]int{2, 3}: 9,
 		[2]int{2, 4}: 9,
 		[2]int{2, 5}: 9,
+		[2]int{3, 0}: 10,
+		[2]int{3, 1}: 10,
+		[2]int{3, 2}: 10,
 	}
 )
 
@@ -657,19 +660,23 @@ type Event int
 
 const (
 	// Flags for (*Socket)Monitor() and (*Socket)RecvEvent()
-	// See: http://api.zeromq.org/4-1:zmq-socket-monitor#toc3
-	EVENT_ALL             = Event(C.ZMQ_EVENT_ALL)
-	EVENT_CONNECTED       = Event(C.ZMQ_EVENT_CONNECTED)
-	EVENT_CONNECT_DELAYED = Event(C.ZMQ_EVENT_CONNECT_DELAYED)
-	EVENT_CONNECT_RETRIED = Event(C.ZMQ_EVENT_CONNECT_RETRIED)
-	EVENT_LISTENING       = Event(C.ZMQ_EVENT_LISTENING)
-	EVENT_BIND_FAILED     = Event(C.ZMQ_EVENT_BIND_FAILED)
-	EVENT_ACCEPTED        = Event(C.ZMQ_EVENT_ACCEPTED)
-	EVENT_ACCEPT_FAILED   = Event(C.ZMQ_EVENT_ACCEPT_FAILED)
-	EVENT_CLOSED          = Event(C.ZMQ_EVENT_CLOSED)
-	EVENT_CLOSE_FAILED    = Event(C.ZMQ_EVENT_CLOSE_FAILED)
-	EVENT_DISCONNECTED    = Event(C.ZMQ_EVENT_DISCONNECTED)
-	EVENT_MONITOR_STOPPED = Event(C.ZMQ_EVENT_MONITOR_STOPPED)
+	// See: http://api.zeromq.org/4-3:zmq-socket-monitor#toc3
+	EVENT_ALL                        = Event(C.ZMQ_EVENT_ALL)
+	EVENT_CONNECTED                  = Event(C.ZMQ_EVENT_CONNECTED)
+	EVENT_CONNECT_DELAYED            = Event(C.ZMQ_EVENT_CONNECT_DELAYED)
+	EVENT_CONNECT_RETRIED            = Event(C.ZMQ_EVENT_CONNECT_RETRIED)
+	EVENT_LISTENING                  = Event(C.ZMQ_EVENT_LISTENING)
+	EVENT_BIND_FAILED                = Event(C.ZMQ_EVENT_BIND_FAILED)
+	EVENT_ACCEPTED                   = Event(C.ZMQ_EVENT_ACCEPTED)
+	EVENT_ACCEPT_FAILED              = Event(C.ZMQ_EVENT_ACCEPT_FAILED)
+	EVENT_CLOSED                     = Event(C.ZMQ_EVENT_CLOSED)
+	EVENT_CLOSE_FAILED               = Event(C.ZMQ_EVENT_CLOSE_FAILED)
+	EVENT_DISCONNECTED               = Event(C.ZMQ_EVENT_DISCONNECTED)
+	EVENT_MONITOR_STOPPED            = Event(C.ZMQ_EVENT_MONITOR_STOPPED)
+	EVENT_HANDSHAKE_FAILED_NO_DETAIL = Event(C.ZMQ_EVENT_HANDSHAKE_FAILED_NO_DETAIL)
+	EVENT_HANDSHAKE_SUCCEEDED        = Event(C.ZMQ_EVENT_HANDSHAKE_SUCCEEDED)
+	EVENT_HANDSHAKE_FAILED_PROTOCOL  = Event(C.ZMQ_EVENT_HANDSHAKE_FAILED_PROTOCOL)
+	EVENT_HANDSHAKE_FAILED_AUTH      = Event(C.ZMQ_EVENT_HANDSHAKE_FAILED_AUTH)
 )
 
 /*
@@ -709,6 +716,20 @@ func (e Event) String() string {
 	}
 	if e&EVENT_DISCONNECTED != 0 {
 		ee = append(ee, "EVENT_DISCONNECTED")
+	}
+	if minor >= 3 {
+		if e&EVENT_HANDSHAKE_FAILED_NO_DETAIL != 0 {
+			ee = append(ee, "EVENT_HANDSHAKE_FAILED_NO_DETAIL")
+		}
+		if e&EVENT_HANDSHAKE_SUCCEEDED != 0 {
+			ee = append(ee, "EVENT_HANDSHAKE_SUCCEEDED")
+		}
+		if e&EVENT_HANDSHAKE_FAILED_PROTOCOL != 0 {
+			ee = append(ee, "EVENT_HANDSHAKE_FAILED_PROTOCOL")
+		}
+		if e&EVENT_HANDSHAKE_FAILED_AUTH != 0 {
+			ee = append(ee, "EVENT_HANDSHAKE_FAILED_AUTH")
+		}
 	}
 	if len(ee) == 0 {
 		return "<NONE>"

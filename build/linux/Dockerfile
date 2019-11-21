@@ -1,6 +1,6 @@
 FROM golang:stretch
 
-ARG ZEROMQ_VER=4.3.1
+ARG ZEROMQ_VER=4.3.2
 LABEL ZEROMQ_VER=$ZEROMQ_VER
 
 RUN apt update && apt install -y wget libtool pkg-config build-essential autoconf automake libsodium-dev
