@@ -56,4 +56,4 @@ services:
 networks:
   default:
     external:
-      name: dt_default
+      name: dt_network
