@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -49,8 +50,16 @@ func newExecutor(task, stage string, logEnqueue enqueueFunc, debug bool) *execut
 func (e *executor) execute(command string) (success bool) {
 	e.sendLog(command, model.ExecStart, false)
 
-	bashCommand := []string{"/bin/sh", "-c", command}
-	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
+	//bashCommand := []string{"/bin/sh", "-c", command}
+	//e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
+	// Note: this helps in passing signals to docker containers in linux,
+	// 	but will fail when spaces are passed in quotes
+	commandParts := strings.Split(command, " ")
+	if len(commandParts) == 1 {
+		e.cmd = exec.Command(commandParts[0])
+	} else {
+		e.cmd = exec.Command(commandParts[0], commandParts[1:]...)
+	}
 	defer func() { e.cmd = nil }()
 
 	e.cmd.Dir = e.workDir
@@ -119,16 +128,16 @@ func (e *executor) stop() (success bool) {
 
 	pid := e.cmd.Process.Pid
 
-	err := e.cmd.Process.Signal(syscall.SIGTERM)
+	err := e.cmd.Process.Signal(syscall.SIGINT)
 	if err != nil {
-		log.Printf("executor: Error terminating process %d: %s", pid, err)
+		log.Printf("executor: Error interrupting process %d: %s", pid, err)
 		return false
 	}
 	err = e.cmd.Process.Release()
 	if err != nil {
 		log.Printf("executor: Error releasing process %d: %s", pid, err)
 	} else {
-		log.Println("executor: Terminated process:", pid)
+		log.Println("executor: Interrupted process:", pid)
 		return true
 	}
 
