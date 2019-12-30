@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -50,16 +49,8 @@ func newExecutor(task, stage string, logEnqueue enqueueFunc, debug bool) *execut
 func (e *executor) execute(command string) (success bool) {
 	e.sendLog(command, model.ExecStart, false)
 
-	//bashCommand := []string{"/bin/sh", "-c", command}
-	//e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
-	// Note: this helps in passing signals to docker containers in linux,
-	// 	but will fail when spaces are passed in quotes
-	commandParts := strings.Split(command, " ")
-	if len(commandParts) == 1 {
-		e.cmd = exec.Command(commandParts[0])
-	} else {
-		e.cmd = exec.Command(commandParts[0], commandParts[1:]...)
-	}
+	bashCommand := []string{"/bin/sh", "-c", command}
+	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
 	defer func() { e.cmd = nil }()
 
 	e.cmd.Dir = e.workDir
