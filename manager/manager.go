@@ -38,9 +38,9 @@ type event struct {
 }
 
 func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageDSN string) (*manager, error) {
-	s, err := storage.NewElasticStorage(storageDSN)
+	s, err := storage.StartElasticStorage(storageDSN)
 	if err != nil {
-		return nil, fmt.Errorf("error creating elastic client: %s", err)
+		return nil, fmt.Errorf("error starting elastic client: %s", err)
 	}
 
 	m := &manager{

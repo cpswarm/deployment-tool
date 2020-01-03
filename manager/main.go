@@ -36,11 +36,10 @@ func main() {
 	log.Println("STARTED DEPLOYMENT MANAGER")
 	defer log.Println("bye.")
 
-	zmqServer, err := zeromq.StartServer("tcp://*:"+os.Getenv(EnvZeromqPubPort), "tcp://*:"+os.Getenv(EnvZeromqSubPort))
+	zmqServer, err := zeromq.SetupServer("tcp://*:"+os.Getenv(EnvZeromqPubPort), "tcp://*:"+os.Getenv(EnvZeromqSubPort))
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
-	defer zmqServer.Close()
 
 	zmqConf := model.ZeromqServerInfo{
 		PublicKey: zmqServer.PublicKey,
@@ -52,6 +51,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error starting manager: %s", err)
 	}
+
+	err = zmqServer.Start()
+	if err != nil {
+		log.Fatalf("Error starting zeromq server: %s", err)
+	}
+	defer zmqServer.Close()
 
 	go startRESTAPI(":"+os.Getenv(EnvHTTPServerPort), m)
 

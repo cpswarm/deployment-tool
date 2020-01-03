@@ -94,7 +94,11 @@ const (
 	propTypeGeoPoint = "geo_point"
 )
 
-func NewElasticStorage(url string) (Storage, error) {
+// StartElasticStorage starts an elastic storage client. It
+//  - creates an elastic client
+//  - waits for the server (few attempts)
+//  - creates storage indices (if missing)
+func StartElasticStorage(url string) (Storage, error) {
 	log.Println("Elasticsearch URL:", url)
 	ctx := context.Background()
 

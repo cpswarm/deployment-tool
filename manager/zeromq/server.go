@@ -28,7 +28,7 @@ type zmqClient struct {
 	PublicKey string
 }
 
-func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
+func SetupServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 	log.Printf("zeromq: Using v%v", strings.Replace(fmt.Sprint(zmq.Version()), " ", ".", -1))
 	log.Println("zeromq: Pub endpoint:", pubEndpoint)
 	log.Println("zeromq: Sub endpoint:", subEndpoint)
@@ -98,16 +98,22 @@ func StartServer(pubEndpoint, subEndpoint string) (*zmqClient, error) {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
 	}
 
-	go c.startPublisher()
-	go c.startListener()
 	go c.startOperator()
 
-	err = c.subscriber.SetSubscribe("")
+	return c, nil
+}
+
+func (c *zmqClient) Start() error {
+	err := c.subscriber.SetSubscribe("")
 	if err != nil {
-		return nil, fmt.Errorf("error subscribing: %s", err)
+		return fmt.Errorf("error subscribing: %s", err)
 	}
 
-	return c, nil
+	go c.startPublisher()
+	go c.startListener()
+
+	log.Println("zeromq: Started server.")
+	return nil
 }
 
 func (c *zmqClient) startPublisher() {
