@@ -37,28 +37,17 @@ type event struct {
 	Payload interface{} `json:"payload"`
 }
 
-func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageDSN string) (*manager, error) {
-	s, err := storage.StartElasticStorage(storageDSN)
-	if err != nil {
-		return nil, fmt.Errorf("error starting elastic client: %s", err)
-	}
-
+func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageClient storage.Storage) (*manager, error) {
 	m := &manager{
-		storage:        s,
+		storage:        storageClient,
 		pipe:           pipe,
 		responseBuffer: make(chan *model.Response, ResponseBufferCap),
 		events:         pubsub.New(EventChannelCap),
 		zmqConf:        zmqConf,
 	}
 
-	keys, err := m.storage.GetTargetKeys()
-	if err != nil {
-		return nil, fmt.Errorf("error reading public keys from database: %s", err)
-	}
-	m.pipe.OperationCh <- model.Operation{model.OperationAuthAdd, keys}
-
 	// create ca keys for swarmio
-	_, _, err = swarmio.CreateKeys(true)
+	_, _, err := swarmio.CreateKeys(true)
 	if err != nil {
 		return nil, fmt.Errorf("error creating keys for CA: %s", err)
 	}

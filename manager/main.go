@@ -10,7 +10,7 @@ import (
 	"runtime/debug"
 
 	"code.linksmart.eu/dt/deployment-tool/manager/env"
-	"code.linksmart.eu/dt/deployment-tool/manager/model"
+	"code.linksmart.eu/dt/deployment-tool/manager/storage"
 	"code.linksmart.eu/dt/deployment-tool/manager/zeromq"
 )
 
@@ -36,18 +36,21 @@ func main() {
 	log.Println("STARTED DEPLOYMENT MANAGER")
 	defer log.Println("bye.")
 
-	zmqServer, err := zeromq.SetupServer("tcp://*:"+os.Getenv(EnvZeromqPubPort), "tcp://*:"+os.Getenv(EnvZeromqSubPort))
+	storageClient, err := storage.StartElasticStorage(os.Getenv(EnvStorageDSN))
+	if err != nil {
+		log.Fatalf("Error starting elastic client: %s", err)
+	}
+	keys, err := storageClient.GetTargetKeys()
+	if err != nil {
+		log.Fatalf("Error reading public keys from database: %s", err)
+	}
+
+	zmqServer, err := zeromq.SetupServer(os.Getenv(EnvZeromqPubPort), os.Getenv(EnvZeromqSubPort), keys)
 	if err != nil {
 		log.Fatalf("Error starting ZeroMQ client: %s", err)
 	}
 
-	zmqConf := model.ZeromqServerInfo{
-		PublicKey: zmqServer.PublicKey,
-		PubPort:   os.Getenv(EnvZeromqPubPort),
-		SubPort:   os.Getenv(EnvZeromqSubPort),
-	}
-
-	m, err := startManager(zmqServer.Pipe, zmqConf, os.Getenv(EnvStorageDSN))
+	m, err := startManager(zmqServer.Pipe, zmqServer.Conf(), storageClient)
 	if err != nil {
 		log.Fatalf("Error starting manager: %s", err)
 	}
