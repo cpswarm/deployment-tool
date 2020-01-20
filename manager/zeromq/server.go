@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	EnvDisableAuth = "DISABLE_AUTH" // disable authentication completely
 	EnvPrivateKey  = "PRIVATE_KEY"
 	EnvPublicKey   = "PUBLIC_KEY"
 
@@ -45,9 +44,7 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 
 	var err error
 	var serverSecret string
-	if env.Eval(EnvDisableAuth) {
-		log.Println("zeromq: WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
-	} else {
+
 		//  Start authentication engine
 		zmq.AuthSetVerbose(true)
 		err = zmq.AuthStart()
@@ -70,7 +67,6 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 			return nil, fmt.Errorf("error reading public key file: %s", err)
 		}
 
-	}
 
 	// add client keys
 	err = c.addKeys(keys)
@@ -84,12 +80,12 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 	if err != nil {
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
-	if !env.Eval(EnvDisableAuth) {
+
 		err = c.publisher.ServerAuthCurve(DomainAll, serverSecret)
 		if err != nil {
 			return nil, fmt.Errorf("error adding server key to PUB socket: %s", err)
 		}
-	}
+
 	err = c.publisher.Bind(pubEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error binding to PUB endpoint: %s", err)
@@ -100,12 +96,12 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 	if err != nil {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
-	if !env.Eval(EnvDisableAuth) {
+
 		err = c.subscriber.ServerAuthCurve(DomainAll, serverSecret)
 		if err != nil {
 			return nil, fmt.Errorf("error adding server key to SUB socket: %s", err)
 		}
-	}
+
 	err = c.subscriber.Bind(subEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)

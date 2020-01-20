@@ -43,9 +43,7 @@ func startZMQClient(conf *zeromqServerConf, clientPublic string, pipe model.Pipe
 
 	// load keys
 	var clientSecret, serverPublic string
-	if env.Eval(EnvDisableAuth) {
-		log.Println("WARNING: AUTHENTICATION HAS BEEN DISABLED MANUALLY.")
-	} else {
+
 		zmq.AuthSetVerbose(true)
 		clientSecret, err = zeromq.ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
 		if err != nil {
@@ -64,18 +62,18 @@ func startZMQClient(conf *zeromqServerConf, clientPublic string, pipe model.Pipe
 		if err != nil {
 			return nil, fmt.Errorf("error decoding key: %s", err)
 		}
-	}
+
 	// socket to receive from server
 	c.subscriber, err = zmq.NewSocket(zmq.SUB)
 	if err != nil {
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
-	if !env.Eval(EnvDisableAuth) {
+
 		err = c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 		if err != nil {
 			return nil, fmt.Errorf("error adding auth keys to SUB socket: %s", err)
 		}
-	}
+
 	err = c.subscriber.SetReconnectIvlMax(MaxReconnectInterval)
 	if err != nil {
 		return nil, fmt.Errorf("error setting reconnect interval for SUB socket: %s", err)
@@ -89,12 +87,12 @@ func startZMQClient(conf *zeromqServerConf, clientPublic string, pipe model.Pipe
 	if err != nil {
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
-	if !env.Eval(EnvDisableAuth) {
+
 		err = c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
 		if err != nil {
 			return nil, fmt.Errorf("error adding auth keys to PUB socket: %s", err)
 		}
-	}
+
 	err = c.publisher.SetReconnectIvlMax(MaxReconnectInterval)
 	if err != nil {
 		return nil, fmt.Errorf("error setting reconnect interval for PUB socket: %s", err)

@@ -12,13 +12,11 @@ import (
 
 const (
 	// Environment keys
-	EnvDisableAuth = "DISABLE_AUTH" // disable authentication completely
 	EnvPrivateKey  = "PRIVATE_KEY"  // path to private key of agent
 	EnvPublicKey   = "PUBLIC_KEY"   // path to public key of agent
 	EnvManagerAddr = "MANAGER_ADDR"
 	EnvAuthToken   = "AUTH_TOKEN"
 	// Default values
-	DefaultEnvFile        = "./.env"       // path to environment variables file
 	DefaultStateFile      = "./state.json" // path to agent state file
 	DefaultPrivateKeyPath = "./agent.key"
 	DefaultPublicKeyPath  = "./agent.pub"
