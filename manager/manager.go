@@ -359,14 +359,6 @@ func (m *manager) getLogs(target, task, stage, command, output, error, sortField
 	return logs, total, nil
 }
 
-func (m *manager) searchLogs(search map[string]interface{}) ([]storage.Log, int64, error) {
-	logs, total, err := m.storage.SearchLogs(search)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error querying logs: %s", err)
-	}
-	return logs, total, nil
-}
-
 func (m *manager) createTokenSet(total int, name string) (set *tokenSetSecret, conflict bool, err error) {
 
 	tokens, err := m.storage.GetTokens(name)

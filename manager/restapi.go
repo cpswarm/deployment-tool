@@ -104,7 +104,6 @@ func (a *restAPI) setupRouter() {
 	r.HandleFunc("/orders", a.addOrder).Methods(http.MethodPost)
 	// logs
 	r.HandleFunc("/logs", a.getLogs).Methods(http.MethodGet)
-	r.HandleFunc("/logs/search", a.searchLogs).Methods(http.MethodGet)
 	// tokens
 	r.HandleFunc("/token_sets", a.getTokenSets).Methods(http.MethodGet)
 	r.HandleFunc("/token_sets", a.createTokenSet).Methods(http.MethodPost)
@@ -623,39 +622,6 @@ func (a *restAPI) getLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	b, err := json.Marshal(&list{total, logs, page, perPage})
-	if err != nil {
-		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	HTTPResponse(w, http.StatusOK, b)
-	return
-}
-
-func (a *restAPI) searchLogs(w http.ResponseWriter, r *http.Request) {
-
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	search := make(map[string]interface{})
-	// body is either empty or a search object
-	if len(body) > 0 {
-		err = json.Unmarshal(body, &search)
-		if err != nil {
-			HTTPResponseError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-	}
-
-	logs, total, err := a.manager.searchLogs(search)
-	if err != nil {
-		HTTPResponseError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	b, err := json.Marshal(&list{total, logs, 1, int(total)})
 	if err != nil {
 		HTTPResponseError(w, http.StatusInternalServerError, err.Error())
 		return

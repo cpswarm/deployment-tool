@@ -26,13 +26,11 @@ type Storage interface {
 	PatchTarget(id string, target *Target) (found bool, err error)
 	IndexTarget(target *Target) (found bool, err error) // add or update
 	MatchTargets(ids, tags []string) (allIDs, hitIDs, hitTags []string, err error)
-	SearchTargets(map[string]interface{}) ([]Target, int64, error)
 	AddTargetTrans(*Target) (conflict bool, trans *transaction, err error)
 	GetTarget(id string) (*Target, error)
 	DeleteTarget(id string) (*Target, error)
 	//
 	GetLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, from, size int) ([]Log, int64, error)
-	SearchLogs(map[string]interface{}) ([]Log, int64, error)
 	AddLog(*Log) error
 	AddLogs(logs []Log) error
 	DeleteLogs(target, task string) error
@@ -437,32 +435,6 @@ func (s *storage) MatchTargets(ids, tags []string) (allIDs, matchIDs, matchTags 
 	return
 }
 
-// SearchTargets takes an Elastic Search's Request Body to perform any query on the index
-// Request body should follow: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html
-func (s *storage) SearchTargets(source map[string]interface{}) (targets []Target, total int64, err error) {
-
-	searchResult, err := s.client.Search().Index(indexTarget).Type(typeFixed).
-		Source(source).Do(s.ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if searchResult.Hits.TotalHits > 0 {
-		log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
-
-		targets = make([]Target, searchResult.Hits.TotalHits)
-		for i, hit := range searchResult.Hits.Hits {
-			err := json.Unmarshal(*hit.Source, &targets[i])
-			if err != nil {
-				return nil, 0, err
-			}
-		}
-	} else {
-		log.Print("Found no entries")
-	}
-	return targets, searchResult.Hits.TotalHits, nil
-}
-
 func (s *storage) GetTarget(id string) (*Target, error) {
 	res, err := s.client.Get().Index(indexTarget).Type(typeFixed).
 		Id(id).Do(s.ctx)
@@ -596,32 +568,6 @@ func (s *storage) GetLogs(target, task, stage, command, output, error, sortField
 
 	searchResult, err := s.client.Search().Index(indexLog).Type(typeFixed).
 		Query(query).Sort(sortField, sortAsc).From(from).Size(size).Do(s.ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if searchResult.Hits.TotalHits > 0 {
-		//log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
-
-		logs = make([]Log, searchResult.Hits.TotalHits)
-		for i, hit := range searchResult.Hits.Hits {
-			err := json.Unmarshal(*hit.Source, &logs[i])
-			if err != nil {
-				return nil, 0, err
-			}
-		}
-	} else {
-		log.Print("Found no entries")
-	}
-	return logs, searchResult.Hits.TotalHits, nil
-}
-
-// SearchLogs takes an Elastic Search's Request Body to perform any query on the index
-// Request body should follow: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html
-func (s *storage) SearchLogs(source map[string]interface{}) (logs []Log, total int64, err error) {
-
-	searchResult, err := s.client.Search().Index(indexLog).Type(typeFixed).
-		Source(source).Do(s.ctx)
 	if err != nil {
 		return nil, 0, err
 	}
