@@ -309,7 +309,7 @@ func (s *storage) IndexTarget(target *Target) (found bool, err error) {
 	return true, nil
 }
 
-func (s *storage) GetTargets(tags []string, from, size int) ([]Target, int64, error) {
+func (s *storage) GetTargets(tags []string, from, size int) (targets []Target, total int64, err error) {
 
 	query := elastic.NewBoolQuery()
 	for i := range tags {
@@ -322,17 +322,15 @@ func (s *storage) GetTargets(tags []string, from, size int) ([]Target, int64, er
 		return nil, 0, err
 	}
 
-	var targets []Target
 	if searchResult.Hits.TotalHits > 0 {
 		//log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 
-		for _, hit := range searchResult.Hits.Hits {
-			var target Target
-			err := json.Unmarshal(*hit.Source, &target)
+		targets = make([]Target, searchResult.Hits.TotalHits)
+		for i, hit := range searchResult.Hits.Hits {
+			err := json.Unmarshal(*hit.Source, &targets[i])
 			if err != nil {
 				return nil, 0, err
 			}
-			targets = append(targets, target)
 		}
 	} else {
 		log.Print("Found no entries")
@@ -441,7 +439,7 @@ func (s *storage) MatchTargets(ids, tags []string) (allIDs, matchIDs, matchTags 
 
 // SearchTargets takes an Elastic Search's Request Body to perform any query on the index
 // Request body should follow: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html
-func (s *storage) SearchTargets(source map[string]interface{}) ([]Target, int64, error) {
+func (s *storage) SearchTargets(source map[string]interface{}) (targets []Target, total int64, err error) {
 
 	searchResult, err := s.client.Search().Index(indexTarget).Type(typeFixed).
 		Source(source).Do(s.ctx)
@@ -449,16 +447,15 @@ func (s *storage) SearchTargets(source map[string]interface{}) ([]Target, int64,
 		return nil, 0, err
 	}
 
-	var targets []Target
 	if searchResult.Hits.TotalHits > 0 {
 		log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
-		for _, hit := range searchResult.Hits.Hits {
-			var t Target
-			err := json.Unmarshal(*hit.Source, &t)
+
+		targets = make([]Target, searchResult.Hits.TotalHits)
+		for i, hit := range searchResult.Hits.Hits {
+			err := json.Unmarshal(*hit.Source, &targets[i])
 			if err != nil {
 				return nil, 0, err
 			}
-			targets = append(targets, t)
 		}
 	} else {
 		log.Print("Found no entries")
@@ -514,7 +511,7 @@ func (s *storage) AddOrder(order *Order) error {
 	return nil
 }
 
-func (s *storage) GetOrders(descr string, sortAsc bool, from, size int) ([]Order, int64, error) {
+func (s *storage) GetOrders(descr string, sortAsc bool, from, size int) (orders []Order, total int64, err error) {
 	query := elastic.NewBoolQuery()
 	if descr != "" { // description has text type
 		query.Must(elastic.NewMatchQuery("description", descr).Operator("and"))
@@ -526,17 +523,15 @@ func (s *storage) GetOrders(descr string, sortAsc bool, from, size int) ([]Order
 		return nil, 0, err
 	}
 
-	var orders []Order
 	if searchResult.Hits.TotalHits > 0 {
 		log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 
-		for _, hit := range searchResult.Hits.Hits {
-			var order Order
-			err := json.Unmarshal(*hit.Source, &order)
+		orders = make([]Order, searchResult.Hits.TotalHits)
+		for i, hit := range searchResult.Hits.Hits {
+			err := json.Unmarshal(*hit.Source, &orders[i])
 			if err != nil {
 				return nil, 0, err
 			}
-			orders = append(orders, order)
 		}
 	} else {
 		log.Print("Found no entries")
@@ -578,7 +573,7 @@ func (s *storage) DeleteOrder(id string) (found bool, err error) {
 	return true, nil
 }
 
-func (s *storage) GetLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, from, size int) ([]Log, int64, error) {
+func (s *storage) GetLogs(target, task, stage, command, output, error, sortField string, sortAsc bool, from, size int) (logs []Log, total int64, err error) {
 	query := elastic.NewBoolQuery()
 	if target != "" {
 		query.Must(elastic.NewMatchQuery("target", target))
@@ -605,16 +600,15 @@ func (s *storage) GetLogs(target, task, stage, command, output, error, sortField
 		return nil, 0, err
 	}
 
-	var logs []Log
 	if searchResult.Hits.TotalHits > 0 {
 		//log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
-		for _, hit := range searchResult.Hits.Hits {
-			var l Log
-			err := json.Unmarshal(*hit.Source, &l)
+
+		logs = make([]Log, searchResult.Hits.TotalHits)
+		for i, hit := range searchResult.Hits.Hits {
+			err := json.Unmarshal(*hit.Source, &logs[i])
 			if err != nil {
 				return nil, 0, err
 			}
-			logs = append(logs, l)
 		}
 	} else {
 		log.Print("Found no entries")
@@ -624,7 +618,7 @@ func (s *storage) GetLogs(target, task, stage, command, output, error, sortField
 
 // SearchLogs takes an Elastic Search's Request Body to perform any query on the index
 // Request body should follow: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html
-func (s *storage) SearchLogs(source map[string]interface{}) ([]Log, int64, error) {
+func (s *storage) SearchLogs(source map[string]interface{}) (logs []Log, total int64, err error) {
 
 	searchResult, err := s.client.Search().Index(indexLog).Type(typeFixed).
 		Source(source).Do(s.ctx)
@@ -632,16 +626,15 @@ func (s *storage) SearchLogs(source map[string]interface{}) ([]Log, int64, error
 		return nil, 0, err
 	}
 
-	var logs []Log
 	if searchResult.Hits.TotalHits > 0 {
 		//log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
-		for _, hit := range searchResult.Hits.Hits {
-			var l Log
-			err := json.Unmarshal(*hit.Source, &l)
+
+		logs = make([]Log, searchResult.Hits.TotalHits)
+		for i, hit := range searchResult.Hits.Hits {
+			err := json.Unmarshal(*hit.Source, &logs[i])
 			if err != nil {
 				return nil, 0, err
 			}
-			logs = append(logs, l)
 		}
 	} else {
 		log.Print("Found no entries")
