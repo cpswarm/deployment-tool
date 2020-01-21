@@ -1,6 +1,8 @@
 # github.com/Microsoft/go-winio v0.4.13
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
+# github.com/Pallinder/go-randomdata v1.2.0
+github.com/Pallinder/go-randomdata
 # github.com/cskr/pubsub v1.0.2
 github.com/cskr/pubsub
 # github.com/davecgh/go-spew v1.1.1
