@@ -10,6 +10,7 @@ import (
 	"code.linksmart.eu/dt/deployment-tool/manager/source"
 	"code.linksmart.eu/dt/deployment-tool/manager/storage"
 	"code.linksmart.eu/dt/deployment-tool/manager/swarmio"
+	"github.com/Pallinder/go-randomdata"
 	"github.com/cskr/pubsub"
 	uuid "github.com/satori/go.uuid"
 )
@@ -57,8 +58,7 @@ func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageClient
 }
 
 func (m *manager) addOrder(order *storage.Order) error {
-	// add system generated meta values
-	order.ID = m.newTaskID()
+
 	order.Created = model.UnixTime()
 
 	// cleanup
@@ -95,6 +95,16 @@ func (m *manager) addOrder(order *storage.Order) error {
 		order.Deploy.Match.List = receivers
 	}
 
+generateID:
+	retry := 0
+	order.ID = m.newTaskID(retry)
+	if tempOrder, err := m.storage.GetOrder(order.ID); err != nil {
+		return fmt.Errorf("error checking if order ID is unique: %s", err)
+	} else if tempOrder != nil { // found order with this id
+		retry++
+		goto generateID
+	}
+
 	// place into work directory
 	err := m.fetchSource(order.ID, order.Source)
 	if err != nil {
@@ -102,7 +112,7 @@ func (m *manager) addOrder(order *storage.Order) error {
 	}
 
 	order.Source = nil
-	err = m.storage.AddOrder(order)
+	_, err = m.storage.AddOrder(order)
 	if err != nil {
 		return fmt.Errorf("error storing order: %s", err)
 	}
@@ -123,7 +133,10 @@ func (m *manager) targetTopics(ids, tags []string) []string {
 	return receiverTopics
 }
 
-func (m *manager) newTaskID() string {
+func (m *manager) newTaskID(retry int) string {
+	if retry < 10 {
+		return randomdata.Adjective() + "-" + randomdata.Noun()
+	}
 	return uuid.NewV4().String()
 }
 

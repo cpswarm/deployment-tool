@@ -17,7 +17,7 @@ import (
 
 type Storage interface {
 	GetOrders(descr string, sortAsc bool, from, size int) ([]Order, int64, error)
-	AddOrder(*Order) error
+	AddOrder(*Order) (dublicate bool, err error)
 	GetOrder(id string) (*Order, error)
 	DeleteOrder(id string) (found bool, err error)
 	//
@@ -90,6 +90,7 @@ const (
 	propTypeText     = "text"
 	propTypeBool     = "boolean"
 	propTypeGeoPoint = "geo_point"
+	opTypeCreate     = "create"
 )
 
 // StartElasticStorage starts an elastic storage client. It
@@ -273,7 +274,7 @@ func (s *storage) AddTargetTrans(target *Target) (conflict bool, trans *transact
 	s.targetLocker.Lock()
 	trans = &transaction{
 		Commit: elastic.NewBulkIndexRequest().Index(indexTarget).Type(typeFixed).
-			Id(target.ID).OpType("create").Doc(target),
+			Id(target.ID).OpType(opTypeCreate).Doc(target),
 		Release: func() {
 			s.targetLocker.Unlock()
 		},
@@ -473,14 +474,18 @@ func (s *storage) DeleteTarget(id string) (*Target, error) {
 	return target, nil
 }
 
-func (s *storage) AddOrder(order *Order) error {
+func (s *storage) AddOrder(order *Order) (dublicate bool, err error) {
 	res, err := s.client.Index().Index(indexOrder).Type(typeFixed).
-		Id(order.ID).BodyJson(order).Do(s.ctx)
+		Id(order.ID).BodyJson(order).OpType(opTypeCreate).Do(s.ctx)
 	if err != nil {
-		return err
+		e := err.(*elastic.Error)
+		if e.Status == http.StatusConflict {
+			return true, nil
+		}
+		return false, err
 	}
 	log.Printf("Indexed %s/%s v%d", res.Index, res.Id, res.Version)
-	return nil
+	return false, nil
 }
 
 func (s *storage) GetOrders(descr string, sortAsc bool, from, size int) (orders []Order, total int64, err error) {
@@ -675,7 +680,7 @@ func (s *storage) GetTokens(name string) ([]TokenMeta, error) {
 
 func (s *storage) AddToken(token TokenHashed) (duplicate bool, err error) {
 	res, err := s.client.Index().Index(indexToken).Type(typeFixed).
-		Id(string(token.Hash)).OpType("create").BodyJson(token).Do(s.ctx)
+		Id(string(token.Hash)).OpType(opTypeCreate).BodyJson(token).Do(s.ctx)
 	if err != nil {
 		e := err.(*elastic.Error)
 		if e.Status == http.StatusConflict {
