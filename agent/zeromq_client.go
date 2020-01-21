@@ -44,24 +44,24 @@ func startZMQClient(conf *zeromqServerConf, clientPublic string, pipe model.Pipe
 	// load keys
 	var clientSecret, serverPublic string
 
-		zmq.AuthSetVerbose(true)
-		clientSecret, err = zeromq.ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("error reading file: %s", err)
-		}
-		// decode
-		clientSecret, err = zeromq.DecodeKey(clientSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding key: %s", err)
-		}
-		clientPublic, err = zeromq.DecodeKey(clientPublic)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding key: %s", err)
-		}
-		serverPublic, err = zeromq.DecodeKey(conf.PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding key: %s", err)
-		}
+	zmq.AuthSetVerbose(true)
+	clientSecret, err = zeromq.ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file: %s", err)
+	}
+	// decode
+	clientSecret, err = zeromq.DecodeKey(clientSecret)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding key: %s", err)
+	}
+	clientPublic, err = zeromq.DecodeKey(clientPublic)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding key: %s", err)
+	}
+	serverPublic, err = zeromq.DecodeKey(conf.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding key: %s", err)
+	}
 
 	// socket to receive from server
 	c.subscriber, err = zmq.NewSocket(zmq.SUB)
@@ -69,10 +69,10 @@ func startZMQClient(conf *zeromqServerConf, clientPublic string, pipe model.Pipe
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
 
-		err = c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error adding auth keys to SUB socket: %s", err)
-		}
+	err = c.subscriber.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+	if err != nil {
+		return nil, fmt.Errorf("error adding auth keys to SUB socket: %s", err)
+	}
 
 	err = c.subscriber.SetReconnectIvlMax(MaxReconnectInterval)
 	if err != nil {
@@ -88,10 +88,10 @@ func startZMQClient(conf *zeromqServerConf, clientPublic string, pipe model.Pipe
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
 
-		err = c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error adding auth keys to PUB socket: %s", err)
-		}
+	err = c.publisher.ClientAuthCurve(serverPublic, clientPublic, clientSecret)
+	if err != nil {
+		return nil, fmt.Errorf("error adding auth keys to PUB socket: %s", err)
+	}
 
 	err = c.publisher.SetReconnectIvlMax(MaxReconnectInterval)
 	if err != nil {

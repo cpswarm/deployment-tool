@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	EnvPrivateKey  = "PRIVATE_KEY"
-	EnvPublicKey   = "PUBLIC_KEY"
+	EnvPrivateKey = "PRIVATE_KEY"
+	EnvPublicKey  = "PUBLIC_KEY"
 
 	DefaultPrivateKeyPath = "./manager.key"
 	DefaultPublicKeyPath  = "./manager.pub"
@@ -22,9 +22,9 @@ const (
 type zmqClient struct {
 	publisher  *zmq.Socket
 	subscriber *zmq.Socket
-	conf model.ZeromqServerInfo
+	conf       model.ZeromqServerInfo
 
-	Pipe      model.Pipe
+	Pipe model.Pipe
 }
 
 func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, error) {
@@ -32,8 +32,8 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 
 	c := &zmqClient{
 		conf: model.ZeromqServerInfo{
-			PubPort:   os.Getenv(pubPort),
-			SubPort:   os.Getenv(subPort),
+			PubPort: os.Getenv(pubPort),
+			SubPort: os.Getenv(subPort),
 		},
 		Pipe: model.NewPipe(),
 	}
@@ -45,28 +45,27 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 	var err error
 	var serverSecret string
 
-		//  Start authentication engine
-		zmq.AuthSetVerbose(true)
-		err = zmq.AuthStart()
-		if err != nil {
-			return nil, fmt.Errorf("error starting auth: %s", err)
-		}
+	//  Start authentication engine
+	zmq.AuthSetVerbose(true)
+	err = zmq.AuthStart()
+	if err != nil {
+		return nil, fmt.Errorf("error starting auth: %s", err)
+	}
 
-		// load key pair
-		serverSecret, err = ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("error reading private key file: %s", err)
-		}
-		serverSecret, err = DecodeKey(serverSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding key: %s", err)
-		}
+	// load key pair
+	serverSecret, err = ReadKeyFile(os.Getenv(EnvPrivateKey), DefaultPrivateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading private key file: %s", err)
+	}
+	serverSecret, err = DecodeKey(serverSecret)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding key: %s", err)
+	}
 
-		c.conf.PublicKey, err = ReadKeyFile(os.Getenv(EnvPublicKey), DefaultPublicKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("error reading public key file: %s", err)
-		}
-
+	c.conf.PublicKey, err = ReadKeyFile(os.Getenv(EnvPublicKey), DefaultPublicKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading public key file: %s", err)
+	}
 
 	// add client keys
 	err = c.addKeys(keys)
@@ -81,10 +80,10 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 		return nil, fmt.Errorf("error creating PUB socket: %s", err)
 	}
 
-		err = c.publisher.ServerAuthCurve(DomainAll, serverSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error adding server key to PUB socket: %s", err)
-		}
+	err = c.publisher.ServerAuthCurve(DomainAll, serverSecret)
+	if err != nil {
+		return nil, fmt.Errorf("error adding server key to PUB socket: %s", err)
+	}
 
 	err = c.publisher.Bind(pubEndpoint)
 	if err != nil {
@@ -97,16 +96,15 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 		return nil, fmt.Errorf("error creating SUB socket: %s", err)
 	}
 
-		err = c.subscriber.ServerAuthCurve(DomainAll, serverSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error adding server key to SUB socket: %s", err)
-		}
+	err = c.subscriber.ServerAuthCurve(DomainAll, serverSecret)
+	if err != nil {
+		return nil, fmt.Errorf("error adding server key to SUB socket: %s", err)
+	}
 
 	err = c.subscriber.Bind(subEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to SUB endpoint: %s", err)
 	}
-
 
 	return c, nil
 }
