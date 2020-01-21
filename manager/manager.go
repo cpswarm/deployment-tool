@@ -558,7 +558,7 @@ func (m *manager) processPackage(p *model.Package) {
 	log.Println("processPackage", p.Task, p.Assembler, len(p.Payload))
 	m.storeLog(p.Task, model.StageBuild, fmt.Sprintf("received package sized %d bytes", len(p.Payload)), false, p.Assembler)
 
-	err := m.decompressPackage(p.Task, p.Payload)
+	err := m.storePackage(p.Task, p.Payload)
 	if err != nil {
 		m.storeLogFatal(p.Task, model.StageBuild, "error decompressing assembled package", p.Assembler)
 		return
@@ -570,16 +570,13 @@ func (m *manager) processPackage(p *model.Package) {
 		return
 	}
 
-	if order.Deploy == nil {
-		m.storeLogFatal(p.Task, model.StageBuild, fmt.Sprintf("no deployment instructions for package"), p.Assembler)
-		log.Println("No deployment instructions for package.")
-		return
-	}
-
 	m.storeLog(p.Task, model.StageBuild, model.StageEnd, false, p.Assembler)
 
-	order.Build = nil
-	m.composeTask(order)
+	// continue to deploy, if required
+	if order.Deploy != nil {
+		order.Build = nil
+		m.composeTask(order)
+	}
 }
 
 func (m *manager) compressSource(orderID string) ([]byte, error) {
@@ -593,7 +590,8 @@ func (m *manager) compressSource(orderID string) ([]byte, error) {
 	return nil, nil
 }
 
-func (m *manager) decompressPackage(orderID string, archive []byte) error {
+// decompress and write to package directory
+func (m *manager) storePackage(orderID string, archive []byte) error {
 	return model.DecompressFiles(archive, fmt.Sprintf("%s/%s/%s", source.OrdersDir, orderID, source.PackageDir))
 }
 
