@@ -8,4 +8,17 @@ env:
   
 install: true # to skip defaults
 
+before_script:
+  - docker build -f manager/Dockerfile -t linksmart/deployment-manager .
+  - docker build -f agent/Dockerfile -t linksmart/deployment-agent .
+
 script: go test ./tests -v -failfast
+
+before_deploy:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+deploy:
+  - provider: script
+    script: docker push linksmart/deployment-manager && docker push linksmart/deployment-agent
+    on:
+      branch: master
