@@ -32,8 +32,8 @@ func SetupServer(pubPort, subPort string, keys map[string]string) (*zmqClient, e
 
 	c := &zmqClient{
 		conf: model.ZeromqServerInfo{
-			PubPort: os.Getenv(pubPort),
-			SubPort: os.Getenv(subPort),
+			PubPort: pubPort,
+			SubPort: subPort,
 		},
 		Pipe: model.NewPipe(),
 	}
