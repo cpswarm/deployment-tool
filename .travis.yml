@@ -1,5 +1,9 @@
 language: go
 
+branches:
+  only:
+    - dev
+
 go:
   - 1.12.x
 
