@@ -31,24 +31,26 @@ import (
 // bug: travis starts before bamboo build new image
 
 const (
-	userDefinedNetwork = "test-network"
+	envExternalNetwork = "EXTERNAL-NETWORK"
 	// elastic
 	elasticImage    = "elasticsearch:6.6.1"
 	elasticName     = "test-elastic"
 	elasticPort     = "9200"
 	elasticEndpoint = "http://" + elasticName + ":" + elasticPort
 	// manager
-	managerImage           = "linksmart/deployment-manager"
-	managerName            = "test-manager"
-	managerPort            = "8080"
-	managerEndpoint        = "http://" + managerName + ":" + managerPort
-	managerExposedEndpoint = "http://localhost:" + managerPort
+	managerImage    = "linksmart/deployment-manager"
+	managerName     = "test-manager"
+	managerPort     = "8080"
+	managerEndpoint = "http://" + managerName + ":" + managerPort
 	// agent
 	agentImage = "linksmart/deployment-agent"
 	agentName  = "test-agent"
 )
 
 var (
+	userDefinedNetwork     = "test-network" // may be overridden with env var
+	managerExposedEndpoint = "http://localhost:" + managerPort
+
 	testDir    string
 	containers map[string]string // id: name
 )
@@ -80,10 +82,16 @@ func TestDeploy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("create network", func(t *testing.T) {
-		tearDown := createNetwork(t, cli, ctx)
-		tearDownFuncs = append(tearDownFuncs, tearDown)
-	})
+	if os.Getenv(envExternalNetwork) == "" {
+		t.Run("create network", func(t *testing.T) {
+			tearDown := createNetwork(t, cli, ctx)
+			tearDownFuncs = append(tearDownFuncs, tearDown)
+		})
+	} else {
+		userDefinedNetwork = os.Getenv(envExternalNetwork)
+		managerExposedEndpoint = managerEndpoint
+		t.Logf("Using external network: %s", userDefinedNetwork)
+	}
 
 	t.Run("run elastic", func(t *testing.T) {
 		tearDown := runElastic(t, cli, ctx)

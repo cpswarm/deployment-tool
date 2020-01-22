@@ -42,8 +42,15 @@ go build -v code.linksmart.eu/dt/deployment-tool/agent
 
 ## Development
 ### Run tests
+Locally:
 ```bash
  go test ./tests -v -failfast
+```
+In a docker container:
+```bash
+docker network create test-network
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):$(pwd) -w $(pwd) --network=test-network -e EXTERNAL-NETWORK=test-network golang:1.12 go test ./tests -v -failfast
+docker network remove test-network
 ```
 
 ### Dependencies
