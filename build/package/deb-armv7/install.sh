@@ -11,8 +11,8 @@ fi
 
 serviceName=linksmart-deployment-agent
 wd=/var/local/$serviceName
-packageName=deployment-agent-linux-arm.deb
-downloadURL=https://pipelines.linksmart.eu/browse/CPSW-DTB/latest/artifact/shared/linux-arm-debian-package/$packageName
+packageName=linksmart-deployment-agent-armv7.deb
+downloadURL=https://pipelines.linksmart.eu/artifact/CPSW-DTB/shared/build-latest/Debian-packages/$packageName
 envFile=.env
 
 echo "================================================================================"
