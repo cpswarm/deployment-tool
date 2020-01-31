@@ -324,7 +324,7 @@ func (s *storage) GetTargets(tags []string, from, size int) (targets []Target, t
 	if searchResult.Hits.TotalHits > 0 {
 		//log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 
-		targets = make([]Target, searchResult.Hits.TotalHits)
+		targets = make([]Target, len(searchResult.Hits.Hits))
 		for i, hit := range searchResult.Hits.Hits {
 			err := json.Unmarshal(*hit.Source, &targets[i])
 			if err != nil {
@@ -503,7 +503,7 @@ func (s *storage) GetOrders(descr string, sortAsc bool, from, size int) (orders 
 	if searchResult.Hits.TotalHits > 0 {
 		log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 
-		orders = make([]Order, searchResult.Hits.TotalHits)
+		orders = make([]Order, len(searchResult.Hits.Hits))
 		for i, hit := range searchResult.Hits.Hits {
 			err := json.Unmarshal(*hit.Source, &orders[i])
 			if err != nil {
@@ -580,7 +580,7 @@ func (s *storage) GetLogs(target, task, stage, command, output, error, sortField
 	if searchResult.Hits.TotalHits > 0 {
 		//log.Printf("Found %d entries in %dms", searchResult.Hits.TotalHits, searchResult.TookInMillis)
 
-		logs = make([]Log, searchResult.Hits.TotalHits)
+		logs = make([]Log, len(searchResult.Hits.Hits))
 		for i, hit := range searchResult.Hits.Hits {
 			err := json.Unmarshal(*hit.Source, &logs[i])
 			if err != nil {
@@ -665,7 +665,7 @@ func (s *storage) GetTokens(name string) ([]TokenMeta, error) {
 
 	var tokens []TokenMeta
 	if searchResult.Hits.TotalHits > 0 {
-		tokens = make([]TokenMeta, searchResult.Hits.TotalHits)
+		tokens = make([]TokenMeta, len(searchResult.Hits.Hits))
 		for i, hit := range searchResult.Hits.Hits {
 			err := json.Unmarshal(*hit.Source, &tokens[i])
 			if err != nil {
