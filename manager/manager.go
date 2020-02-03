@@ -157,21 +157,6 @@ func (m *manager) getOrder(id string) (*storage.Order, error) {
 }
 
 func (m *manager) deleteOrder(id string) (found bool, err error) {
-	// check if order is complete
-	found, targets, err := m.getOrderStatus(id)
-	if err != nil {
-		return false, fmt.Errorf("error getting order status: %s", err)
-	}
-	if !found {
-		return false, nil
-	}
-	for id := range targets {
-		for stage, status := range targets[id] {
-			if status != model.StageEnd {
-				return false, fmt.Errorf("unable to delete unfinished order. Target %s pending end of %s", id, stage)
-			}
-		}
-	}
 	// remove logs
 	err = m.storage.DeleteLogs("", id)
 	if err != nil {
@@ -183,34 +168,6 @@ func (m *manager) deleteOrder(id string) (found bool, err error) {
 		return false, fmt.Errorf("error querying order: %s", err)
 	}
 	return found, nil
-}
-
-func (m *manager) getOrderStatus(id string) (found bool, targets map[string]map[string]string, err error) {
-	order, err := m.storage.GetOrder(id)
-	if err != nil {
-		return false, nil, fmt.Errorf("error querying order: %s", err)
-	}
-	if order == nil {
-		return false, nil, nil
-	}
-
-	list := m.getTargetList(order)
-	targets = make(map[string]map[string]string)
-	for i := range list {
-		targets[list[i]] = make(map[string]string)
-	}
-	const searchKeyword, stages, outputsPerStage = "stage", 3, 2
-	logs, _, err := m.storage.GetLogs("", id, "", "", searchKeyword, "", _time, true, 0, stages*outputsPerStage*len(targets))
-	if err != nil {
-		return false, nil, fmt.Errorf("error querying logs: %s", err)
-	}
-
-	for i := range logs {
-		if targets[logs[i].Target][logs[i].Stage] != model.StageEnd {
-			targets[logs[i].Target][logs[i].Stage] = logs[i].Output
-		}
-	}
-	return true, targets, nil
 }
 
 func (m *manager) stopOrder(id string) (found bool, list []string, err error) {
@@ -265,31 +222,6 @@ func (m *manager) getTarget(id string) (*storage.Target, error) {
 }
 
 func (m *manager) deleteTarget(id string) (found bool, err error) {
-	// stop running tasks
-	found, err = m.stopTargetOrders(id)
-	if err != nil {
-		return false, fmt.Errorf("error stopping order to delete target: %s", err)
-	}
-	if !found {
-		return false, nil
-	}
-	time.Sleep(time.Second) // wait for possible responses
-	// log the event
-	orders, err := m.getOrderList(id)
-	if err != nil {
-		return false, fmt.Errorf("error getting orders to delete target: %s", err)
-	}
-	for i := range orders {
-		_, targets, err := m.getOrderStatus(orders[i])
-		if err != nil {
-			return false, fmt.Errorf("error getting order status to delete target: %s", err)
-		}
-		for stage, status := range targets[id] {
-			if status != model.StageEnd {
-				m.storeLogFatal(orders[i], stage, "target has been deleted", id)
-			}
-		}
-	}
 	// delete
 	target, err := m.storage.DeleteTarget(id)
 	if err != nil {
@@ -298,27 +230,6 @@ func (m *manager) deleteTarget(id string) (found bool, err error) {
 	// remove key
 	m.pipe.OperationCh <- model.Operation{model.OperationAuthRemove, map[string]string{target.ID: target.PublicKey}}
 	return found, nil
-}
-
-func (m *manager) getOrderList(targetID string) (orders []string, err error) {
-	for from := 0; ; from += 100 {
-		ordersInPage, total, err := m.storage.GetOrders("", true, from, 100)
-		if err != nil {
-			return nil, err
-		}
-		for i := range ordersInPage {
-			for _, id := range m.getTargetList(&ordersInPage[i]) {
-				if id == targetID {
-					orders = append(orders, ordersInPage[i].ID)
-					break
-				}
-			}
-		}
-		if int64(from+len(ordersInPage)) == total {
-			break
-		}
-	}
-	return orders, nil
 }
 
 func (m *manager) stopTargetOrders(targetID string) (found bool, err error) {
@@ -848,6 +759,8 @@ func (m *manager) processResponse(response *model.Response) {
 			log.Printf("Error updating target: %s", err)
 		}
 	}
+
+	// TODO check if the target and order exist
 
 	// convert and store
 	logs := make([]storage.Log, len(response.Logs))
