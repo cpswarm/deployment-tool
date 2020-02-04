@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -48,6 +49,12 @@ func newExecutor(task, stage string, logEnqueue enqueueFunc, debug bool) *execut
 // execute executes a command
 func (e *executor) execute(command string) (success bool) {
 	e.sendLog(command, model.ExecStart, false)
+
+	// Use exec to replace the shell process, rather than making a subprocess.
+	// This is necessary to propagate interrupt signal to certain programs.
+	if !strings.HasPrefix(strings.TrimSpace(command), "exec") {
+		command = "exec " + command
+	}
 
 	bashCommand := []string{"/bin/sh", "-c", command}
 	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
