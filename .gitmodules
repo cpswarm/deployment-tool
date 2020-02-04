@@ -1,4 +1,0 @@
-[submodule "ui"]
-	path = ui
-	url = https://github.com/cpswarm/deployment-tool-ui.git
-	branch = master
