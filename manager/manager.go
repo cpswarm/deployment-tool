@@ -31,6 +31,7 @@ const (
 	ResponseBufferCap  = 100
 	TokenLength        = 12
 	TokenValidityDays  = 7
+	TokenPurgeInterval = time.Hour
 )
 
 type event struct {
@@ -53,6 +54,7 @@ func startManager(pipe model.Pipe, zmqConf model.ZeromqServerInfo, storageClient
 		return nil, fmt.Errorf("error creating keys for CA: %s", err)
 	}
 
+	go m.purgeExpiredTokens()
 	go m.manageResponses()
 	return m, nil
 }
@@ -430,6 +432,19 @@ func (m *manager) getServerInfo() (*model.ServerInfo, error) {
 		ZeroMQ:           m.zmqConf,
 		PublicKeySwarmio: cert.PublicKey,
 	}, nil
+}
+
+func (m *manager) purgeExpiredTokens() {
+	for t := time.Now(); true; t = <-time.Tick(TokenPurgeInterval) {
+		total, err := m.storage.PurgeOldTokens(t.AddDate(0, 0, -TokenValidityDays))
+		if err != nil {
+			log.Printf("Error purging tokens: %s", err)
+			continue
+		}
+		if total > 0 {
+			log.Printf("Purged %d old tokens.", total)
+		}
+	}
 }
 
 type tokenSet struct {

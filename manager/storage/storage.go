@@ -41,6 +41,7 @@ type Storage interface {
 	findToken(hash string) (found bool, err error)
 	DeleteTokenTrans(hash string) (found bool, trans *transaction, err error)
 	DeleteTokens(name string) error
+	PurgeOldTokens(to time.Time) (total int64, err error)
 	//
 	DoBulk(...interface{}) error
 }
@@ -732,6 +733,16 @@ func (s *storage) DeleteTokens(name string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *storage) PurgeOldTokens(to time.Time) (int64, error) {
+	query := elastic.NewBoolQuery().Filter(elastic.NewRangeQuery("expiresAt").To(to))
+
+	res, err := s.client.DeleteByQuery(indexToken).Query(query).Do(s.ctx)
+	if err != nil {
+		return 0, err
+	}
+	return res.Total, nil
 }
 
 // DoBulk performs elastic.BulkableRequests
