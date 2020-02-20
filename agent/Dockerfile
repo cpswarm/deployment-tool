@@ -1,8 +1,9 @@
 FROM ubuntu:bionic
 
+COPY bin/deployment-agent-linux-amd64 /home/
+
 WORKDIR /home
 
-ADD https://pipelines.linksmart.eu/artifact/CPSW-DTB/shared/build-latest/linux-amd64-binary-distributions/deployment-agent-linux-amd64 .
 RUN chmod +x deployment-agent-linux-amd64
 
 ENV PRIVATE_KEY=agent.key

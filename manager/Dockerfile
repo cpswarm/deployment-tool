@@ -1,8 +1,9 @@
 FROM ubuntu:bionic
 
+COPY bin/deployment-manager-linux-amd64 /home/
+
 WORKDIR /home
 
-ADD https://pipelines.linksmart.eu/artifact/CPSW-DTB/shared/build-latest/linux-amd64-binary-distributions/deployment-manager-linux-amd64 .
 RUN chmod +x deployment-manager-linux-amd64
 
 ENV PRIVATE_KEY=/home/keys/manager.key
