@@ -231,7 +231,7 @@ func (m *manager) deleteTarget(id string) (found bool, err error) {
 	}
 	// remove key
 	m.pipe.OperationCh <- model.Operation{model.OperationAuthRemove, map[string]string{target.ID: target.PublicKey}}
-	return found, nil
+	return true, nil
 }
 
 func (m *manager) stopTargetOrders(targetID string) (found bool, err error) {
