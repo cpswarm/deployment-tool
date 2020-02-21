@@ -38,10 +38,9 @@ type Storage interface {
 	//
 	GetTokens(name string) ([]TokenMeta, error)
 	AddToken(TokenHashed) (duplicate bool, err error)
-	findToken(hash string) (found bool, err error)
-	DeleteTokenTrans(hash string) (found bool, trans *transaction, err error)
+	DeleteTokenTrans(hash string) (valid bool, trans *transaction, err error)
 	DeleteTokens(name string) error
-	PurgeOldTokens(to time.Time) (total int64, err error)
+	PurgeExpiredTokens() (total int64, err error)
 	//
 	DoBulk(...interface{}) error
 }
@@ -657,8 +656,10 @@ func (s *storage) GetTokens(name string) ([]TokenMeta, error) {
 		query.Must(elastic.NewMatchQuery("name", name))
 	}
 
+	fetch := elastic.NewFetchSourceContext(true).Include("name", "expiresAt")
+
 	// TODO paginate or use the scroll service
-	searchResult, err := s.client.Search().Index(indexToken).Type(typeFixed).
+	searchResult, err := s.client.Search().Index(indexToken).Type(typeFixed).FetchSourceContext(fetch).
 		Query(query).Size(1000).Sort("expiresAt", false).Do(s.ctx)
 	if err != nil {
 		return nil, err
@@ -693,25 +694,36 @@ func (s *storage) AddToken(token TokenHashed) (duplicate bool, err error) {
 	return false, nil
 }
 
-func (s *storage) findToken(hash string) (found bool, err error) {
-	_, err = s.client.Get().Index(indexToken).Type(typeFixed).FetchSource(false).
+func (s *storage) getToken(hash string) (tokenMeta *TokenMeta, err error) {
+	fetch := elastic.NewFetchSourceContext(true).Include("expiresAt")
+
+	res, err := s.client.Get().Index(indexToken).Type(typeFixed).FetchSourceContext(fetch).
 		Id(hash).Do(s.ctx)
 	if err != nil {
 		e := err.(*elastic.Error)
 		if e.Status == http.StatusNotFound {
-			return false, nil
+			return nil, nil
 		}
-		return false, err
+		return nil, err
 	}
-	return true, nil
+
+	err = json.Unmarshal(*res.Source, &tokenMeta)
+	if err != nil {
+		return nil, err
+	}
 	//log.Printf("Got %s/%s v%d", res.Index, res.Id, res.Version)
+	return tokenMeta, nil
 }
 
 // DeleteTokenTrans prepares a delete operation and returns an object to commit and/or release the transaction
-func (s *storage) DeleteTokenTrans(hash string) (found bool, trans *transaction, err error) {
-	found, err = s.findToken(hash)
-	if err != nil || !found {
+func (s *storage) DeleteTokenTrans(hash string) (valid bool, trans *transaction, err error) {
+	tokenMeta, err := s.getToken(hash)
+	if err != nil {
 		return false, nil, err
+	}
+	// some old tokens may still be unpurged
+	if tokenMeta.ExpiresAt < model.UnixTime() {
+		return false, nil, nil
 	}
 
 	s.tokenLocker.Lock()
@@ -735,8 +747,8 @@ func (s *storage) DeleteTokens(name string) error {
 	return nil
 }
 
-func (s *storage) PurgeOldTokens(to time.Time) (int64, error) {
-	query := elastic.NewBoolQuery().Filter(elastic.NewRangeQuery("expiresAt").To(to))
+func (s *storage) PurgeExpiredTokens() (int64, error) {
+	query := elastic.NewBoolQuery().Filter(elastic.NewRangeQuery("expiresAt").To(time.Now()))
 
 	res, err := s.client.DeleteByQuery(indexToken).Query(query).Do(s.ctx)
 	if err != nil {

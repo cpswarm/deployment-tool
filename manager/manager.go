@@ -435,8 +435,8 @@ func (m *manager) getServerInfo() (*model.ServerInfo, error) {
 }
 
 func (m *manager) purgeExpiredTokens() {
-	for t := time.Now(); true; t = <-time.Tick(TokenPurgeInterval) {
-		total, err := m.storage.PurgeOldTokens(t.AddDate(0, 0, -TokenValidityDays))
+	for ; true; <-time.Tick(TokenPurgeInterval) {
+		total, err := m.storage.PurgeExpiredTokens()
 		if err != nil {
 			log.Printf("Error purging tokens: %s", err)
 			continue
