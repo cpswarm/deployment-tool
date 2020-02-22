@@ -53,11 +53,11 @@ func (e *executor) execute(command string) (success bool) {
 	// Use exec to replace the shell process, rather than making a subprocess.
 	// This is necessary to propagate interrupt signal to certain programs.
 	if !strings.HasPrefix(strings.TrimSpace(command), "exec") {
-		command = "exec " + command
+		e.cmd = exec.Command("/bin/sh", "-c", "exec "+command)
+	} else {
+		e.cmd = exec.Command("/bin/sh", "-c", command)
 	}
 
-	bashCommand := []string{"/bin/sh", "-c", command}
-	e.cmd = exec.Command(bashCommand[0], bashCommand[1:]...)
 	defer func() { e.cmd = nil }()
 
 	e.cmd.Dir = e.workDir
