@@ -721,6 +721,9 @@ func (s *storage) DeleteTokenTrans(hash string) (valid bool, trans *transaction,
 	if err != nil {
 		return false, nil, err
 	}
+	if tokenMeta == nil {
+		return false, nil, nil
+	}
 	// some old tokens may still be unpurged
 	if tokenMeta.ExpiresAt < model.UnixTime() {
 		return false, nil, nil
